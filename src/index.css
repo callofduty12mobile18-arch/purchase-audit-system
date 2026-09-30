@@ -1,0 +1,162 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    color-scheme: light;
+  }
+
+  body {
+    background-color: #F5F7FF;
+    color: #1F1F2C;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  @media (min-width: 768px) {
+    input,
+    select,
+    textarea {
+      font-size: 0.875rem;
+    }
+  }
+}
+
+@layer components {
+  .page-title {
+    @apply text-xl sm:text-2xl font-bold tracking-tight text-[#1F1F2C] flex items-center gap-2.5;
+  }
+
+  .page-subtitle {
+    @apply text-xs sm:text-sm text-[#6C7383] mt-1 leading-relaxed max-w-2xl;
+  }
+
+  .glass-card {
+    @apply bg-white border border-[#ECEEF5] shadow-skydash rounded-2xl;
+  }
+
+  .glass-panel {
+    @apply bg-white border border-[#ECEEF5] rounded-2xl shadow-skydash-lg;
+  }
+
+  .tap-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F5F7FF;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #C8D4FF;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #98BDFF;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm 15mm;
+  }
+
+  body {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  header,
+  nav,
+  aside,
+  .no-print,
+  button,
+  .sidebar,
+  .app-header {
+    display: none !important;
+  }
+
+  main, .printable-container {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: #ffffff !important;
+  }
+
+  .printable-document {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    border: 1px solid #4B49AC !important;
+    border-radius: 0 !important;
+    padding: 24px !important;
+    box-shadow: none !important;
+    page-break-inside: avoid;
+  }
+
+  .printable-document table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  .printable-document th {
+    background-color: #F5F7FF !important;
+    color: #4B49AC !important;
+    border-bottom: 2px solid #4B49AC !important;
+    padding: 8px 12px !important;
+    font-size: 11px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+  }
+
+  .printable-document td {
+    border-bottom: 1px solid #ECEEF5 !important;
+    padding: 10px 12px !important;
+    color: #1F1F2C !important;
+    font-size: 12px !important;
+  }
+
+  .printable-document tr:nth-child(even) {
+    background-color: #FAFAFE !important;
+  }
+
+  .print-text-dark {
+    color: #1F1F2C !important;
+  }
+
+  .print-text-muted {
+    color: #6C7383 !important;
+  }
+
+  .print-bg-light {
+    background-color: #F5F7FF !important;
+  }
+
+  .print-border {
+    border-color: #ECEEF5 !important;
+  }
+}
