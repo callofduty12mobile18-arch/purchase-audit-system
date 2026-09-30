@@ -205,13 +205,18 @@ export const dbService = {
     return (data as PurchaseInvoice) || null;
   },
 
-  checkDuplicateInvoice: async (supplierId: string, invoiceNumber: string): Promise<PurchaseInvoice | null> => {
-    const { data, error } = await supabase
+  checkDuplicateInvoice: async (supplierId: string, invoiceNumber: string, invoiceDate?: string): Promise<PurchaseInvoice | null> => {
+    let query = supabase
       .from('purchase_invoices')
       .select('*')
       .eq('supplier_id', supplierId)
-      .ilike('invoice_number', invoiceNumber.trim())
-      .maybeSingle();
+      .ilike('invoice_number', invoiceNumber.trim());
+
+    if (invoiceDate) {
+      query = query.eq('invoice_date', invoiceDate);
+    }
+
+    const { data, error } = await query.maybeSingle();
 
     if (error) {
       console.error('Duplicate invoice check query error:', error);
@@ -276,20 +281,24 @@ export const dbService = {
     const currentProducts = [...products];
 
     for (const itemData of extractedData.items) {
+      const effectiveRate = itemData.each_pack_rate || itemData.purchase_rate || 0;
+      const effectiveQty = itemData.pack_qty || itemData.quantity || itemData.qty || 1;
+      const sellingPrice = itemData.mrp_rsp || Math.round(effectiveRate * 1.3);
+
       let product = currentProducts.find(
-        p => p.supplier_item_name.trim().toLowerCase() === itemData.supplier_item_name.trim().toLowerCase()
+        p => p.supplier_item_name.trim().toLowerCase() === (itemData.supplier_item_name || itemData.item_name || '').trim().toLowerCase()
       );
 
       if (!product) {
         const { data: newProd, error: prodErr } = await supabase
           .from('products')
           .insert({
-            supplier_item_name: itemData.supplier_item_name,
-            nickname: itemData.supplier_item_name,
+            supplier_item_name: itemData.supplier_item_name || itemData.item_name,
+            nickname: itemData.item_name || itemData.supplier_item_name,
             hsn: itemData.hsn,
-            uom: itemData.uom || 'PCS',
-            current_purchase_ref_price: itemData.purchase_rate,
-            current_selling_price: Math.round(itemData.purchase_rate * 1.4),
+            uom: itemData.uom || 'PAC',
+            current_purchase_ref_price: effectiveRate,
+            current_selling_price: sellingPrice,
             min_stock_level: 5,
             is_active: true,
             created_at: now,
@@ -303,12 +312,13 @@ export const dbService = {
           currentProducts.push(product);
         }
       } else {
-        if (product.current_purchase_ref_price !== itemData.purchase_rate) {
+        if (effectiveRate > 0 && product.current_purchase_ref_price !== effectiveRate) {
           const oldPrice = product.current_purchase_ref_price;
           await supabase
             .from('products')
             .update({
-              current_purchase_ref_price: itemData.purchase_rate,
+              current_purchase_ref_price: effectiveRate,
+              current_selling_price: sellingPrice || product.current_selling_price,
               updated_at: now
             })
             .eq('id', product.id);
@@ -317,7 +327,7 @@ export const dbService = {
             product_id: product.id,
             price_type: 'PURCHASE_REF',
             old_value: oldPrice,
-            new_value: itemData.purchase_rate,
+            new_value: effectiveRate,
             effective_from: now,
             reason: `Invoice verification #${extractedData.invoice_number}`,
           });
@@ -327,17 +337,17 @@ export const dbService = {
       itemsToInsert.push({
         purchase_invoice_id: invoiceId,
         product_id: product?.id,
-        supplier_item_name_snapshot: itemData.supplier_item_name,
+        supplier_item_name_snapshot: itemData.supplier_item_name || itemData.item_name,
         hsn_snapshot: itemData.hsn,
-        quantity: itemData.quantity,
-        uom_snapshot: itemData.uom || 'PCS',
-        purchase_rate: itemData.purchase_rate,
+        quantity: effectiveQty,
+        uom_snapshot: itemData.uom || 'PAC',
+        purchase_rate: effectiveRate,
         gst_rate: itemData.gst_rate,
         taxable_value: itemData.taxable_value,
         cgst: itemData.cgst,
         sgst: itemData.sgst,
         igst: itemData.igst,
-        total: itemData.total,
+        total: itemData.invoice_amount || itemData.total,
         created_at: now
       });
     }

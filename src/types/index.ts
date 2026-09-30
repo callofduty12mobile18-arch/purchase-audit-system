@@ -149,21 +149,42 @@ export interface AuditLog {
   timestamp: string;
 }
 
+export interface RowValidation {
+  valid: boolean;
+  warnings: string[];
+}
+
+export interface InvoiceValidation {
+  valid: boolean;
+  warnings: string[];
+}
+
 // Extracted OCR Data Interface
 export interface ExtractedOcrItem {
+  item_name?: string;
   supplier_item_name: string;
-  hsn?: string;
+  qty?: number;
   quantity: number;
+  mrp_rsp?: number;
+  pack_qty?: number;
+  invoice_amount?: number;
+  each_pack_rate?: number;
+  hsn?: string;
   uom: string;
   purchase_rate: number;
+  invoice_value?: number;
+  net_invoice_value?: number;
   gst_rate: number;
   taxable_value: number;
   cgst: number;
   sgst: number;
   igst: number;
   discount?: number;
+  total_tax?: number;
   total: number;
   confidence: number; // 0.0 to 1.0
+  needs_review?: boolean;
+  validation?: RowValidation;
 }
 
 export interface ExtractedOcrInvoice {
@@ -174,6 +195,8 @@ export interface ExtractedOcrInvoice {
   payment_mode: PaymentMode;
   payment_status: PaymentStatus;
   items: ExtractedOcrItem[];
+  total_items?: number;
+  total_packs?: number;
   subtotal: number;
   taxable_amount: number;
   cgst: number;
@@ -191,5 +214,7 @@ export interface ExtractedOcrInvoice {
     grand_total?: number;
     [key: string]: number | undefined;
   };
+  validation?: InvoiceValidation;
+  needs_review?: boolean;
   raw_text?: string;
 }

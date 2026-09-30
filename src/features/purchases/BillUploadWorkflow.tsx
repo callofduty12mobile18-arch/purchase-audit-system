@@ -114,20 +114,25 @@ export const BillUploadWorkflow: React.FC = () => {
   };
 
   const recalcFromItems = (items: ExtractedOcrItem[], roundOff = ocrResult?.round_off ?? 0) => {
-    const subtotal = items.reduce((sum, i) => sum + (Number(i.taxable_value) || 0), 0);
+    const subtotal = items.reduce((sum, i) => sum + (Number(i.taxable_value) || (Number(i.invoice_amount || i.total) / 1.4)), 0);
     const cgstTotal = items.reduce((sum, i) => sum + (Number(i.cgst) || 0), 0);
     const sgstTotal = items.reduce((sum, i) => sum + (Number(i.sgst) || 0), 0);
     const igstTotal = items.reduce((sum, i) => sum + (Number(i.igst) || 0), 0);
     const totalTax = cgstTotal + sgstTotal + igstTotal;
+    const itemsTotal = items.reduce((sum, i) => sum + (Number(i.invoice_amount ?? i.total) || 0), 0);
+    const totalPacks = items.reduce((sum, i) => sum + (Number(i.pack_qty) || 0), 0);
+
     return {
       items,
+      total_items: items.length,
+      total_packs: Math.round(totalPacks),
       subtotal: Number(subtotal.toFixed(2)),
       taxable_amount: Number(subtotal.toFixed(2)),
       cgst: Number(cgstTotal.toFixed(2)),
       sgst: Number(sgstTotal.toFixed(2)),
       igst: Number(igstTotal.toFixed(2)),
       total_tax: Number(totalTax.toFixed(2)),
-      grand_total: Number((subtotal + totalTax + roundOff).toFixed(2)),
+      grand_total: Number(itemsTotal > 0 ? (itemsTotal + roundOff).toFixed(2) : (subtotal + totalTax + roundOff).toFixed(2)),
     };
   };
 
@@ -165,32 +170,63 @@ export const BillUploadWorkflow: React.FC = () => {
     const items = [...ocrResult.items];
     const item = { ...items[index], [field]: value } as ExtractedOcrItem;
 
-    // Auto math calculation on item changes
-    if (['quantity', 'purchase_rate', 'gst_rate'].includes(field)) {
-      const qty = Number(item.quantity) || 0;
-      const rate = Number(item.purchase_rate) || 0;
-      const gstRate = Number(item.gst_rate) || 0;
+    if (field === 'supplier_item_name' || field === 'item_name') {
+      item.item_name = String(value);
+      item.supplier_item_name = String(value);
+    } else if (field === 'qty' || field === 'quantity') {
+      item.qty = Number(value) || 0;
+      item.quantity = Number(value) || 0;
+    } else if (field === 'mrp_rsp') {
+      item.mrp_rsp = Number(value) || 0;
+    } else if (field === 'pack_qty') {
+      item.pack_qty = Number(value) || 0;
+    } else if (field === 'invoice_amount' || field === 'total') {
+      item.invoice_amount = Number(value) || 0;
+      item.total = Number(value) || 0;
+    }
 
-      item.taxable_value = Number((qty * rate).toFixed(2));
-      item.cgst = Number(((item.taxable_value * (gstRate / 2)) / 100).toFixed(2));
-      item.sgst = Number(((item.taxable_value * (gstRate / 2)) / 100).toFixed(2));
-      item.igst = 0;
-      item.total = Number((item.taxable_value + item.cgst + item.sgst).toFixed(2));
-    } else if (field === 'taxable_value') {
+    // Auto math calculation on item changes:
+    // Deterministic each_pack_rate = invoice_amount / pack_qty
+    const packQty = Number(item.pack_qty) || 0;
+    const invAmt = Number(item.invoice_amount ?? item.total) || 0;
+    if (packQty > 0) {
+      item.each_pack_rate = Number((invAmt / packQty).toFixed(2));
+    } else {
+      item.each_pack_rate = 0;
+    }
+
+    if (field === 'taxable_value') {
       const taxVal = Number(value) || 0;
-      const gstRate = Number(item.gst_rate) || 0;
+      const gstRate = Number(item.gst_rate) || 40;
       item.taxable_value = taxVal;
       item.cgst = Number(((taxVal * (gstRate / 2)) / 100).toFixed(2));
       item.sgst = Number(((taxVal * (gstRate / 2)) / 100).toFixed(2));
       item.igst = 0;
       item.total = Number((taxVal + item.cgst + item.sgst).toFixed(2));
-    } else if (['cgst', 'sgst', 'igst'].includes(field)) {
-      const taxVal = Number(item.taxable_value) || 0;
-      const cgst = Number(item.cgst) || 0;
-      const sgst = Number(item.sgst) || 0;
-      const igst = Number(item.igst) || 0;
-      item.total = Number((taxVal + cgst + sgst + igst).toFixed(2));
+      item.invoice_amount = item.total;
+    } else if (['purchase_rate', 'gst_rate'].includes(field)) {
+      const qty = Number(item.qty || item.quantity) || 0;
+      const rate = Number(item.purchase_rate) || 0;
+      const gstRate = Number(item.gst_rate) || 40;
+      if (rate > 0 && qty > 0) {
+        item.taxable_value = Number((qty * rate).toFixed(2));
+        item.cgst = Number(((item.taxable_value * (gstRate / 2)) / 100).toFixed(2));
+        item.sgst = Number(((item.taxable_value * (gstRate / 2)) / 100).toFixed(2));
+        item.igst = 0;
+        item.total = Number((item.taxable_value + item.cgst + item.sgst).toFixed(2));
+        item.invoice_amount = item.total;
+      }
     }
+
+    // Re-check validation
+    const warnings: string[] = [];
+    if (!item.pack_qty || item.pack_qty <= 0) warnings.push('Pack quantity is missing');
+    if (!item.invoice_amount || item.invoice_amount <= 0) warnings.push('Invoice amount is missing');
+    if (item.mrp_rsp && item.each_pack_rate && item.each_pack_rate > item.mrp_rsp * 1.05) {
+      warnings.push(`Each pack rate (₹${item.each_pack_rate}) exceeds MRP (₹${item.mrp_rsp})`);
+    }
+    item.needs_review = warnings.length > 0;
+    item.validation = { valid: warnings.length === 0, warnings };
 
     items[index] = item;
     setOcrResult({
@@ -202,22 +238,31 @@ export const BillUploadWorkflow: React.FC = () => {
   const handleAddItem = () => {
     if (!ocrResult) return;
     const newItem: ExtractedOcrItem = {
+      item_name: 'New Line Item',
       supplier_item_name: 'New Line Item',
-      hsn: '',
+      hsn: '24022090',
+      qty: 1,
       quantity: 1,
-      uom: 'PCS',
+      uom: 'PAC',
+      mrp_rsp: 0,
+      pack_qty: 100,
+      invoice_amount: 0,
+      each_pack_rate: 0,
       purchase_rate: 0,
-      gst_rate: 18,
+      gst_rate: 40,
       taxable_value: 0,
       cgst: 0,
       sgst: 0,
       igst: 0,
       total: 0,
-      confidence: 1.0
+      confidence: 1.0,
+      needs_review: false,
+      validation: { valid: true, warnings: [] },
     };
+    const items = [...ocrResult.items, newItem];
     setOcrResult({
       ...ocrResult,
-      items: [...ocrResult.items, newItem]
+      ...recalcFromItems(items, ocrResult.round_off),
     });
   };
 
@@ -245,7 +290,11 @@ export const BillUploadWorkflow: React.FC = () => {
       );
 
       if (matchedSupplier) {
-        const duplicate = await dbService.checkDuplicateInvoice(matchedSupplier.id, ocrResult.invoice_number);
+        const duplicate = await dbService.checkDuplicateInvoice(
+          matchedSupplier.id,
+          ocrResult.invoice_number,
+          ocrResult.invoice_date
+        );
         if (duplicate) {
           setExistingDuplicate(duplicate);
           setShowDuplicateModal(true);
@@ -625,16 +674,33 @@ export const BillUploadWorkflow: React.FC = () => {
                     </Button>
                   </div>
 
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     {ocrResult.items.map((item, idx) => (
-                      <div key={idx} className="p-4 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5] space-y-3 relative group">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs font-mono font-bold text-[#4B49AC] px-2 py-0.5 rounded bg-white border border-[#D5DCED]">#{idx + 1}</span>
+                      <div
+                        key={idx}
+                        className={`p-4 rounded-2xl border transition-all ${
+                          item.needs_review
+                            ? 'bg-amber-50/50 border-amber-300 shadow-sm ring-1 ring-amber-300'
+                            : 'bg-white border-[#ECEEF5] shadow-xs'
+                        } space-y-3.5 relative group`}
+                      >
+                        {/* Item Card Top Bar */}
+                        <div className="flex items-center justify-between gap-2 border-b border-[#ECEEF5] pb-2.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-mono font-bold text-[#4B49AC] px-2.5 py-0.5 rounded-lg bg-[#F5F7FF] border border-[#D5DCED]">
+                              #{idx + 1}
+                            </span>
+                            {item.needs_review ? (
+                              <Badge variant="warning">⚠️ Requires Review</Badge>
+                            ) : (
+                              <Badge variant="success">✓ Verified</Badge>
+                            )}
+                          </div>
                           <div className="flex items-center gap-2">
                             {getConfidenceBadge(item.confidence)}
                             <button
                               onClick={() => handleRemoveItem(idx)}
-                              className="text-[#8F93A0] hover:text-rose-600 p-1.5 rounded-lg hover:bg-white transition-colors"
+                              className="text-[#8F93A0] hover:text-rose-600 p-1.5 rounded-lg hover:bg-[#F5F7FF] transition-colors"
                               title="Delete Item"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -642,41 +708,85 @@ export const BillUploadWorkflow: React.FC = () => {
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-                          <div className="sm:col-span-5">
+                        {/* Row Validation Warnings */}
+                        {item.validation?.warnings && item.validation.warnings.length > 0 && (
+                          <div className="px-3 py-1.5 bg-amber-100/70 border border-amber-300 text-amber-900 rounded-xl text-xs flex items-center gap-2">
+                            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                            <span className="font-medium">{item.validation.warnings.join(' • ')}</span>
+                          </div>
+                        )}
+
+                        {/* PRIMARY 6-COLUMN WHOLESALE GRID */}
+                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                          <div className="sm:col-span-4">
                             <Input
-                              label="Supplier Item Name (Exact Text)"
-                              value={item.supplier_item_name}
-                              onChange={(e) => handleItemChange(idx, 'supplier_item_name', e.target.value)}
+                              label="Item"
+                              value={item.item_name || item.supplier_item_name}
+                              onChange={(e) => handleItemChange(idx, 'item_name', e.target.value)}
                             />
                           </div>
-                          <div className="sm:col-span-2">
-                            <Input
-                              label="HSN"
-                              value={item.hsn || ''}
-                              onChange={(e) => handleItemChange(idx, 'hsn', e.target.value)}
-                            />
-                          </div>
-                          <div className="sm:col-span-2">
+                          <div className="sm:col-span-1">
                             <Input
                               label="Qty"
                               type="number"
-                              value={item.quantity}
-                              onChange={(e) => handleItemChange(idx, 'quantity', parseFloat(e.target.value) || 0)}
+                              step="0.1"
+                              value={item.qty ?? item.quantity}
+                              onChange={(e) => handleItemChange(idx, 'qty', parseFloat(e.target.value) || 0)}
                             />
                           </div>
-                          <div className="sm:col-span-3">
+                          <div className="sm:col-span-2">
                             <Input
-                              label="UOM"
-                              value={item.uom}
-                              onChange={(e) => handleItemChange(idx, 'uom', e.target.value)}
+                              label="MRP / RSP (₹)"
+                              type="number"
+                              step="0.01"
+                              value={item.mrp_rsp ?? 0}
+                              onChange={(e) => handleItemChange(idx, 'mrp_rsp', parseFloat(e.target.value) || 0)}
                             />
+                          </div>
+                          <div className="sm:col-span-1">
+                            <Input
+                              label="Pack Qty"
+                              type="number"
+                              step="1"
+                              value={item.pack_qty ?? 0}
+                              onChange={(e) => handleItemChange(idx, 'pack_qty', parseFloat(e.target.value) || 0)}
+                            />
+                          </div>
+                          <div className="sm:col-span-2">
+                            <Input
+                              label="Invoice Amount (₹)"
+                              type="number"
+                              step="0.01"
+                              className="font-bold text-[#1F1F2C]"
+                              value={item.invoice_amount ?? item.total}
+                              onChange={(e) => handleItemChange(idx, 'invoice_amount', parseFloat(e.target.value) || 0)}
+                            />
+                          </div>
+                          <div className="sm:col-span-2">
+                            <label className="block text-xs font-semibold text-[#1F1F2C] mb-1.5">Each Pack Rate</label>
+                            <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-[#F5F7FF] border border-[#7DA0FA]/50 shadow-xs min-h-[38px]">
+                              <span className="text-sm font-extrabold text-[#4B49AC] font-mono">
+                                ₹{(item.each_pack_rate || (item.pack_qty ? (item.invoice_amount ?? item.total) / item.pack_qty : 0)).toFixed(2)}
+                              </span>
+                              <span className="text-[9px] text-[#6C7383] font-semibold uppercase tracking-wider">₹/PAC</span>
+                            </div>
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+                        {/* SECONDARY ROW: HSN, UOM, Base Rate, GST %, Taxable */}
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-1.5 text-xs border-t border-[#ECEEF5]">
                           <Input
-                            label="Rate (₹)"
+                            label="HSN / SAC"
+                            value={item.hsn || ''}
+                            onChange={(e) => handleItemChange(idx, 'hsn', e.target.value)}
+                          />
+                          <Input
+                            label="UOM"
+                            value={item.uom}
+                            onChange={(e) => handleItemChange(idx, 'uom', e.target.value)}
+                          />
+                          <Input
+                            label="Base Rate (₹)"
                             type="number"
                             step="0.01"
                             value={item.purchase_rate}
@@ -694,13 +804,6 @@ export const BillUploadWorkflow: React.FC = () => {
                             readOnly
                             className="bg-[#F8F9FE] text-[#6C7383]"
                             value={item.taxable_value}
-                          />
-                          <Input
-                            label="Total (₹)"
-                            type="number"
-                            readOnly
-                            className="bg-[#F8F9FE] text-[#4B49AC] font-bold"
-                            value={item.total}
                           />
                         </div>
                       </div>

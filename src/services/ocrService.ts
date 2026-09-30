@@ -18,10 +18,16 @@ export const createBlankInvoice = (): ExtractedOcrInvoice => ({
   overall_confidence: 0,
   items: [
     {
+      item_name: '',
       supplier_item_name: '',
       hsn: '',
+      qty: 1,
       quantity: 1,
       uom: 'PAC',
+      mrp_rsp: 0,
+      pack_qty: 100,
+      invoice_amount: 0,
+      each_pack_rate: 0,
       purchase_rate: 0,
       gst_rate: 40,
       taxable_value: 0,
@@ -29,7 +35,8 @@ export const createBlankInvoice = (): ExtractedOcrInvoice => ({
       sgst: 0,
       igst: 0,
       total: 0,
-      confidence: 0,
+      confidence: 1.0,
+      needs_review: false,
     },
   ],
 });
