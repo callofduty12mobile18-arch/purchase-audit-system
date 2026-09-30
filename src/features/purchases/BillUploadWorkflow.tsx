@@ -38,11 +38,30 @@ export const BillUploadWorkflow: React.FC = () => {
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [existingDuplicate, setExistingDuplicate] = useState<PurchaseInvoice | null>(null);
   const [serviceStatus, setServiceStatus] = useState<{ isOnline: boolean; detail?: string } | null>(null);
+  const [isCheckingHealth, setIsCheckingHealth] = useState(true);
   const isPdf = selectedFile?.type === 'application/pdf' || selectedFile?.name.toLowerCase().endsWith('.pdf');
 
+  const checkHealth = async () => {
+    setIsCheckingHealth(true);
+    try {
+      const status = await ocrService.checkServiceHealth();
+      setServiceStatus(status);
+    } catch {
+      setServiceStatus({ isOnline: false, detail: 'Waking up cloud service...' });
+    } finally {
+      setIsCheckingHealth(false);
+    }
+  };
+
   useEffect(() => {
-    ocrService.checkServiceHealth().then(setServiceStatus);
-  }, []);
+    checkHealth();
+    // Poll every 5 seconds until online, then every 30 seconds
+    const interval = setInterval(() => {
+      checkHealth();
+    }, serviceStatus?.isOnline ? 30000 : 5000);
+
+    return () => clearInterval(interval);
+  }, [serviceStatus?.isOnline]);
 
   useEffect(() => {
     return () => {
@@ -273,14 +292,28 @@ export const BillUploadWorkflow: React.FC = () => {
                 Upload paper bills, receipts, or PDF invoices. High-accuracy local OCR extracts supplier info, HSN codes, rates & GST taxes.
               </p>
             </div>
-            {serviceStatus && (
-              <div className="flex items-center justify-center sm:justify-end gap-2 px-3.5 py-1.5 rounded-xl bg-white border border-[#ECEEF5] shadow-xs shrink-0 self-center sm:self-auto">
-                <div className={`w-2.5 h-2.5 rounded-full ${serviceStatus.isOnline ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : 'bg-amber-400 animate-pulse'}`} />
-                <span className="text-xs font-semibold text-[#1F1F2C]">
-                  {serviceStatus.isOnline ? 'OCR Engine: Online' : 'OCR Engine: Offline'}
-                </span>
-              </div>
-            )}
+            <div
+              onClick={checkHealth}
+              className="flex items-center justify-center sm:justify-end gap-2 px-3.5 py-1.5 rounded-xl bg-white border border-[#ECEEF5] shadow-xs shrink-0 self-center sm:self-auto cursor-pointer hover:bg-[#F5F7FF] transition-colors"
+              title="Click to recheck service status"
+            >
+              <div
+                className={`w-2.5 h-2.5 rounded-full ${
+                  serviceStatus?.isOnline
+                    ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50'
+                    : isCheckingHealth
+                    ? 'bg-blue-500 animate-ping'
+                    : 'bg-amber-400 animate-pulse'
+                }`}
+              />
+              <span className="text-xs font-semibold text-[#1F1F2C]">
+                {serviceStatus?.isOnline
+                  ? 'OCR Engine: Online'
+                  : isCheckingHealth
+                  ? 'OCR Engine: Checking...'
+                  : 'OCR Engine: Waking up (Tap to refresh)'}
+              </span>
+            </div>
           </div>
 
           <div
