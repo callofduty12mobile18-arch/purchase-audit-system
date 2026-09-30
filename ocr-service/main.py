@@ -44,17 +44,26 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS Configuration
+# Robust Cross-Origin Resource Sharing (CORS) for Cloud & Mobile
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS if isinstance(settings.ALLOWED_ORIGINS, list) else [settings.ALLOWED_ORIGINS],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
 
 
+@app.get("/")
+@app.head("/")
+async def root():
+    """Root endpoint for status verification."""
+    return {"service": "invoice-ocr-service", "status": "running"}
+
+
 @app.get("/health", response_model=HealthResponse)
+@app.head("/health")
 async def health_check():
     """Health check endpoint to report service and model status."""
     engine = OcrEngine.get_instance()

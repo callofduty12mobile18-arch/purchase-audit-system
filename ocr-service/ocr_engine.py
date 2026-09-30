@@ -92,16 +92,27 @@ def pdf_bytes_to_images(pdf_bytes: bytes, dpi: int = 200) -> List[np.ndarray]:
     return images
 
 
+from PIL import Image, ImageOps
+
 def bytes_to_images(file_bytes: bytes, filename: str) -> List[np.ndarray]:
-    """Convert uploaded file bytes (PDF or image) into a list of OpenCV BGR images."""
+    """Convert uploaded file bytes (PDF or image) into a list of OpenCV BGR images with EXIF orientation correction."""
     lower_name = filename.lower()
 
     if lower_name.endswith(".pdf"):
         return pdf_bytes_to_images(file_bytes)
     else:
-        # Standard raster image (JPG, PNG, WEBP)
-        nparr = np.frombuffer(file_bytes, np.uint8)
-        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        if img is None:
-            raise ValueError(f"Could not decode image file: {filename}")
-        return [img]
+        # Standard raster image (JPG, PNG, WEBP) - Auto transpose phone rotation
+        try:
+            pil_img = Image.open(io.BytesIO(file_bytes))
+            pil_img = ImageOps.exif_transpose(pil_img)
+            if pil_img.mode != "RGB":
+                pil_img = pil_img.convert("RGB")
+            rgb_arr = np.array(pil_img)
+            bgr_img = cv2.cvtColor(rgb_arr, cv2.COLOR_RGB2BGR)
+            return [bgr_img]
+        except Exception:
+            nparr = np.frombuffer(file_bytes, np.uint8)
+            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            if img is None:
+                raise ValueError(f"Could not decode image file: {filename}")
+            return [img]
