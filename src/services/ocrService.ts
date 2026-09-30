@@ -48,50 +48,86 @@ const fileToBase64 = (file: File): Promise<string> => {
   });
 };
 
+const getOcrBaseUrl = (): string => {
+  const envUrl = import.meta.env.VITE_OCR_SERVICE_URL;
+  if (envUrl && typeof envUrl === 'string' && envUrl.trim() !== '') {
+    return envUrl.trim().replace(/\/+$/, '');
+  }
+  return 'https://invoice-ocr-service-9szm.onrender.com';
+};
+
 export const ocrService = {
   checkServiceHealth: async (): Promise<{ isOnline: boolean; detail?: string }> => {
-    const ocrUrl = import.meta.env.VITE_OCR_SERVICE_URL;
-    if (!ocrUrl) {
-      return { isOnline: false, detail: 'VITE_OCR_SERVICE_URL is not defined in environment.' };
-    }
+    const baseUrl = getOcrBaseUrl();
     try {
-      const response = await fetch(`${ocrUrl}/health`, { method: 'GET' });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+      const response = await fetch(`${baseUrl}/health`, {
+        method: 'GET',
+        signal: controller.signal,
+        headers: { 'Accept': 'application/json' }
+      });
+      clearTimeout(timeoutId);
+
       if (response.ok) {
         const data = await response.json();
         return { isOnline: data.status === 'healthy', detail: `Model loaded: ${data.model_loaded ? 'Yes' : 'No'}` };
       }
       return { isOnline: false, detail: `Health check returned status ${response.status}` };
     } catch (e: any) {
-      return { isOnline: false, detail: e?.message || 'Failed to connect to local OCR microservice.' };
+      return { isOnline: false, detail: e?.message || 'Connecting to OCR microservice...' };
     }
   },
 
   processInvoiceDocument: async (file: File): Promise<ExtractedOcrInvoice> => {
-    const ocrUrl = import.meta.env.VITE_OCR_SERVICE_URL;
-
-    if (!ocrUrl) {
-      throw new Error('OCR service URL is not configured. Please start the Python OCR service and configure VITE_OCR_SERVICE_URL, or enter invoice data manually.');
-    }
-
+    const baseUrl = getOcrBaseUrl();
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await fetch(`${ocrUrl}/ocr/invoice`, {
-      method: 'POST',
-      body: formData,
-    });
+    let lastError: any = null;
 
-    if (!response.ok) {
-      const errData = await response.json().catch(() => null);
-      throw new Error(errData?.detail || `OCR processing failed with status ${response.status}`);
+    // Retry up to 2 times to handle Render cold-start wakeups
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const controller = new AbortController();
+        // Allow up to 45 seconds for cold-start PaddleOCR response
+        const timeoutId = setTimeout(() => controller.abort(), 45000);
+
+        const response = await fetch(`${baseUrl}/ocr/invoice`, {
+          method: 'POST',
+          body: formData,
+          signal: controller.signal,
+          headers: { 'Accept': 'application/json' }
+        });
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => null);
+          throw new Error(errData?.detail || `OCR processing failed with status ${response.status}`);
+        }
+
+        const result = await response.json();
+        if (!result || !result.items || !Array.isArray(result.items)) {
+          throw new Error('Invalid response structure received from OCR service');
+        }
+
+        return result as ExtractedOcrInvoice;
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`OCR attempt ${attempt} failed:`, err?.message);
+        if (attempt < 2) {
+          await new Promise((res) => setTimeout(res, 2000));
+        }
+      }
     }
 
-    const result = await response.json();
-    if (!result || !result.items || !Array.isArray(result.items)) {
-      throw new Error('Invalid response structure received from OCR service');
-    }
-
-    return result as ExtractedOcrInvoice;
+    throw new Error(
+      lastError?.name === 'AbortError'
+        ? 'OCR service is taking longer than usual to start up. Please tap Retry OCR in a moment.'
+        : lastError?.message || 'Could not connect to OCR service. Please check your network or try again.'
+    );
   }
 };
+
 

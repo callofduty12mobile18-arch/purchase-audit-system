@@ -57,6 +57,7 @@ app.add_middleware(
 
 @app.get("/")
 @app.head("/")
+@app.options("/")
 async def root():
     """Root endpoint for status verification."""
     return {"service": "invoice-ocr-service", "status": "running"}
@@ -64,6 +65,7 @@ async def root():
 
 @app.get("/health", response_model=HealthResponse)
 @app.head("/health")
+@app.options("/health")
 async def health_check():
     """Health check endpoint to report service and model status."""
     engine = OcrEngine.get_instance()
@@ -74,6 +76,12 @@ async def health_check():
         supported_formats=["image/jpeg", "image/png", "image/webp", "application/pdf"],
         max_file_size_mb=settings.MAX_FILE_SIZE_MB
     )
+
+
+@app.options("/ocr/invoice")
+async def options_ocr_invoice():
+    """CORS preflight handler for invoice OCR."""
+    return {}
 
 
 @app.post("/ocr/invoice", response_model=ExtractedOcrInvoice)
