@@ -86,6 +86,25 @@ export const AuditLogPage: React.FC = () => {
     }
   };
 
+  const formatTimestamp = (ts?: string) => {
+    if (!ts) return '-';
+    try {
+      const d = new Date(ts);
+      if (isNaN(d.getTime())) return ts;
+      return d.toLocaleString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      });
+    } catch {
+      return ts;
+    }
+  };
+
   const getActionBadgeVariant = (action: string) => {
     const act = action.toUpperCase();
     if (act.includes('CONFIRMED') || act.includes('VERIFIED')) return 'success';
@@ -131,7 +150,7 @@ export const AuditLogPage: React.FC = () => {
         <div className="flex items-center gap-1.5">
           <Calendar className="w-3.5 h-3.5 text-[#8F93A0] shrink-0" />
           <span className="font-mono text-xs text-[#6C7383]">
-            {row.timestamp ? row.timestamp.replace('T', ' ').slice(0, 19) : '-'}
+            {formatTimestamp(row.timestamp)}
           </span>
         </div>
       )
@@ -479,7 +498,7 @@ export const AuditLogPage: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-1.5 text-xs text-[#6C7383] font-mono">
                   <Calendar className="w-3.5 h-3.5 text-[#8F93A0]" />
-                  <span>{selectedLog.timestamp ? selectedLog.timestamp.replace('T', ' ').slice(0, 19) : '-'}</span>
+                  <span>{formatTimestamp(selectedLog.timestamp)}</span>
                 </div>
               </div>
 
