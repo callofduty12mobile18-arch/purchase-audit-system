@@ -13,7 +13,6 @@ import { SuppliersPage } from './pages/SuppliersPage';
 import { SupplierDetailPage } from './pages/SupplierDetailPage';
 import { ProductsPage } from './pages/ProductsPage';
 import { ProductDetailPage } from './pages/ProductDetailPage';
-import { PriceHistoryPage } from './pages/PriceHistoryPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
 import { OrderPlannerPage } from './pages/OrderPlannerPage';
 import { AuditLogPage } from './pages/AuditLogPage';
@@ -68,7 +67,6 @@ export const App: React.FC = () => {
                 <Route path="suppliers/:id" element={<SupplierDetailPage />} />
                 <Route path="products" element={<ProductsPage />} />
                 <Route path="products/:id" element={<ProductDetailPage />} />
-                <Route path="price-history" element={<PriceHistoryPage />} />
                 <Route path="analytics" element={<AnalyticsPage />} />
                 <Route path="order-planner" element={<OrderPlannerPage />} />
                 <Route path="audit-log" element={<AuditLogPage />} />
