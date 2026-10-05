@@ -128,10 +128,6 @@ export const PurchasesPage: React.FC = () => {
   ];
 
   const totalSpend = filteredInvoices.reduce((sum, i) => sum + i.grand_total, 0);
-  const totalPacksPurchased = filteredInvoices.reduce(
-    (sum, inv) => sum + (inv.items?.reduce((s, it) => s + (Number(it.quantity) || 0), 0) || 0),
-    0
-  );
 
   return (
     <div className="space-y-6">
@@ -156,7 +152,7 @@ export const PurchasesPage: React.FC = () => {
       </div>
 
       {/* Summary Stats Strip */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
         <div className="p-5 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash">
           <span className="text-[11px] font-bold text-[#6C7383] uppercase tracking-wider block">Total Invoices</span>
           {loading ? (
@@ -174,16 +170,6 @@ export const PurchasesPage: React.FC = () => {
           ) : (
             <span className="text-xl sm:text-2xl font-bold font-mono text-[#4B49AC] mt-1 block">
               ₹{totalSpend.toFixed(2)}
-            </span>
-          )}
-        </div>
-        <div className="p-5 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash">
-          <span className="text-[11px] font-bold text-[#6C7383] uppercase tracking-wider block">Total Packs Purchased</span>
-          {loading ? (
-            <ShimmerBar className="h-7 w-24 mt-1" />
-          ) : (
-            <span className="text-xl sm:text-2xl font-bold font-mono text-[#7978E9] mt-1 block">
-              {totalPacksPurchased}
             </span>
           )}
         </div>
