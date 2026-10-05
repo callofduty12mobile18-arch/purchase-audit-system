@@ -491,7 +491,7 @@ export const dbService = {
     return prods.find(p => p.id === id) || null;
   },
 
-  saveProduct: async (product: Partial<Product>, priceChangeReason?: string): Promise<Product> => {
+  saveProduct: async (product: Partial<Product>, priceChangeReason?: string, skipAuditLog = false): Promise<Product> => {
     const now = new Date().toISOString();
     const currentProds = await dbService.getProducts();
     const existing = currentProds.find(p =>
@@ -579,14 +579,16 @@ export const dbService = {
       ? `${priceChangeReason}: ${savedProd.nickname} (Ref Rate: ₹${savedProd.current_purchase_ref_price})`
       : `Saved product: ${savedProd.nickname} (${savedProd.supplier_item_name})`;
 
-    await dbService.logAudit(
-      existing ? 'PRODUCT_UPDATED' : 'PRODUCT_CREATED',
-      'products',
-      savedProd.id,
-      oldProdVal,
-      newProdVal,
-      auditReasonText
-    );
+    if (!skipAuditLog) {
+      await dbService.logAudit(
+        existing ? 'PRODUCT_UPDATED' : 'PRODUCT_CREATED',
+        'products',
+        savedProd.id,
+        oldProdVal,
+        newProdVal,
+        auditReasonText
+      );
+    }
 
     return savedProd;
   },
@@ -742,7 +744,7 @@ export const dbService = {
         current_selling_price: sellingPrice,
         min_stock_level: 5,
         is_active: true
-      }, `Invoice #${extractedData.invoice_number}`);
+      }, undefined, true);
 
       const itemId = generateUUID();
       itemsToInsert.push({
@@ -1018,19 +1020,25 @@ export const dbService = {
       l.action === 'INVOICE_DELETED' ||
       l.entity_type?.toLowerCase().includes('invoice');
 
-    const orphanInvoiceLogIds: string[] = [];
+    const orphanLogIds: string[] = [];
 
     allLogs = allLogs.filter(l => {
+      // Clean up auto-generated redundant invoice product logs
+      if (l.action === 'PRODUCT_UPDATED' && (l.reason?.startsWith('Invoice #') || l.reason?.toLowerCase().includes('invoice #'))) {
+        orphanLogIds.push(l.id);
+        return false;
+      }
+
       if (isInvoiceLog(l)) {
         // If there are zero active invoices across both remote and local, prune old invoice logs
         if (allActiveInvoices.length === 0) {
-          orphanInvoiceLogIds.push(l.id);
+          orphanLogIds.push(l.id);
           return false;
         }
         const matchesId = l.entity_id && activeInvoiceIds.has(l.entity_id);
         const matchesNumber = l.reason && Array.from(activeInvoiceNumbers).some(num => num && l.reason?.toLowerCase().includes(num));
         if (!matchesId && !matchesNumber) {
-          orphanInvoiceLogIds.push(l.id);
+          orphanLogIds.push(l.id);
           return false;
         }
       }
@@ -1045,11 +1053,11 @@ export const dbService = {
     // Save cleaned, merged logs to localStorage
     setLocalData(LOCAL_STORAGE_KEY_AUDIT, allLogs);
 
-    // Background clean up of remote orphan invoice logs if any
-    if (orphanInvoiceLogIds.length > 0) {
+    // Background clean up of remote orphan logs if any
+    if (orphanLogIds.length > 0) {
       (async () => {
         try {
-          await supabase.from('audit_logs').delete().in('id', orphanInvoiceLogIds);
+          await supabase.from('audit_logs').delete().in('id', orphanLogIds);
         } catch (err) {
           console.warn('Orphan audit log cleanup note:', err);
         }
