@@ -5,6 +5,8 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Table } from '../components/ui/Table';
+import { CardSkeleton } from '../components/ui/LoadingSkeleton';
+import { ErrorState } from '../components/ui/ErrorState';
 import { PurchaseInvoice, PurchaseItem } from '../types';
 import { dbService } from '../services/dbService';
 
@@ -13,6 +15,7 @@ export const PurchaseDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const [invoice, setInvoice] = useState<PurchaseInvoice | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
     if (id) loadInvoice();
@@ -20,23 +23,44 @@ export const PurchaseDetailPage: React.FC = () => {
 
   const loadInvoice = async () => {
     setLoading(true);
-    const data = await dbService.getInvoiceById(id!);
-    setInvoice(data);
-    setLoading(false);
+    setFetchError(null);
+    try {
+      const data = await dbService.getInvoiceById(id!);
+      setInvoice(data);
+      if (!data) {
+        setFetchError('Invoice not found in database.');
+      }
+    } catch (err: any) {
+      setFetchError(err.message || 'Failed to load invoice details.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  if (!invoice && !loading) {
+  if (loading) {
     return (
-      <div className="text-center py-16 space-y-4">
-        <p className="text-[#6C7383] text-sm">Invoice not found.</p>
-        <Button variant="outline" size="sm" onClick={() => navigate('/purchases')}>
-          Back to Invoices
-        </Button>
+      <div className="space-y-6 max-w-6xl mx-auto pb-12">
+        <div className="h-9 w-40 bg-[#ECEEF5] rounded-xl animate-pulse" />
+        <CardSkeleton />
+        <CardSkeleton />
       </div>
     );
   }
 
-  const totalPacks = invoice?.items?.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0) || 0;
+  if (fetchError || !invoice) {
+    return (
+      <div className="py-12 max-w-2xl mx-auto">
+        <ErrorState
+          title="Invoice Record Not Found"
+          message={fetchError || `Could not find an invoice with ID: "${id}"`}
+          onRetry={loadInvoice}
+          showHomeButton
+        />
+      </div>
+    );
+  }
+
+  const totalPacks = invoice.items?.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0) || 0;
 
   const columns = [
     {
@@ -99,150 +123,95 @@ export const PurchaseDetailPage: React.FC = () => {
           size="sm"
           onClick={() => navigate('/purchases')}
           icon={<ArrowLeft className="w-4 h-4" />}
+          className="text-xs"
         >
-          Back to Invoices Ledger
+          Back to Ledger
         </Button>
       </div>
 
       {/* Invoice Banner */}
-      <Card>
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-xl sm:text-2xl font-bold text-[#1F1F2C] flex items-center gap-2.5 tracking-tight font-mono">
-                <Receipt className="w-6 h-6 text-[#4B49AC]" />
-                Invoice #{invoice?.invoice_number}
-              </h1>
+      <div className="p-6 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-4 border-b border-[#ECEEF5]">
+          <div className="flex items-start gap-3.5">
+            <div className="p-3 bg-[#F5F7FF] text-[#4B49AC] rounded-2xl border border-[#ECEEF5] shadow-xs">
+              <Receipt className="w-6 h-6" />
             </div>
-            <div className="text-xs sm:text-sm text-[#6C7383] flex flex-wrap items-center gap-2.5">
-              <div className="flex items-center gap-1.5">
-                <Building2 className="w-4 h-4 text-[#4B49AC]" />
-                <span>Supplier: <strong className="text-[#1F1F2C]">{invoice?.supplier?.name}</strong></span>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-bold font-mono text-[#1F1F2C]">{invoice.invoice_number}</h1>
+                <Badge variant={invoice.payment_status === 'PAID' ? 'success' : 'warning'}>
+                  {invoice.payment_status}
+                </Badge>
               </div>
-              <span className="text-[#ECEEF5]">•</span>
-              <div className="flex items-center gap-1.5">
-                <Calendar className="w-4 h-4 text-[#4B49AC]" />
-                <span>Invoice Date: <strong className="text-[#1F1F2C] font-mono">{invoice?.invoice_date}</strong></span>
-              </div>
-              <span className="text-[#ECEEF5]">•</span>
-              <div className="flex items-center gap-1.5">
-                <Package2 className="w-4 h-4 text-[#4B49AC]" />
-                <span>Total Packs: <strong className="text-[#1F1F2C] font-mono">{totalPacks}</strong></span>
-              </div>
+              <p className="text-xs text-[#6C7383] mt-0.5">
+                Recorded on {new Date(invoice.created_at).toLocaleDateString()} at {new Date(invoice.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
-            <Badge variant="purple" className="font-mono text-xs px-3 py-1">
-              Payment: {invoice?.payment_mode} • {invoice?.payment_status}
-            </Badge>
+          <div className="text-left sm:text-right">
+            <span className="text-xs text-[#6C7383] uppercase font-bold tracking-wider block">Grand Total</span>
+            <span className="text-2xl sm:text-3xl font-bold font-mono text-[#4B49AC]">
+              ₹{invoice.grand_total.toFixed(2)}
+            </span>
           </div>
         </div>
-      </Card>
 
-      {/* Line Items & Summary */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Line Items */}
-        <div className="lg:col-span-2 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-[#1F1F2C] uppercase tracking-wider flex items-center gap-2">
-              <Receipt className="w-4 h-4 text-[#4B49AC]" />
-              Line Items ({invoice?.items?.length || 0})
-            </h3>
-            <span className="text-xs font-mono text-[#6C7383]">
-              Total: {totalPacks} Packs
+        {/* Metadata Details Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="p-4 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5] space-y-1">
+            <span className="text-[11px] font-bold text-[#6C7383] uppercase tracking-wider block flex items-center gap-1.5">
+              <Building2 className="w-3.5 h-3.5 text-[#4B49AC]" /> Supplier
+            </span>
+            <span className="text-sm font-bold text-[#1F1F2C] block">
+              {invoice.supplier?.name || 'AYYAPPA ENTERPRISES'}
+            </span>
+            {invoice.supplier?.gstin && (
+              <span className="text-xs font-mono text-[#6C7383] block">
+                GSTIN: {invoice.supplier.gstin}
+              </span>
+            )}
+          </div>
+
+          <div className="p-4 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5] space-y-1">
+            <span className="text-[11px] font-bold text-[#6C7383] uppercase tracking-wider block flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-[#7DA0FA]" /> Invoice & Cheque Date
+            </span>
+            <span className="text-sm font-mono font-bold text-[#1F1F2C] block">
+              {invoice.invoice_date}
+            </span>
+            <span className="text-xs text-[#6C7383] block">
+              Payment Mode: <strong className="text-[#1F1F2C]">{invoice.payment_mode}</strong>
             </span>
           </div>
 
-          {/* Desktop Table View */}
-          <div className="hidden sm:block">
-            <Table
-              columns={columns}
-              data={invoice?.items || []}
-              keyExtractor={(row) => row.id}
-              isLoading={loading}
-            />
+          <div className="p-4 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5] space-y-1">
+            <span className="text-[11px] font-bold text-[#6C7383] uppercase tracking-wider block flex items-center gap-1.5">
+              <Package2 className="w-3.5 h-3.5 text-[#7978E9]" /> Volume Summary
+            </span>
+            <span className="text-sm font-mono font-bold text-[#1F1F2C] block">
+              {invoice.items?.length || 0} Distinct Items
+            </span>
+            <span className="text-xs font-mono text-[#6C7383] block">
+              {totalPacks} Total Packs
+            </span>
           </div>
-
-          {/* Mobile Cards View */}
-          <div className="sm:hidden space-y-3">
-            {invoice?.items?.map((item, idx) => (
-              <div key={item.id || idx} className="p-4 rounded-xl bg-white border border-[#ECEEF5] space-y-2.5 shadow-xs">
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-xs text-[#6C7383]">#{idx + 1}</span>
-                  <span className="font-mono text-xs font-bold text-[#4B49AC]">
-                    ₹{item.total.toFixed(2)}
-                  </span>
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-[#1F1F2C]">
-                    {item.product?.nickname || item.supplier_item_name_snapshot}
-                  </h4>
-                  <p className="text-[11px] font-mono text-[#6C7383]">
-                    {item.supplier_item_name_snapshot}
-                  </p>
-                </div>
-                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[#ECEEF5] text-xs">
-                  <div>
-                    <span className="text-[10px] text-[#6C7383] uppercase block">Packs</span>
-                    <span className="font-mono font-bold text-[#1F1F2C]">{item.quantity} {item.uom_snapshot}</span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[10px] text-[#6C7383] uppercase block">Purchase Rate</span>
-                    <span className="font-mono font-bold text-[#4B49AC]">₹{item.purchase_rate.toFixed(2)}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Invoice Summary Card */}
-        <div>
-          <Card title="Invoice Summary" subtitle="Audited purchase totals">
-            <div className="space-y-4 text-xs">
-              <div className="flex justify-between text-[#6C7383] py-2 border-b border-[#ECEEF5]">
-                <span>Total Items:</span>
-                <span className="font-mono text-[#1F1F2C] font-semibold text-sm">
-                  {invoice?.items?.length || 0} Products
-                </span>
-              </div>
-              <div className="flex justify-between text-[#6C7383] py-2 border-b border-[#ECEEF5]">
-                <span>Total Packs:</span>
-                <span className="font-mono text-[#1F1F2C] font-semibold text-sm">
-                  {totalPacks} Packs
-                </span>
-              </div>
-              <div className="flex justify-between text-[#6C7383] py-2 border-b border-[#ECEEF5]">
-                <span>Payment Mode:</span>
-                <span className="font-mono text-[#1F1F2C] font-semibold">
-                  {invoice?.payment_mode}
-                </span>
-              </div>
-              <div className="flex justify-between text-[#6C7383] py-2 border-b border-[#ECEEF5]">
-                <span>Payment Status:</span>
-                <Badge variant={invoice?.payment_status === 'PAID' ? 'success' : 'warning'}>
-                  {invoice?.payment_status}
-                </Badge>
-              </div>
-              {invoice?.cheque_date && (
-                <div className="flex justify-between text-[#6C7383] py-2 border-b border-[#ECEEF5]">
-                  <span>Cheque Clearance Date:</span>
-                  <span className="font-mono text-[#1F1F2C] font-semibold">
-                    {invoice.cheque_date}
-                  </span>
-                </div>
-              )}
-              <div className="flex justify-between text-sm font-bold text-[#1F1F2C] pt-3 border-t border-[#ECEEF5]">
-                <span>Invoice Total:</span>
-                <span className="font-mono text-[#4B49AC] text-xl font-bold">
-                  ₹{invoice?.grand_total.toFixed(2)}
-                </span>
-              </div>
-            </div>
-          </Card>
         </div>
       </div>
+
+      {/* Invoice Line Items Card */}
+      <Card
+        title={`Purchased Items (${invoice.items?.length || 0})`}
+        subtitle="Item purchase rates and computed line totals"
+      >
+        <Table
+          columns={columns}
+          data={invoice.items || []}
+          keyExtractor={(row) => row.id}
+          isLoading={false}
+          emptyText="No line items recorded for this invoice."
+        />
+      </Card>
     </div>
   );
 };

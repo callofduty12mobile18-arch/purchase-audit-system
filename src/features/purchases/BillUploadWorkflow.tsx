@@ -11,16 +11,21 @@ import {
   Package,
   Receipt,
   Calendar,
-  Eye
+  Eye,
+  AlertTriangle,
+  WifiOff
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
+import { CardSkeleton } from '../../components/ui/LoadingSkeleton';
 import { InvoiceFormData, InvoiceFormItem, PurchaseInvoice, Supplier, Product } from '../../types';
 import { createBlankInvoice, createBlankInvoiceItem } from '../../services/invoiceService';
 import { dbService } from '../../services/dbService';
+import { useToast } from '../../context/ToastContext';
 
 export const BillUploadWorkflow: React.FC = () => {
   const navigate = useNavigate();
+  const { success: toastSuccess, error: toastError, warning: toastWarning } = useToast();
   const [formData, setFormData] = useState<InvoiceFormData>(createBlankInvoice());
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -29,7 +34,8 @@ export const BillUploadWorkflow: React.FC = () => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [savedInvoice, setSavedInvoice] = useState<PurchaseInvoice | null>(null);
   const [existingDuplicate, setExistingDuplicate] = useState<PurchaseInvoice | null>(null);
-  const [, setLoadingInitial] = useState(true);
+  const [loadingInitial, setLoadingInitial] = useState(true);
+  const [formValidationErrors, setFormValidationErrors] = useState<string[]>([]);
 
   useEffect(() => {
     loadMetadata();
@@ -54,8 +60,9 @@ export const BillUploadWorkflow: React.FC = () => {
         payment_status: prev.payment_status === 'CHEQUE' ? 'CHEQUE' : 'PAID',
         cheque_date: prev.cheque_date || prev.invoice_date || new Date().toISOString().slice(0, 10)
       }));
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to load suppliers/products:', err);
+      toastError('Failed to load catalog', err.message || 'Check database connection.');
     } finally {
       setLoadingInitial(false);
     }
@@ -251,16 +258,44 @@ export const BillUploadWorkflow: React.FC = () => {
     }));
   };
 
-  // Confirmation & Save
-  const handleInitiateConfirm = async () => {
+  // Form Validation & Confirmation
+  const validateForm = () => {
+    const errors: string[] = [];
+
+    if (!navigator.onLine) {
+      errors.push('No internet connection. Please reconnect to save to database.');
+    }
+
+    if (!formData.invoice_date) {
+      errors.push('Invoice date is required');
+    }
+
     if (formData.items.length === 0) {
-      alert('Please enter at least one line item.');
-      return;
+      errors.push('Please enter at least one line item.');
     }
 
     const unselected = formData.items.some(it => !it.supplier_item_name?.trim());
     if (unselected) {
-      alert('Please select a product for all line items before saving.');
+      errors.push('Please choose a product for all line items.');
+    }
+
+    const invalidQuantities = formData.items.some(it => !it.pack_qty || it.pack_qty <= 0);
+    if (invalidQuantities) {
+      errors.push('All line items must have a pack quantity > 0.');
+    }
+
+    const invalidTotals = formData.items.some(it => !it.invoice_amount || it.invoice_amount <= 0);
+    if (invalidTotals) {
+      errors.push('All line items must have a bill amount > 0.');
+    }
+
+    setFormValidationErrors(errors);
+    return errors.length === 0;
+  };
+
+  const handleInitiateConfirm = async () => {
+    if (!validateForm()) {
+      toastWarning('Form Incomplete', 'Please check highlighted fields and line items before saving.');
       return;
     }
 
@@ -297,7 +332,7 @@ export const BillUploadWorkflow: React.FC = () => {
       await executeSave(submissionData);
     } catch (err: any) {
       console.error('Save error:', err);
-      alert(err.message || 'Failed to save purchase invoice');
+      toastError('Save Failed', err.message || 'Failed to save purchase invoice');
       setIsSubmitting(false);
     }
   };
@@ -309,12 +344,28 @@ export const BillUploadWorkflow: React.FC = () => {
       const saved = await dbService.confirmAndSaveInvoice(overrideData || formData);
       setSavedInvoice(saved);
       setShowSuccessModal(true);
+      toastSuccess('Invoice Saved', `Invoice #${saved.invoice_number} successfully recorded.`);
     } catch (err: any) {
-      alert(err.message || 'Error saving invoice to database');
+      toastError('Save Error', err.message || 'Error saving invoice to database');
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  if (loadingInitial) {
+    return (
+      <div className="space-y-6 max-w-6xl mx-auto pb-16">
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <div className="h-6 w-60 bg-[#ECEEF5] rounded-xl animate-pulse" />
+            <div className="h-4 w-96 bg-[#ECEEF5] rounded-xl animate-pulse" />
+          </div>
+        </div>
+        <CardSkeleton />
+        <CardSkeleton />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5 sm:space-y-6 max-w-6xl mx-auto pb-24 md:pb-16">
@@ -359,6 +410,21 @@ export const BillUploadWorkflow: React.FC = () => {
         </div>
       </div>
 
+      {/* Validation Errors Notice */}
+      {formValidationErrors.length > 0 && (
+        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-800 space-y-1.5 animate-in slide-in-from-top-2 duration-200 shadow-sm">
+          <div className="flex items-center gap-2 font-bold text-rose-900 text-sm">
+            <AlertTriangle className="w-4 h-4 text-rose-600" />
+            <span>Please complete all required invoice fields:</span>
+          </div>
+          <ul className="list-disc list-inside space-y-1 pl-2 text-rose-700">
+            {formValidationErrors.map((err, i) => (
+              <li key={i}>{err}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Main Invoice Form */}
       <div className="space-y-5 sm:space-y-6">
         
@@ -402,7 +468,10 @@ export const BillUploadWorkflow: React.FC = () => {
                 type="date"
                 required
                 value={formData.invoice_date}
-                onChange={(e) => handleHeaderChange('invoice_date', e.target.value)}
+                onChange={(e) => {
+                  handleHeaderChange('invoice_date', e.target.value);
+                  if (formValidationErrors.length > 0) setFormValidationErrors([]);
+                }}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#ECEEF5] text-xs sm:text-sm font-mono text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC] shadow-xs"
               />
             </div>
@@ -494,8 +563,14 @@ export const BillUploadWorkflow: React.FC = () => {
           <div className="md:hidden space-y-3.5">
             {formData.items.map((item, idx) => {
               const isCustom = item.supplier_item_name && !products.some(p => p.supplier_item_name === item.supplier_item_name);
+              const hasError = !item.supplier_item_name || (item.pack_qty || 0) <= 0;
               return (
-                <div key={idx} className="p-4 rounded-xl bg-[#F8F9FE] border border-[#ECEEF5] space-y-3">
+                <div
+                  key={idx}
+                  className={`p-4 rounded-xl border space-y-3 transition-colors ${
+                    hasError ? 'bg-rose-50/20 border-rose-200' : 'bg-[#F8F9FE] border-[#ECEEF5]'
+                  }`}
+                >
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <span className="w-6 h-6 rounded-full bg-[#4B49AC] text-white font-mono font-bold text-xs flex items-center justify-center">
@@ -526,7 +601,9 @@ export const BillUploadWorkflow: React.FC = () => {
                           handleProductSelect(idx, val);
                         }
                       }}
-                      className="w-full px-3 py-2 rounded-lg bg-white border border-[#ECEEF5] text-xs font-semibold text-[#1F1F2C] focus:outline-none focus:ring-1 focus:ring-[#4B49AC]"
+                      className={`w-full px-3 py-2 rounded-lg bg-white border text-xs font-semibold text-[#1F1F2C] focus:outline-none focus:ring-1 focus:ring-[#4B49AC] ${
+                        !item.supplier_item_name ? 'border-rose-300' : 'border-[#ECEEF5]'
+                      }`}
                     >
                       <option value="">-- Choose Product / Cigarette --</option>
                       {products.map((p) => (
@@ -622,8 +699,14 @@ export const BillUploadWorkflow: React.FC = () => {
               <tbody className="divide-y divide-[#ECEEF5]">
                 {formData.items.map((item, idx) => {
                   const isCustom = item.supplier_item_name && !products.some(p => p.supplier_item_name === item.supplier_item_name);
+                  const hasError = !item.supplier_item_name;
                   return (
-                    <tr key={idx} className="hover:bg-[#F8F9FE] transition-colors">
+                    <tr
+                      key={idx}
+                      className={`hover:bg-[#F8F9FE] transition-colors ${
+                        hasError ? 'bg-rose-50/10' : ''
+                      }`}
+                    >
                       <td className="py-2.5 px-3.5 font-mono text-[#6C7383] text-center font-bold">
                         {idx + 1}
                       </td>
@@ -639,7 +722,9 @@ export const BillUploadWorkflow: React.FC = () => {
                                 handleProductSelect(idx, val);
                               }
                             }}
-                            className="w-full px-3 py-2 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5] text-xs font-semibold text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC] shadow-xs cursor-pointer"
+                            className={`w-full px-3 py-2 rounded-xl bg-[#F5F7FF] border text-xs font-semibold text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC] shadow-xs cursor-pointer ${
+                              !item.supplier_item_name ? 'border-rose-300' : 'border-[#ECEEF5]'
+                            }`}
                           >
                             <option value="">-- Choose Product / Cigarette --</option>
                             {products.map((p) => (

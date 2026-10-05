@@ -1,31 +1,34 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Package, Plus, Search, AlertCircle, History, Sparkles } from 'lucide-react';
+import { Package, Plus, Search, AlertCircle, History } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
-import { Badge } from '../components/ui/Badge';
 import { Table } from '../components/ui/Table';
 import { Product } from '../types';
 import { dbService } from '../services/dbService';
+import { useToast } from '../context/ToastContext';
 
 export const ProductsPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { success: toastSuccess, error: toastError } = useToast();
   const initialSearch = searchParams.get('search') || '';
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [search, setSearch] = useState(initialSearch);
 
   // Edit / Add Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Partial<Product>>({
     supplier_item_name: '',
     nickname: '',
     sku: '',
     barcode: '',
-    hsn: '',
+    hsn: '24022090',
     uom: 'PAC',
     current_purchase_ref_price: 0,
     current_selling_price: 0,
@@ -34,6 +37,14 @@ export const ProductsPage: React.FC = () => {
   });
   const [priceReason, setPriceReason] = useState('');
   const [showReasonInput, setShowReasonInput] = useState(false);
+
+  // Form Validation Errors
+  const [formErrors, setFormErrors] = useState<{
+    nickname?: string;
+    supplier_item_name?: string;
+    current_purchase_ref_price?: string;
+    priceReason?: string;
+  }>({});
 
   useEffect(() => {
     loadData();
@@ -45,9 +56,17 @@ export const ProductsPage: React.FC = () => {
 
   const loadData = async () => {
     setLoading(true);
-    const prods = await dbService.getProducts();
-    setProducts(prods);
-    setLoading(false);
+    setFetchError(null);
+    try {
+      const prods = await dbService.getProducts();
+      setProducts(prods);
+    } catch (err: any) {
+      const msg = err.message || 'Failed to load catalog products.';
+      setFetchError(msg);
+      toastError('Catalog Error', msg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const filteredProducts = products.filter(p =>
@@ -69,6 +88,7 @@ export const ProductsPage: React.FC = () => {
     });
     setPriceReason('');
     setShowReasonInput(false);
+    setFormErrors({});
     setIsModalOpen(true);
   };
 
@@ -76,6 +96,7 @@ export const ProductsPage: React.FC = () => {
     setEditingProduct(p);
     setPriceReason('');
     setShowReasonInput(false);
+    setFormErrors({});
     setIsModalOpen(true);
   };
 
@@ -88,11 +109,52 @@ export const ProductsPage: React.FC = () => {
     }
   };
 
+  const validateForm = () => {
+    const errors: {
+      nickname?: string;
+      supplier_item_name?: string;
+      current_purchase_ref_price?: string;
+      priceReason?: string;
+    } = {};
+
+    if (!editingProduct.nickname || !editingProduct.nickname.trim()) {
+      errors.nickname = 'Personal Nickname is required';
+    }
+    if (!editingProduct.supplier_item_name || !editingProduct.supplier_item_name.trim()) {
+      errors.supplier_item_name = 'Supplier item name is required';
+    }
+    if (
+      editingProduct.current_purchase_ref_price === undefined ||
+      editingProduct.current_purchase_ref_price < 0
+    ) {
+      errors.current_purchase_ref_price = 'Valid purchase rate (≥ 0) is required';
+    }
+    if (showReasonInput && (!priceReason || !priceReason.trim())) {
+      errors.priceReason = 'Audit reason is required when modifying existing price';
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    await dbService.saveProduct(editingProduct, priceReason || 'Manual catalog price update');
-    setIsModalOpen(false);
-    loadData();
+    if (!validateForm()) return;
+
+    setIsSaving(true);
+    try {
+      await dbService.saveProduct(editingProduct, priceReason || 'Manual catalog price update');
+      toastSuccess(
+        editingProduct.id ? 'Product Updated' : 'Product Created',
+        `"${editingProduct.nickname}" has been recorded in the catalog.`
+      );
+      setIsModalOpen(false);
+      loadData();
+    } catch (err: any) {
+      toastError('Save Failed', err.message || 'Unable to save product');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const columns = [
@@ -164,9 +226,11 @@ export const ProductsPage: React.FC = () => {
             icon={<Search className="w-4 h-4" />}
           />
         </div>
-        <span className="text-xs text-[#6C7383] font-mono hidden sm:inline-block ml-auto">
-          {filteredProducts.length} of {products.length} Products
-        </span>
+        {!loading && (
+          <span className="text-xs text-[#6C7383] font-mono hidden sm:inline-block ml-auto">
+            {filteredProducts.length} of {products.length} Products
+          </span>
+        )}
       </div>
 
       <Table
@@ -175,10 +239,19 @@ export const ProductsPage: React.FC = () => {
         keyExtractor={(row) => row.id}
         onRowClick={(row) => handleOpenEdit(row)}
         isLoading={loading}
-        emptyText="No cataloged products found matching search."
+        isError={fetchError}
+        onRetry={loadData}
+        searchQuery={search}
+        onClearSearch={() => setSearch('')}
+        emptyVariant="products"
+        emptyTitle="No Products in Catalog"
+        emptyText="No items are mapped in your product catalog yet. Add products to auto-fill rates during bill entry."
+        emptyActionLabel="Add First Product"
+        onEmptyAction={handleOpenAdd}
+        skeletonRows={5}
       />
 
-      {/* Edit / Add Product Modal Popup */}
+      {/* Edit / Add Product Modal Popup with Form Validations */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -209,18 +282,28 @@ export const ProductsPage: React.FC = () => {
           )}
 
           <Input
-            label="Personal Nickname (Primary UI Name) *"
+            label="Personal Nickname (Primary UI Name)"
             required
-            value={editingProduct.nickname}
-            onChange={(e) => setEditingProduct({ ...editingProduct, nickname: e.target.value })}
+            value={editingProduct.nickname || ''}
+            onChange={(e) => {
+              setEditingProduct({ ...editingProduct, nickname: e.target.value });
+              if (formErrors.nickname) setFormErrors({ ...formErrors, nickname: undefined });
+            }}
+            error={formErrors.nickname}
+            isValid={Boolean(editingProduct.nickname?.trim())}
             helperText="e.g. 'Ice Burst 10M' or 'Gold Flake Red 10R'"
           />
 
           <Input
-            label="Supplier Item Name (Exact Text on Invoices) *"
+            label="Supplier Item Name (Exact Text on Invoices)"
             required
-            value={editingProduct.supplier_item_name}
-            onChange={(e) => setEditingProduct({ ...editingProduct, supplier_item_name: e.target.value })}
+            value={editingProduct.supplier_item_name || ''}
+            onChange={(e) => {
+              setEditingProduct({ ...editingProduct, supplier_item_name: e.target.value });
+              if (formErrors.supplier_item_name) setFormErrors({ ...formErrors, supplier_item_name: undefined });
+            }}
+            error={formErrors.supplier_item_name}
+            isValid={Boolean(editingProduct.supplier_item_name?.trim())}
             helperText="Exact string written on purchase bills (e.g. 'CI Ice Burst 10M 10BE')"
           />
 
@@ -233,22 +316,26 @@ export const ProductsPage: React.FC = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <Input
-              label="Purchase Ref Rate (₹) *"
+              label="Purchase Ref Rate (₹)"
               type="number"
               step="0.01"
               required
-              value={editingProduct.current_purchase_ref_price}
+              value={editingProduct.current_purchase_ref_price ?? ''}
               onChange={(e) => {
                 const val = parseFloat(e.target.value) || 0;
                 setEditingProduct({ ...editingProduct, current_purchase_ref_price: val });
                 handlePriceChangeCheck(val);
+                if (formErrors.current_purchase_ref_price) {
+                  setFormErrors({ ...formErrors, current_purchase_ref_price: undefined });
+                }
               }}
+              error={formErrors.current_purchase_ref_price}
             />
             <Input
               label="Selling Price / MRP (₹)"
               type="number"
               step="0.01"
-              value={editingProduct.current_selling_price}
+              value={editingProduct.current_selling_price ?? ''}
               onChange={(e) => setEditingProduct({ ...editingProduct, current_selling_price: parseFloat(e.target.value) || 0 })}
             />
           </div>
@@ -260,11 +347,15 @@ export const ProductsPage: React.FC = () => {
                 <span>Price Modification Audit Log Triggered</span>
               </div>
               <Input
-                label="Reason for Price Change *"
+                label="Reason for Price Change"
                 required
                 placeholder="e.g. Supplier price increase or seasonal discount"
                 value={priceReason}
-                onChange={(e) => setPriceReason(e.target.value)}
+                onChange={(e) => {
+                  setPriceReason(e.target.value);
+                  if (formErrors.priceReason) setFormErrors({ ...formErrors, priceReason: undefined });
+                }}
+                error={formErrors.priceReason}
               />
             </div>
           )}
@@ -273,7 +364,12 @@ export const ProductsPage: React.FC = () => {
             <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} className="w-full sm:w-auto justify-center">
               Cancel
             </Button>
-            <Button variant="primary" type="submit" className="w-full sm:w-auto justify-center shadow-md shadow-[#4B49AC]/25">
+            <Button
+              variant="primary"
+              type="submit"
+              isLoading={isSaving}
+              className="w-full sm:w-auto justify-center shadow-md shadow-[#4B49AC]/25 font-bold"
+            >
               Save Product Record
             </Button>
           </div>

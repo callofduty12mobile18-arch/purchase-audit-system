@@ -8,13 +8,17 @@ import { Badge } from '../components/ui/Badge';
 import { Table } from '../components/ui/Table';
 import { Supplier } from '../types';
 import { dbService } from '../services/dbService';
+import { useToast } from '../context/ToastContext';
 
 export const SuppliersPage: React.FC = () => {
   const navigate = useNavigate();
+  const { success: toastSuccess, error: toastError } = useToast();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Partial<Supplier>>({
     name: '',
     gstin: '',
@@ -25,7 +29,10 @@ export const SuppliersPage: React.FC = () => {
     notes: '',
     is_active: true
   });
-  const [gstinError, setGstinError] = useState<string | null>(null);
+  const [formErrors, setFormErrors] = useState<{
+    name?: string;
+    gstin?: string;
+  }>({});
 
   useEffect(() => {
     loadSuppliers();
@@ -33,9 +40,17 @@ export const SuppliersPage: React.FC = () => {
 
   const loadSuppliers = async () => {
     setLoading(true);
-    const data = await dbService.getSuppliers();
-    setSuppliers(data);
-    setLoading(false);
+    setFetchError(null);
+    try {
+      const data = await dbService.getSuppliers();
+      setSuppliers(data);
+    } catch (err: any) {
+      const msg = err.message || 'Failed to load suppliers from database.';
+      setFetchError(msg);
+      toastError('Suppliers Error', msg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const filteredSuppliers = suppliers.filter(s =>
@@ -55,36 +70,57 @@ export const SuppliersPage: React.FC = () => {
       notes: '',
       is_active: true
     });
-    setGstinError(null);
+    setFormErrors({});
     setIsModalOpen(true);
   };
 
   const handleOpenEdit = (sup: Supplier, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditingSupplier(sup);
-    setGstinError(null);
+    setFormErrors({});
     setIsModalOpen(true);
+  };
+
+  const validateForm = () => {
+    const errors: { name?: string; gstin?: string } = {};
+
+    if (!editingSupplier.name || !editingSupplier.name.trim()) {
+      errors.name = 'Supplier name is required';
+    }
+
+    if (editingSupplier.gstin && editingSupplier.gstin.trim()) {
+      const gstinRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+      if (!gstinRegex.test(editingSupplier.gstin.trim().toUpperCase())) {
+        errors.gstin = 'Invalid Indian GSTIN format (e.g. 33AAACS1234F1Z5)';
+      }
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    setGstinError(null);
+    if (!validateForm()) return;
 
-    // Validate GSTIN pattern if provided
-    if (editingSupplier.gstin && editingSupplier.gstin.trim()) {
-      const gstinRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
-      if (!gstinRegex.test(editingSupplier.gstin.trim().toUpperCase())) {
-        setGstinError('Invalid Indian GSTIN format (e.g. 33AAACS1234F1Z5)');
-        return;
-      }
+    setIsSaving(true);
+    try {
+      await dbService.saveSupplier({
+        ...editingSupplier,
+        name: editingSupplier.name!.trim(),
+        gstin: editingSupplier.gstin ? editingSupplier.gstin.trim().toUpperCase() : undefined
+      });
+      toastSuccess(
+        editingSupplier.id ? 'Supplier Updated' : 'Supplier Registered',
+        `Supplier "${editingSupplier.name}" saved successfully.`
+      );
+      setIsModalOpen(false);
+      loadSuppliers();
+    } catch (err: any) {
+      toastError('Save Error', err.message || 'Unable to save supplier details.');
+    } finally {
+      setIsSaving(false);
     }
-
-    await dbService.saveSupplier({
-      ...editingSupplier,
-      gstin: editingSupplier.gstin ? editingSupplier.gstin.trim().toUpperCase() : undefined
-    });
-    setIsModalOpen(false);
-    loadSuppliers();
   };
 
   const columns = [
@@ -187,9 +223,11 @@ export const SuppliersPage: React.FC = () => {
             icon={<Search className="w-4 h-4" />}
           />
         </div>
-        <span className="text-xs text-[#6C7383] font-mono hidden sm:inline-block ml-auto">
-          {filteredSuppliers.length} Vendors Registered
-        </span>
+        {!loading && (
+          <span className="text-xs text-[#6C7383] font-mono hidden sm:inline-block ml-auto">
+            {filteredSuppliers.length} Vendors Registered
+          </span>
+        )}
       </div>
 
       {/* Table */}
@@ -199,7 +237,16 @@ export const SuppliersPage: React.FC = () => {
         keyExtractor={(row) => row.id}
         onRowClick={(row) => navigate(`/suppliers/${row.id}`)}
         isLoading={loading}
-        emptyText="No suppliers match your search query."
+        isError={fetchError}
+        onRetry={loadSuppliers}
+        searchQuery={search}
+        onClearSearch={() => setSearch('')}
+        emptyVariant="suppliers"
+        emptyTitle="No Suppliers Registered Yet"
+        emptyText="No vendor profiles exist in your database. Register your distributor to associate purchase invoices."
+        emptyActionLabel="Register First Supplier"
+        onEmptyAction={handleOpenAdd}
+        skeletonRows={5}
       />
 
       {/* Modal */}
@@ -211,17 +258,25 @@ export const SuppliersPage: React.FC = () => {
       >
         <form onSubmit={handleSave} className="space-y-4">
           <Input
-            label="Supplier Name *"
+            label="Supplier Name"
             required
-            value={editingSupplier.name}
-            onChange={(e) => setEditingSupplier({ ...editingSupplier, name: e.target.value })}
+            value={editingSupplier.name || ''}
+            onChange={(e) => {
+              setEditingSupplier({ ...editingSupplier, name: e.target.value });
+              if (formErrors.name) setFormErrors({ ...formErrors, name: undefined });
+            }}
+            error={formErrors.name}
+            isValid={Boolean(editingSupplier.name?.trim())}
           />
           <Input
             label="GSTIN (15 Digits)"
             placeholder="e.g. 33AAACS1234F1Z5"
             value={editingSupplier.gstin || ''}
-            onChange={(e) => setEditingSupplier({ ...editingSupplier, gstin: e.target.value })}
-            error={gstinError || undefined}
+            onChange={(e) => {
+              setEditingSupplier({ ...editingSupplier, gstin: e.target.value });
+              if (formErrors.gstin) setFormErrors({ ...formErrors, gstin: undefined });
+            }}
+            error={formErrors.gstin}
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
@@ -251,7 +306,7 @@ export const SuppliersPage: React.FC = () => {
             <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
               Cancel
             </Button>
-            <Button variant="primary" type="submit">
+            <Button variant="primary" type="submit" isLoading={isSaving}>
               Save Supplier Record
             </Button>
           </div>

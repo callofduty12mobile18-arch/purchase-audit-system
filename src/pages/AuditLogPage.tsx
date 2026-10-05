@@ -5,10 +5,13 @@ import { Badge } from '../components/ui/Badge';
 import { Table } from '../components/ui/Table';
 import { AuditLog } from '../types';
 import { dbService } from '../services/dbService';
+import { useToast } from '../context/ToastContext';
 
 export const AuditLogPage: React.FC = () => {
+  const { error: toastError } = useToast();
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -18,9 +21,17 @@ export const AuditLogPage: React.FC = () => {
 
   const loadLogs = async () => {
     setLoading(true);
-    const data = await dbService.getAuditLogs();
-    setLogs(data);
-    setLoading(false);
+    setFetchError(null);
+    try {
+      const data = await dbService.getAuditLogs();
+      setLogs(data);
+    } catch (err: any) {
+      const msg = err.message || 'Failed to load audit security logs.';
+      setFetchError(msg);
+      toastError('Audit Logs Error', msg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const filteredLogs = logs.filter(l =>
@@ -59,18 +70,24 @@ export const AuditLogPage: React.FC = () => {
       cell: (row: AuditLog) => <span className="text-xs text-[#1F1F2C]">{row.reason || '-'}</span>
     },
     {
-      header: 'Auditor User',
-      cell: (row: AuditLog) => <span className="text-xs text-[#6C7383] font-mono">{row.user_email || 'admin@audit.local'}</span>
-    },
-    {
       header: 'Details',
       cell: (row: AuditLog) => (
         <button
-          onClick={() => toggleExpand(row.id)}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-[#4B49AC] bg-[#F5F7FF] border border-[#ECEEF5] hover:bg-[#ECEEF5] transition-all cursor-pointer shadow-sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleExpand(row.id);
+          }}
+          className="flex items-center gap-1 text-xs text-[#4B49AC] hover:underline font-semibold"
         >
-          {expandedId === row.id ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-          JSON Diff
+          {expandedId === row.id ? (
+            <>
+              <ChevronDown className="w-3.5 h-3.5" /> Hide State
+            </>
+          ) : (
+            <>
+              <ChevronRight className="w-3.5 h-3.5" /> View Diff
+            </>
+          )}
         </button>
       )
     }
@@ -78,36 +95,30 @@ export const AuditLogPage: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-12">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="page-title flex items-center gap-2.5">
-            <ClipboardList className="w-6 h-6 text-[#4B49AC]" />
-            System Audit Stream
-          </h1>
-          <p className="page-subtitle">
-            Immutable append-only record of all supplier edits, product nickname changes, invoice confirmations & price adjustments
-          </p>
-        </div>
-
-        <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#F5F7FF] text-[#4B49AC] border border-[#ECEEF5] text-xs font-mono font-medium shadow-sm">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#4B49AC] animate-pulse" />
-          <ShieldCheck className="w-4 h-4 text-[#4B49AC]" />
-          Tamper-Proof Audit
-        </span>
+      <div>
+        <h1 className="page-title flex items-center gap-2.5">
+          <ShieldCheck className="w-6 h-6 text-[#4B49AC]" />
+          System Audit Trail & Security Logs
+        </h1>
+        <p className="page-subtitle">
+          Append-only cryptographic event logs recording all invoice approvals, price calibrations, and database changes.
+        </p>
       </div>
 
       <div className="p-4 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash flex items-center gap-3">
         <div className="w-full max-w-md">
           <Input
-            placeholder="Filter logs by action, entity, or description..."
+            placeholder="Search by action, entity type, or justification..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             icon={<Search className="w-4 h-4" />}
           />
         </div>
-        <span className="text-xs text-[#6C7383] font-mono hidden sm:inline-block ml-auto">
-          {filteredLogs.length} Events Logged
-        </span>
+        {!loading && (
+          <span className="text-xs text-[#6C7383] font-mono hidden sm:inline-block ml-auto">
+            {filteredLogs.length} Security Events
+          </span>
+        )}
       </div>
 
       <div className="space-y-4">
@@ -115,43 +126,55 @@ export const AuditLogPage: React.FC = () => {
           columns={columns}
           data={filteredLogs}
           keyExtractor={(row) => row.id}
+          onRowClick={(row) => toggleExpand(row.id)}
           isLoading={loading}
-          emptyText="No audit logs recorded yet."
+          isError={fetchError}
+          onRetry={loadLogs}
+          searchQuery={search}
+          onClearSearch={() => setSearch('')}
+          emptyTitle="No Audit Events Recorded"
+          emptyText="Audit trails will log system events automatically when invoices or products are modified."
+          skeletonRows={5}
         />
 
-        {/* JSON Diff Drawer Modal / Expanded Container */}
+        {/* Expanded Audit Payload Box */}
         {expandedId && (
-          <div className="p-5 bg-white border border-[#ECEEF5] rounded-2xl space-y-4 shadow-xl">
-            <div className="flex items-center justify-between border-b border-[#ECEEF5] pb-3">
-              <div className="flex items-center gap-2">
+          <div className="p-5 rounded-2xl bg-[#F8F9FE] border border-[#ECEEF5] space-y-3 animate-in fade-in duration-200 shadow-skydash">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold text-[#1F1F2C] flex items-center gap-2 uppercase tracking-wider">
                 <FileCode2 className="w-4 h-4 text-[#4B49AC]" />
-                <span className="text-xs font-semibold font-mono text-[#1F1F2C]">Audit Payload Delta — ID: {expandedId}</span>
-              </div>
+                Event Metadata Payload #{expandedId.slice(0, 8)}
+              </h4>
               <button
                 onClick={() => setExpandedId(null)}
-                className="text-xs text-[#6C7383] hover:text-[#1F1F2C] px-2 py-1 rounded-md hover:bg-[#F5F7FF] transition-colors"
+                className="text-xs text-[#6C7383] hover:text-[#1F1F2C]"
               >
-                Close Panel
+                Close
               </button>
             </div>
             {(() => {
-              const log = logs.find(l => l.id === expandedId);
-              return log ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                  <div>
-                    <span className="text-[#6C7383] font-mono text-[11px] block mb-1.5 font-medium">Previous State (JSONB)</span>
-                    <pre className="p-4 bg-[#F5F7FF] border border-[#ECEEF5] rounded-xl font-mono text-[#1F1F2C] overflow-x-auto text-[11px] leading-relaxed">
-                      {JSON.stringify(log.old_value || null, null, 2)}
-                    </pre>
-                  </div>
-                  <div>
-                    <span className="text-[#4B49AC] font-mono text-[11px] block mb-1.5 font-bold">New Audited State (JSONB)</span>
-                    <pre className="p-4 bg-[#F5F7FF] border border-[#ECEEF5] rounded-xl font-mono text-[#1F1F2C] overflow-x-auto text-[11px] leading-relaxed">
-                      {JSON.stringify(log.new_value || null, null, 2)}
-                    </pre>
-                  </div>
-                </div>
-              ) : null;
+              const selectedLog = logs.find(l => l.id === expandedId);
+              if (!selectedLog) return null;
+              return (
+                <pre className="p-3.5 bg-slate-900 text-emerald-400 rounded-xl font-mono text-xs overflow-x-auto border border-slate-800">
+                  {JSON.stringify(
+                    {
+                      id: selectedLog.id,
+                      timestamp: selectedLog.timestamp,
+                      action: selectedLog.action,
+                      entity_type: selectedLog.entity_type,
+                      entity_id: selectedLog.entity_id,
+                      user_id: selectedLog.user_id,
+                      user_email: selectedLog.user_email,
+                      reason: selectedLog.reason,
+                      old_value: selectedLog.old_value,
+                      new_value: selectedLog.new_value,
+                    },
+                    null,
+                    2
+                  )}
+                </pre>
+              );
             })()}
           </div>
         )}

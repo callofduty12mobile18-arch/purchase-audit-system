@@ -1,16 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { TrendingUp, Search, ArrowRight, History } from 'lucide-react';
+import { TrendingUp, Search, ArrowRight } from 'lucide-react';
 import { Input } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
 import { Table } from '../components/ui/Table';
 import { PriceHistory } from '../types';
 import { dbService } from '../services/dbService';
+import { useToast } from '../context/ToastContext';
 
 export const PriceHistoryPage: React.FC = () => {
   const navigate = useNavigate();
+  const { error: toastError } = useToast();
   const [history, setHistory] = useState<PriceHistory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
 
   useEffect(() => {
@@ -19,17 +22,25 @@ export const PriceHistoryPage: React.FC = () => {
 
   const loadHistory = async () => {
     setLoading(true);
-    const data = await dbService.getPriceHistory();
-    const products = await dbService.getProducts();
+    setFetchError(null);
+    try {
+      const data = await dbService.getPriceHistory();
+      const products = await dbService.getProducts();
 
-    // Attach products if missing
-    const enriched = data.map(ph => ({
-      ...ph,
-      product: ph.product || products.find(p => p.id === ph.product_id)
-    }));
+      // Attach products if missing
+      const enriched = data.map(ph => ({
+        ...ph,
+        product: ph.product || products.find(p => p.id === ph.product_id)
+      }));
 
-    setHistory(enriched);
-    setLoading(false);
+      setHistory(enriched);
+    } catch (err: any) {
+      const msg = err.message || 'Failed to load price history records.';
+      setFetchError(msg);
+      toastError('Price History Error', msg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const filteredHistory = history.filter(ph =>
@@ -97,9 +108,11 @@ export const PriceHistoryPage: React.FC = () => {
             icon={<Search className="w-4 h-4" />}
           />
         </div>
-        <span className="text-xs text-[#6C7383] font-mono hidden sm:inline-block ml-auto">
-          {filteredHistory.length} Rate Adjustments Logged
-        </span>
+        {!loading && (
+          <span className="text-xs text-[#6C7383] font-mono hidden sm:inline-block ml-auto">
+            {filteredHistory.length} Rate Adjustments Logged
+          </span>
+        )}
       </div>
 
       <Table
@@ -110,7 +123,14 @@ export const PriceHistoryPage: React.FC = () => {
           if (row.product_id) navigate(`/products/${row.product_id}`);
         }}
         isLoading={loading}
-        emptyText="No price adjustments logged yet."
+        isError={fetchError}
+        onRetry={loadHistory}
+        searchQuery={search}
+        onClearSearch={() => setSearch('')}
+        emptyVariant="history"
+        emptyTitle="No Price Changes Recorded"
+        emptyText="When you edit a product's reference purchase rate in the catalog, an audit entry will be recorded here."
+        skeletonRows={5}
       />
     </div>
   );

@@ -5,6 +5,8 @@ import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Table } from '../components/ui/Table';
+import { CardSkeleton } from '../components/ui/LoadingSkeleton';
+import { ErrorState } from '../components/ui/ErrorState';
 import { Supplier, PurchaseInvoice } from '../types';
 import { dbService } from '../services/dbService';
 
@@ -14,6 +16,7 @@ export const SupplierDetailPage: React.FC = () => {
   const [supplier, setSupplier] = useState<Supplier | null>(null);
   const [invoices, setInvoices] = useState<PurchaseInvoice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
     if (id) loadSupplierData();
@@ -21,19 +24,43 @@ export const SupplierDetailPage: React.FC = () => {
 
   const loadSupplierData = async () => {
     setLoading(true);
-    const sup = await dbService.getSupplierById(id!);
-    const allInvoices = await dbService.getInvoices();
-    const filtered = allInvoices.filter(inv => inv.supplier_id === id);
+    setFetchError(null);
+    try {
+      const sup = await dbService.getSupplierById(id!);
+      const allInvoices = await dbService.getInvoices();
+      const filtered = allInvoices.filter(inv => inv.supplier_id === id);
 
-    setSupplier(sup);
-    setInvoices(filtered);
-    setLoading(false);
+      setSupplier(sup);
+      setInvoices(filtered);
+      if (!sup) {
+        setFetchError('Supplier profile not found.');
+      }
+    } catch (err: any) {
+      setFetchError(err.message || 'Failed to load supplier details.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  if (!supplier && !loading) {
+  if (loading) {
     return (
-      <div className="text-center py-12 text-[#6C7383]">
-        Supplier record not found.
+      <div className="space-y-6 max-w-6xl mx-auto pb-12">
+        <div className="h-9 w-40 bg-[#ECEEF5] rounded-xl animate-pulse" />
+        <CardSkeleton />
+        <CardSkeleton />
+      </div>
+    );
+  }
+
+  if (fetchError || !supplier) {
+    return (
+      <div className="py-12 max-w-2xl mx-auto">
+        <ErrorState
+          title="Supplier Not Found"
+          message={fetchError || `Could not find supplier with ID: "${id}"`}
+          onRetry={loadSupplierData}
+          showHomeButton
+        />
       </div>
     );
   }
@@ -44,15 +71,16 @@ export const SupplierDetailPage: React.FC = () => {
       cell: (row: PurchaseInvoice) => (
         <span
           onClick={() => navigate(`/purchases/${row.id}`)}
-          className="font-mono text-[#4B49AC] hover:underline cursor-pointer font-bold"
+          className="font-mono text-[#4B49AC] hover:underline cursor-pointer font-bold flex items-center gap-1.5"
         >
+          <Receipt className="w-3.5 h-3.5 text-[#7DA0FA]" />
           {row.invoice_number}
         </span>
       )
     },
     {
       header: 'Date',
-      cell: (row: PurchaseInvoice) => <span className="text-[#1F1F2C] font-mono">{row.invoice_date}</span>
+      cell: (row: PurchaseInvoice) => <span className="text-[#1F1F2C] font-mono text-xs">{row.invoice_date}</span>
     },
     {
       header: 'Items & Packs',
@@ -73,12 +101,6 @@ export const SupplierDetailPage: React.FC = () => {
       }
     },
     {
-      header: 'Payment Mode',
-      cell: (row: PurchaseInvoice) => (
-        <span className="font-mono text-xs text-[#1F1F2C] font-medium">{row.payment_mode}</span>
-      )
-    },
-    {
       header: 'Payment Status',
       cell: (row: PurchaseInvoice) => (
         <Badge variant={row.payment_status === 'PAID' ? 'success' : 'warning'}>
@@ -87,92 +109,99 @@ export const SupplierDetailPage: React.FC = () => {
       )
     },
     {
-      header: 'Invoice Total (₹)',
-      cell: (row: PurchaseInvoice) => <span className="font-mono font-bold text-[#4B49AC]">₹{row.grand_total.toFixed(2)}</span>
+      header: 'Grand Total',
+      cell: (row: PurchaseInvoice) => (
+        <span className="font-mono font-bold text-[#1F1F2C] text-sm">₹{row.grand_total.toFixed(2)}</span>
+      )
     }
   ];
 
+  const totalSpend = invoices.reduce((sum, i) => sum + i.grand_total, 0);
+
   return (
-    <div className="space-y-6">
-      <Button variant="outline" size="sm" onClick={() => navigate('/suppliers')} icon={<ArrowLeft className="w-4 h-4" />}>
-        Back to Suppliers List
-      </Button>
+    <div className="space-y-6 max-w-6xl mx-auto pb-12">
+      {/* Top Bar */}
+      <div className="flex items-center justify-between">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => navigate('/suppliers')}
+          icon={<ArrowLeft className="w-4 h-4" />}
+          className="text-xs"
+        >
+          Back to Suppliers
+        </Button>
+      </div>
 
       {/* Supplier Profile Banner */}
-      <Card>
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="flex items-start gap-4">
-            <div className="p-3.5 rounded-2xl bg-[#4B49AC] text-white shadow-skydash-primary shrink-0">
-              <Building2 className="w-8 h-8" />
+      <div className="p-6 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-4 border-b border-[#ECEEF5]">
+          <div className="flex items-start gap-3.5">
+            <div className="p-3 bg-[#F5F7FF] text-[#4B49AC] rounded-2xl border border-[#ECEEF5] shadow-xs">
+              <Building2 className="w-6 h-6" />
             </div>
             <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-xl sm:text-2xl font-bold text-[#1F1F2C] tracking-tight">{supplier?.name}</h1>
-                <Badge variant={supplier?.is_active ? 'success' : 'default'}>
-                  {supplier?.is_active ? 'Active Vendor' : 'Inactive'}
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-bold text-[#1F1F2C]">{supplier.name}</h1>
+                <Badge variant={supplier.is_active ? 'success' : 'default'}>
+                  {supplier.is_active ? 'Active' : 'Inactive'}
                 </Badge>
               </div>
-              {supplier?.gstin && (
-                <p className="text-xs text-[#6C7383] font-mono mt-1">GSTIN: {supplier.gstin}</p>
+              {supplier.gstin && (
+                <p className="text-xs font-mono text-[#6C7383] mt-0.5">GSTIN: {supplier.gstin}</p>
               )}
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5 text-xs">
-            <div className="p-4 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5]">
-              <span className="text-[#6C7383] block uppercase font-mono text-[10px] tracking-wider font-semibold">Payment Terms</span>
-              <span className="text-[#1F1F2C] font-bold text-base mt-1 block">{supplier?.payment_terms || 'NET 30'}</span>
-            </div>
-            <div className="p-4 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5]">
-              <span className="text-[#6C7383] block uppercase font-mono text-[10px] tracking-wider font-semibold">Total Invoices</span>
-              <span className="text-[#1F1F2C] font-bold text-base mt-1 block">{invoices.length} Bills</span>
-            </div>
-            <div className="p-4 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5] col-span-2 sm:col-span-1">
-              <span className="text-[#6C7383] block uppercase font-mono text-[10px] tracking-wider font-semibold">Lifetime Spend</span>
-              <span className="text-[#4B49AC] font-mono font-bold text-lg mt-1 block">
-                ₹{invoices.reduce((sum, inv) => sum + inv.grand_total, 0).toFixed(2)}
-              </span>
-            </div>
+          <div className="text-left sm:text-right">
+            <span className="text-xs text-[#6C7383] uppercase font-bold tracking-wider block">Total Billed Spend</span>
+            <span className="text-2xl font-bold font-mono text-[#4B49AC]">
+              ₹{totalSpend.toFixed(2)}
+            </span>
           </div>
         </div>
 
-        {/* Address and Contact info */}
-        <div className="mt-6 pt-4 border-t border-[#ECEEF5] grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs text-[#6C7383]">
-          {supplier?.phone && (
-            <div className="flex items-center gap-2">
-              <Phone className="w-4 h-4 text-[#4B49AC]" />
-              <span className="text-[#1F1F2C] font-mono">{supplier.phone}</span>
+        {/* Contact Strip */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs text-[#1F1F2C]">
+          {supplier.phone && (
+            <div className="flex items-center gap-2 p-3 bg-[#F5F7FF] rounded-xl border border-[#ECEEF5]">
+              <Phone className="w-4 h-4 text-[#6C7383]" />
+              <span className="font-mono">{supplier.phone}</span>
             </div>
           )}
-          {supplier?.email && (
-            <div className="flex items-center gap-2">
-              <Mail className="w-4 h-4 text-[#4B49AC]" />
-              <span className="text-[#1F1F2C]">{supplier.email}</span>
+          {supplier.email && (
+            <div className="flex items-center gap-2 p-3 bg-[#F5F7FF] rounded-xl border border-[#ECEEF5]">
+              <Mail className="w-4 h-4 text-[#6C7383]" />
+              <span>{supplier.email}</span>
             </div>
           )}
-          {supplier?.address && (
-            <div className="flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-[#4B49AC]" />
-              <span className="text-[#1F1F2C]">{supplier.address}</span>
+          {supplier.address && (
+            <div className="flex items-center gap-2 p-3 bg-[#F5F7FF] rounded-xl border border-[#ECEEF5]">
+              <MapPin className="w-4 h-4 text-[#6C7383]" />
+              <span className="truncate">{supplier.address}</span>
             </div>
           )}
         </div>
-      </Card>
+      </div>
 
-      {/* Invoices List */}
-      <div className="space-y-4">
-        <h3 className="text-base font-bold text-[#1F1F2C] flex items-center gap-2">
-          <Receipt className="w-5 h-5 text-[#4B49AC]" />
-          Supplier Invoice Ledger ({invoices.length})
-        </h3>
+      {/* Associated Invoices */}
+      <Card
+        title={`Purchase Invoices (${invoices.length})`}
+        subtitle="Invoices billed by this supplier"
+      >
         <Table
           columns={columns}
           data={invoices}
           keyExtractor={(row) => row.id}
-          isLoading={loading}
-          emptyText="No invoices recorded for this supplier yet."
+          onRowClick={(row) => navigate(`/purchases/${row.id}`)}
+          isLoading={false}
+          emptyVariant="invoices"
+          emptyTitle="No Invoices from this Supplier"
+          emptyText="No bills have been recorded under this supplier yet."
+          emptyActionLabel="Enter Bill for Supplier"
+          onEmptyAction={() => navigate('/purchases/import')}
         />
-      </div>
+      </Card>
     </div>
   );
 };

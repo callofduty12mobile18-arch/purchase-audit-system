@@ -3,19 +3,21 @@ import { useNavigate } from 'react-router-dom';
 import { Receipt, PlusCircle, Search, Eye } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Select } from '../components/ui/Select';
 import { Badge } from '../components/ui/Badge';
 import { Table } from '../components/ui/Table';
 import { Pagination } from '../components/ui/Pagination';
+import { ShimmerBar } from '../components/ui/LoadingSkeleton';
 import { PurchaseInvoice } from '../types';
 import { dbService } from '../services/dbService';
+import { useToast } from '../context/ToastContext';
 
 export const PurchasesPage: React.FC = () => {
   const navigate = useNavigate();
+  const { error: toastError } = useToast();
   const [invoices, setInvoices] = useState<PurchaseInvoice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
@@ -25,9 +27,17 @@ export const PurchasesPage: React.FC = () => {
 
   const loadInvoices = async () => {
     setLoading(true);
-    const data = await dbService.getInvoices();
-    setInvoices(data);
-    setLoading(false);
+    setFetchError(null);
+    try {
+      const data = await dbService.getInvoices();
+      setInvoices(data);
+    } catch (err: any) {
+      const msg = err.message || 'Failed to retrieve purchase invoices from database.';
+      setFetchError(msg);
+      toastError('Database Error', msg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const filteredInvoices = invoices.filter(inv => {
@@ -35,8 +45,7 @@ export const PurchasesPage: React.FC = () => {
       inv.invoice_number.toLowerCase().includes(search.toLowerCase()) ||
       (inv.supplier?.name && inv.supplier.name.toLowerCase().includes(search.toLowerCase()));
 
-    const matchesStatus = !statusFilter || inv.verification_status === statusFilter;
-    return matchesSearch && matchesStatus;
+    return matchesSearch;
   });
 
   const totalPages = Math.ceil(filteredInvoices.length / pageSize) || 1;
@@ -150,17 +159,33 @@ export const PurchasesPage: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-4">
         <div className="p-5 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash">
           <span className="text-[11px] font-bold text-[#6C7383] uppercase tracking-wider block">Total Invoices</span>
-          <span className="text-xl sm:text-2xl font-bold font-mono text-[#1F1F2C] mt-1 block">{filteredInvoices.length}</span>
+          {loading ? (
+            <ShimmerBar className="h-7 w-20 mt-1" />
+          ) : (
+            <span className="text-xl sm:text-2xl font-bold font-mono text-[#1F1F2C] mt-1 block">
+              {filteredInvoices.length}
+            </span>
+          )}
         </div>
         <div className="p-5 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash">
           <span className="text-[11px] font-bold text-[#6C7383] uppercase tracking-wider block">Total Spend</span>
-          <span className="text-xl sm:text-2xl font-bold font-mono text-[#4B49AC] mt-1 block">₹{totalSpend.toFixed(2)}</span>
+          {loading ? (
+            <ShimmerBar className="h-7 w-32 mt-1" />
+          ) : (
+            <span className="text-xl sm:text-2xl font-bold font-mono text-[#4B49AC] mt-1 block">
+              ₹{totalSpend.toFixed(2)}
+            </span>
+          )}
         </div>
         <div className="p-5 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash">
           <span className="text-[11px] font-bold text-[#6C7383] uppercase tracking-wider block">Total Packs Purchased</span>
-          <span className="text-xl sm:text-2xl font-bold font-mono text-[#7978E9] mt-1 block">
-            {totalPacksPurchased}
-          </span>
+          {loading ? (
+            <ShimmerBar className="h-7 w-24 mt-1" />
+          ) : (
+            <span className="text-xl sm:text-2xl font-bold font-mono text-[#7978E9] mt-1 block">
+              {totalPacksPurchased}
+            </span>
+          )}
         </div>
       </div>
 
@@ -179,7 +204,7 @@ export const PurchasesPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Invoices Table */}
+      {/* Invoices Table with Complete States */}
       <div className="space-y-4">
         <Table
           columns={columns}
@@ -187,10 +212,19 @@ export const PurchasesPage: React.FC = () => {
           keyExtractor={(row) => row.id}
           onRowClick={(row) => navigate(`/purchases/${row.id}`)}
           isLoading={loading}
-          emptyText="No invoices matched your filter criteria."
+          isError={fetchError}
+          onRetry={loadInvoices}
+          searchQuery={search}
+          onClearSearch={() => setSearch('')}
+          emptyVariant="invoices"
+          emptyTitle="No Purchase Invoices Recorded Yet"
+          emptyText="Start logging your purchase bills to keep track of supplier procurement, item rates, and totals."
+          emptyActionLabel="Create First Purchase Invoice"
+          onEmptyAction={() => navigate('/purchases/import')}
+          skeletonRows={5}
         />
 
-        {totalPages > 1 && (
+        {!loading && !fetchError && totalPages > 1 && (
           <div className="pt-2">
             <Pagination
               currentPage={currentPage}

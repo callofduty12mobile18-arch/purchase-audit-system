@@ -12,6 +12,8 @@ import { Button } from '../components/ui/Button';
 import { Select } from '../components/ui/Select';
 import { Table } from '../components/ui/Table';
 import { Badge } from '../components/ui/Badge';
+import { StatCardSkeleton, ShimmerBar } from '../components/ui/LoadingSkeleton';
+import { ErrorState } from '../components/ui/ErrorState';
 import { PurchaseInvoice, Product, PriceHistory } from '../types';
 import { dbService } from '../services/dbService';
 
@@ -22,6 +24,7 @@ export const DashboardPage: React.FC = () => {
   const [priceHistory, setPriceHistory] = useState<PriceHistory[]>([]);
   const [dateFilter, setDateFilter] = useState('ALL');
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
     loadDashboardData();
@@ -29,14 +32,22 @@ export const DashboardPage: React.FC = () => {
 
   const loadDashboardData = async () => {
     setLoading(true);
-    const invs = await dbService.getInvoices();
-    const prods = await dbService.getProducts();
-    const history = await dbService.getPriceHistory();
+    setFetchError(null);
+    try {
+      const [invs, prods, history] = await Promise.all([
+        dbService.getInvoices(),
+        dbService.getProducts(),
+        dbService.getPriceHistory(),
+      ]);
 
-    setInvoices(invs);
-    setProducts(prods);
-    setPriceHistory(history);
-    setLoading(false);
+      setInvoices(invs);
+      setProducts(prods);
+      setPriceHistory(history);
+    } catch (err: any) {
+      setFetchError(err.message || 'Failed to fetch executive dashboard metrics.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const matchesDateFilter = (invoiceDate: string, filter: string) => {
@@ -72,21 +83,6 @@ export const DashboardPage: React.FC = () => {
 
   // Real data calculations
   const totalPurchaseValue = visibleInvoices.reduce((sum, inv) => sum + inv.grand_total, 0);
-  const totalGstPaid = visibleInvoices.reduce((sum, inv) => sum + inv.total_tax, 0);
-
-  // Supplier calculation
-  const supplierSpendMap: Record<string, { name: string; total: number }> = {};
-  visibleInvoices.forEach(inv => {
-    if (inv.supplier) {
-      if (!supplierSpendMap[inv.supplier.id]) {
-        supplierSpendMap[inv.supplier.id] = { name: inv.supplier.name, total: 0 };
-      }
-      supplierSpendMap[inv.supplier.id].total += inv.grand_total;
-    }
-  });
-
-  const topSupplierEntry = Object.values(supplierSpendMap).sort((a, b) => b.total - a.total)[0];
-  const topSupplierName = topSupplierEntry ? topSupplierEntry.name : 'N/A';
 
   // Recent 5 Invoices
   const recentInvoices = visibleInvoices.slice(0, 5);
@@ -133,6 +129,18 @@ export const DashboardPage: React.FC = () => {
     }
   ];
 
+  if (fetchError) {
+    return (
+      <div className="py-8">
+        <ErrorState
+          title="Dashboard Unavailable"
+          message={fetchError}
+          onRetry={loadDashboardData}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-7">
       {/* Header Banner */}
@@ -172,26 +180,35 @@ export const DashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Metrics Row (2 Prominent Cards) */}
+      {/* Metrics Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
-        <StatCard
-          color="blue"
-          title="Total Purchase Value"
-          value={`₹${totalPurchaseValue.toFixed(2)}`}
-          subtitle="Total procurement spend"
-          change={visibleInvoices.length > 0 ? `${visibleInvoices.length} Invoices` : undefined}
-          changeType="positive"
-          icon={<Receipt className="w-5 h-5" />}
-        />
-        <StatCard
-          color="coral"
-          title="Cataloged SKUs"
-          value={products.length}
-          subtitle="Mapped item aliases"
-          change={`${products.length} Active`}
-          changeType="positive"
-          icon={<Package className="w-5 h-5" />}
-        />
+        {loading ? (
+          <>
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+          </>
+        ) : (
+          <>
+            <StatCard
+              color="blue"
+              title="Total Purchase Value"
+              value={`₹${totalPurchaseValue.toFixed(2)}`}
+              subtitle="Total procurement spend"
+              change={visibleInvoices.length > 0 ? `${visibleInvoices.length} Invoices` : undefined}
+              changeType="positive"
+              icon={<Receipt className="w-5 h-5" />}
+            />
+            <StatCard
+              color="coral"
+              title="Cataloged SKUs"
+              value={products.length}
+              subtitle="Mapped item aliases"
+              change={`${products.length} Active`}
+              changeType="positive"
+              icon={<Package className="w-5 h-5" />}
+            />
+          </>
+        )}
       </div>
 
       {/* Main Grid */}
@@ -212,7 +229,12 @@ export const DashboardPage: React.FC = () => {
               data={recentInvoices}
               keyExtractor={(row) => row.id}
               isLoading={loading}
-              emptyText="No invoices recorded yet. Click '+ New Purchase Invoice' to enter your first bill."
+              emptyVariant="invoices"
+              emptyTitle="No Invoices Recorded Yet"
+              emptyText="Click '+ New Purchase Invoice' to enter your first bill."
+              emptyActionLabel="Enter Purchase Bill"
+              onEmptyAction={() => navigate('/purchases/import')}
+              skeletonRows={3}
             />
           </Card>
         </div>
@@ -229,7 +251,13 @@ export const DashboardPage: React.FC = () => {
             }
           >
             <div className="space-y-2.5">
-              {topProducts.length === 0 ? (
+              {loading ? (
+                <div className="space-y-2.5">
+                  <ShimmerBar className="h-12 w-full rounded-xl" />
+                  <ShimmerBar className="h-12 w-full rounded-xl" />
+                  <ShimmerBar className="h-12 w-full rounded-xl" />
+                </div>
+              ) : topProducts.length === 0 ? (
                 <div className="text-[#8F93A0] text-xs py-6 text-center font-mono">No products cataloged yet</div>
               ) : (
                 topProducts.map((prod, idx) => (
@@ -266,7 +294,12 @@ export const DashboardPage: React.FC = () => {
             }
           >
             <div className="space-y-2.5">
-              {priceHistory.length === 0 ? (
+              {loading ? (
+                <div className="space-y-2.5">
+                  <ShimmerBar className="h-12 w-full rounded-xl" />
+                  <ShimmerBar className="h-12 w-full rounded-xl" />
+                </div>
+              ) : priceHistory.length === 0 ? (
                 <div className="text-[#8F93A0] text-xs py-6 text-center font-mono">No price adjustments recorded yet</div>
               ) : (
                 priceHistory.slice(0, 3).map((ph) => (

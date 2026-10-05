@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { LineChart as ChartIcon, TrendingUp, Receipt, Package, Layers, Calendar } from 'lucide-react';
+import { LineChart as ChartIcon, TrendingUp, Receipt, Package, Layers } from 'lucide-react';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -16,6 +16,8 @@ import { Card } from '../components/ui/Card';
 import { StatCard } from '../components/ui/StatCard';
 import { Select } from '../components/ui/Select';
 import { Table } from '../components/ui/Table';
+import { StatCardSkeleton, CardSkeleton } from '../components/ui/LoadingSkeleton';
+import { ErrorState } from '../components/ui/ErrorState';
 import { PurchaseInvoice, Product } from '../types';
 import { dbService } from '../services/dbService';
 
@@ -24,6 +26,7 @@ export const AnalyticsPage: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [timeFilter, setTimeFilter] = useState('ALL');
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
     loadAnalyticsData();
@@ -31,11 +34,17 @@ export const AnalyticsPage: React.FC = () => {
 
   const loadAnalyticsData = async () => {
     setLoading(true);
-    const invs = await dbService.getInvoices();
-    const prods = await dbService.getProducts();
-    setInvoices(invs);
-    setProducts(prods);
-    setLoading(false);
+    setFetchError(null);
+    try {
+      const invs = await dbService.getInvoices();
+      const prods = await dbService.getProducts();
+      setInvoices(invs);
+      setProducts(prods);
+    } catch (err: any) {
+      setFetchError(err.message || 'Failed to load procurement analytics.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const matchesDateFilter = (invoiceDate: string, filter: string) => {
@@ -58,120 +67,94 @@ export const AnalyticsPage: React.FC = () => {
     return true;
   };
 
-  const visibleInvoices = invoices.filter((inv) => matchesDateFilter(inv.invoice_date, timeFilter));
+  const filteredInvoices = invoices.filter(inv => matchesDateFilter(inv.invoice_date, timeFilter));
 
-  const totalSpend = visibleInvoices.reduce((sum, i) => sum + i.grand_total, 0);
-  const totalTax = visibleInvoices.reduce((sum, i) => sum + i.total_tax, 0);
-  const invoiceCount = visibleInvoices.length;
+  // Spend calculations
+  const totalSpend = filteredInvoices.reduce((sum, i) => sum + i.grand_total, 0);
 
-  const monthlyMap: Record<string, { month: string; total: number; tax: number; count: number }> = {};
-  visibleInvoices.forEach((inv) => {
-    const d = new Date(inv.invoice_date);
-    if (Number.isNaN(d.getTime())) return;
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    const label = d.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
-    if (!monthlyMap[key]) monthlyMap[key] = { month: label, total: 0, tax: 0, count: 0 };
-    monthlyMap[key].total += inv.grand_total;
-    monthlyMap[key].tax += inv.total_tax;
-    monthlyMap[key].count += 1;
-  });
-  const monthlyData = Object.keys(monthlyMap).sort().map((k) => monthlyMap[k]);
-
-  // Supplier-wise spend data
-  const supplierSpendMap: Record<string, number> = {};
-  visibleInvoices.forEach(inv => {
-    const sName = inv.supplier?.name || 'Other';
-    supplierSpendMap[sName] = (supplierSpendMap[sName] || 0) + inv.grand_total;
+  // Group by month for timeline chart
+  const monthlyDataMap: Record<string, { month: string; spend: number; invoiceCount: number }> = {};
+  filteredInvoices.forEach(inv => {
+    const monthKey = inv.invoice_date.slice(0, 7); // YYYY-MM
+    if (!monthlyDataMap[monthKey]) {
+      monthlyDataMap[monthKey] = {
+        month: monthKey,
+        spend: 0,
+        invoiceCount: 0
+      };
+    }
+    monthlyDataMap[monthKey].spend += inv.grand_total;
+    monthlyDataMap[monthKey].invoiceCount += 1;
   });
 
-  const supplierPieData = Object.keys(supplierSpendMap).map(sName => ({
-    name: sName,
-    value: supplierSpendMap[sName]
-  }));
+  const timelineData = Object.values(monthlyDataMap).sort((a, b) => a.month.localeCompare(b.month));
 
-  // Skydash Palette for Charts
-  const SKYDASH_CHART_COLORS = ['#4B49AC', '#7DA0FA', '#7978E9', '#F3797E', '#98BDFF', '#6563D9'];
-
-  // Product analytical summary table
-  const productAnalyticsList = products.map(prod => {
-    let totalQty = 0;
-    let totalVal = 0;
-    let invoiceOccurrences = 0;
-    let lastRate = prod.current_purchase_ref_price;
-
-    visibleInvoices.forEach(inv => {
-      inv.items?.forEach(item => {
-        if (item.product_id === prod.id || item.supplier_item_name_snapshot === prod.supplier_item_name) {
-          totalQty += item.quantity;
-          totalVal += item.total;
-          invoiceOccurrences += 1;
-          lastRate = item.purchase_rate;
-        }
-      });
+  // Breakdown by Product Alias
+  const productSpendMap: Record<string, { nickname: string; spend: number; totalPacks: number }> = {};
+  filteredInvoices.forEach(inv => {
+    inv.items?.forEach(it => {
+      const pName = it.product?.nickname || it.supplier_item_name_snapshot;
+      if (!productSpendMap[pName]) {
+        productSpendMap[pName] = { nickname: pName, spend: 0, totalPacks: 0 };
+      }
+      productSpendMap[pName].spend += it.total;
+      productSpendMap[pName].totalPacks += Number(it.quantity) || 0;
     });
-
-    const avgRate = totalQty > 0 ? totalVal / totalQty : prod.current_purchase_ref_price;
-
-    return {
-      id: prod.id,
-      nickname: prod.nickname,
-      supplier_item_name: prod.supplier_item_name,
-      uom: prod.uom,
-      totalQty,
-      totalVal,
-      avgRate,
-      lastRate,
-      invoiceOccurrences
-    };
   });
 
-  type ProductAnalyticsRow = (typeof productAnalyticsList)[number];
+  const productBreakdown = Object.values(productSpendMap).sort((a, b) => b.spend - a.spend);
 
-  const columns = [
+  const COLORS = ['#4B49AC', '#7DA0FA', '#7978E9', '#F3797E', '#FFB64D', '#57B657'];
+
+  const productTableColumns = [
     {
       header: 'Product Alias',
-      cell: (row: ProductAnalyticsRow) => (
-        <div>
-          <span className="font-bold text-[#1F1F2C] block group-hover:text-[#4B49AC] transition-colors">{row.nickname}</span>
-          <span className="text-[11px] font-mono text-[#6C7383]">"{row.supplier_item_name}"</span>
-        </div>
+      cell: (row: { nickname: string; spend: number; totalPacks: number }) => (
+        <span className="font-bold text-[#1F1F2C]">{row.nickname}</span>
       )
     },
     {
       header: 'Total Quantity',
-      cell: (row: ProductAnalyticsRow) => (
-        <span className="font-mono text-[#1F1F2C] font-semibold">
-          {row.totalQty} <span className="text-[#6C7383] text-xs">{row.uom}</span>
-        </span>
+      cell: (row: { nickname: string; spend: number; totalPacks: number }) => (
+        <span className="font-mono text-xs text-[#1F1F2C] font-semibold">{row.totalPacks} Packs</span>
       )
     },
     {
       header: 'Total Spend (₹)',
-      cell: (row: ProductAnalyticsRow) => (
-        <span className="font-mono font-bold text-[#4B49AC] tracking-tight">₹{row.totalVal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+      cell: (row: { nickname: string; spend: number; totalPacks: number }) => (
+        <span className="font-mono text-xs font-bold text-[#4B49AC]">₹{row.spend.toFixed(2)}</span>
       )
     },
     {
-      header: 'Avg Rate (₹)',
-      cell: (row: ProductAnalyticsRow) => (
-        <span className="font-mono text-[#1F1F2C]">₹{row.avgRate.toFixed(2)}</span>
-      )
-    },
-    {
-      header: 'Last Purchase Rate',
-      cell: (row: ProductAnalyticsRow) => (
-        <span className="font-mono font-bold text-[#1F1F2C]">₹{row.lastRate.toFixed(2)}</span>
-      )
-    },
-    {
-      header: 'Audit Invoices',
-      cell: (row: ProductAnalyticsRow) => (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#4B49AC]/10 text-[#4B49AC] border border-[#4B49AC]/20">
-          {row.invoiceOccurrences} bills
-        </span>
-      )
+      header: 'Share %',
+      cell: (row: { nickname: string; spend: number; totalPacks: number }) => {
+        const percent = totalSpend > 0 ? (row.spend / totalSpend) * 100 : 0;
+        return (
+          <div className="flex items-center gap-2">
+            <div className="w-16 bg-[#ECEEF5] rounded-full h-1.5 overflow-hidden">
+              <div
+                className="bg-[#4B49AC] h-1.5 rounded-full"
+                style={{ width: `${Math.min(100, Math.max(0, percent))}%` }}
+              />
+            </div>
+            <span className="font-mono text-xs text-[#6C7383]">{percent.toFixed(1)}%</span>
+          </div>
+        );
+      }
     }
   ];
+
+  if (fetchError) {
+    return (
+      <div className="py-8">
+        <ErrorState
+          title="Analytics Unavailable"
+          message={fetchError}
+          onRetry={loadAnalyticsData}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 pb-12">
@@ -180,128 +163,194 @@ export const AnalyticsPage: React.FC = () => {
         <div>
           <h1 className="page-title flex items-center gap-2.5">
             <ChartIcon className="w-6 h-6 text-[#4B49AC]" />
-            Spending & Purchase Analytics
+            Procurement Analytics & Spend Intelligence
           </h1>
-          <p className="page-subtitle">Procurement spend velocity and product purchase rates</p>
+          <p className="page-subtitle">
+            Aggregate procurement trends, SKU breakdown, and volume patterns
+          </p>
         </div>
 
-        <div className="w-full sm:w-60">
+        <div className="w-48">
           <Select
             value={timeFilter}
             onChange={(e) => setTimeFilter(e.target.value)}
             options={[
-              { value: 'ALL', label: 'Lifetime All Data' },
+              { value: 'ALL', label: 'All Invoices' },
               { value: 'THIS_MONTH', label: 'This Month' },
-              { value: 'LAST_MONTH', label: 'Previous Month' },
+              { value: 'LAST_MONTH', label: 'Last Month' },
               { value: 'THIS_YEAR', label: 'This Year' },
             ]}
           />
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <StatCard
-          color="blue"
-          title="Total Purchase Spend"
-          value={`₹${totalSpend.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-          subtitle="All recorded invoices"
-          icon={<TrendingUp className="w-5 h-5" />}
-        />
-        <StatCard
-          color="purple"
-          title="Processed Invoices"
-          value={invoiceCount}
-          subtitle="Total recorded invoices"
-          icon={<ChartIcon className="w-5 h-5" />}
-        />
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {loading ? (
+          <>
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+          </>
+        ) : (
+          <>
+            <StatCard
+              color="blue"
+              title="Total Billed Spend"
+              value={`₹${totalSpend.toFixed(2)}`}
+              subtitle="Procurement total"
+              icon={<Receipt className="w-5 h-5" />}
+            />
+            <StatCard
+              color="purple"
+              title="Recorded Invoices"
+              value={filteredInvoices.length}
+              subtitle="Total verified bills"
+              icon={<TrendingUp className="w-5 h-5" />}
+            />
+            <StatCard
+              color="coral"
+              title="Active SKUs Purchased"
+              value={productBreakdown.length}
+              subtitle="Unique items ordered"
+              icon={<Package className="w-5 h-5" />}
+            />
+          </>
+        )}
       </div>
 
       {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Monthly Trend Area Chart */}
-        <div className="lg:col-span-8">
-          <Card title="Monthly Purchase Velocity" subtitle="Purchase spend trend across billing cycles">
-            <div className="h-72 w-full pt-4">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={monthlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="totalColor" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#4B49AC" stopOpacity={0.4}/>
-                      <stop offset="95%" stopColor="#4B49AC" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="month" stroke="#6C7383" fontSize={12} tickLine={false} axisLine={{ stroke: '#ECEEF5' }} />
-                  <YAxis stroke="#6C7383" fontSize={12} tickLine={false} axisLine={{ stroke: '#ECEEF5' }} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#FFFFFF',
-                      borderColor: '#ECEEF5',
-                      borderRadius: '12px',
-                      color: '#1F1F2C',
-                      boxShadow: '0 10px 25px -5px rgba(75, 73, 172, 0.15)'
-                    }}
-                  />
-                  <Legend wrapperStyle={{ paddingTop: '10px', fontSize: '12px' }} />
-                  <Area type="monotone" dataKey="total" name="Total Spend (₹)" stroke="#4B49AC" strokeWidth={2.5} fillOpacity={1} fill="url(#totalColor)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Spend Over Time Chart */}
+        <div className="lg:col-span-2">
+          <Card
+            title="Procurement Spend Timeline"
+            subtitle="Monthly billed amount distribution"
+          >
+            {loading ? (
+              <div className="h-72 bg-[#F5F7FF] rounded-xl animate-pulse flex items-center justify-center">
+                <span className="text-xs text-[#8F93A0] font-mono">Generating trend charts...</span>
+              </div>
+            ) : timelineData.length === 0 ? (
+              <div className="h-72 flex items-center justify-center text-xs text-[#8F93A0] font-mono">
+                No historical invoice data available for this range.
+              </div>
+            ) : (
+              <div className="h-72 w-full pt-2">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={timelineData}>
+                    <defs>
+                      <linearGradient id="spendGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#4B49AC" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#4B49AC" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="month" stroke="#8F93A0" fontSize={11} tickLine={false} />
+                    <YAxis
+                      stroke="#8F93A0"
+                      fontSize={11}
+                      tickLine={false}
+                      tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`}
+                    />
+                    <Tooltip
+                      formatter={(val: number) => [`₹${val.toFixed(2)}`, 'Total Spend']}
+                      contentStyle={{
+                        backgroundColor: '#FFFFFF',
+                        borderColor: '#ECEEF5',
+                        borderRadius: '12px',
+                        boxShadow: '0 4px 20px 0 rgba(75, 73, 172, 0.1)',
+                        fontSize: '12px',
+                      }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="spend"
+                      stroke="#4B49AC"
+                      strokeWidth={2.5}
+                      fillOpacity={1}
+                      fill="url(#spendGradient)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </Card>
         </div>
 
-        {/* Supplier Distribution Donut Chart */}
-        <div className="lg:col-span-4">
-          <Card title="Supplier Distribution" subtitle="Share by vendor spend volume">
-            <div className="h-72 w-full flex items-center justify-center">
-              <ResponsiveContainer width="100%" height="100%">
+        {/* SKU Category Breakdown Chart */}
+        <Card
+          title="Product Spend Share"
+          subtitle="Top items by purchase volume"
+        >
+          {loading ? (
+            <div className="h-72 bg-[#F5F7FF] rounded-xl animate-pulse flex items-center justify-center">
+              <span className="text-xs text-[#8F93A0] font-mono">Calculating proportions...</span>
+            </div>
+          ) : productBreakdown.length === 0 ? (
+            <div className="h-72 flex items-center justify-center text-xs text-[#8F93A0] font-mono">
+              No products ordered in this range.
+            </div>
+          ) : (
+            <div className="h-72 w-full flex flex-col items-center justify-center">
+              <ResponsiveContainer width="100%" height="80%">
                 <PieChart>
                   <Pie
-                    data={supplierPieData}
+                    data={productBreakdown.slice(0, 5)}
+                    dataKey="spend"
+                    nameKey="nickname"
                     cx="50%"
                     cy="50%"
-                    innerRadius={55}
-                    outerRadius={85}
-                    paddingAngle={4}
-                    dataKey="value"
+                    innerRadius={50}
+                    outerRadius={75}
+                    paddingAngle={3}
                   >
-                    {supplierPieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={SKYDASH_CHART_COLORS[index % SKYDASH_CHART_COLORS.length]} stroke="#FFFFFF" strokeWidth={2} />
+                    {productBreakdown.slice(0, 5).map((_entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
                   <Tooltip
+                    formatter={(val: number) => [`₹${val.toFixed(2)}`, 'Spend']}
                     contentStyle={{
                       backgroundColor: '#FFFFFF',
                       borderColor: '#ECEEF5',
                       borderRadius: '12px',
-                      color: '#1F1F2C',
-                      boxShadow: '0 10px 25px -5px rgba(75, 73, 172, 0.15)'
+                      fontSize: '12px',
                     }}
                   />
-                  <Legend wrapperStyle={{ fontSize: '11px', color: '#6C7383' }} />
                 </PieChart>
               </ResponsiveContainer>
+              <div className="flex flex-wrap justify-center gap-2 text-[10px] text-[#6C7383] font-semibold mt-1">
+                {productBreakdown.slice(0, 4).map((p, idx) => (
+                  <div key={p.nickname} className="flex items-center gap-1">
+                    <span
+                      className="w-2.5 h-2.5 rounded-full"
+                      style={{ backgroundColor: COLORS[idx % COLORS.length] }}
+                    />
+                    <span className="truncate max-w-[80px]">{p.nickname}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </Card>
-        </div>
+          )}
+        </Card>
       </div>
 
-      {/* Product Analytical Table */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-base font-bold text-[#1F1F2C] flex items-center gap-2">
-            <Package className="w-5 h-5 text-[#4B49AC]" />
-            Per-Product Volume & Rate Breakdown
-          </h3>
-          <span className="text-xs text-[#6C7383] font-mono">{productAnalyticsList.length} registered products</span>
-        </div>
+      {/* SKU Table Breakdown */}
+      <Card
+        title="Product Procurement Breakdown"
+        subtitle="Ranked summary of all purchased items and their respective spend share"
+      >
         <Table
-          columns={columns}
-          data={productAnalyticsList}
-          keyExtractor={(row) => row.id}
+          columns={productTableColumns}
+          data={productBreakdown}
+          keyExtractor={(row) => row.nickname}
           isLoading={loading}
+          emptyVariant="products"
+          emptyTitle="No Items in this Time Period"
+          emptyText="There are no product purchases recorded for the selected time filter."
+          skeletonRows={4}
         />
-      </div>
+      </Card>
     </div>
   );
 };
