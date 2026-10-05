@@ -52,7 +52,7 @@ export const DEFAULT_17_PRODUCTS: Product[] = [
   {
     id: 'b0000000-0000-0000-0000-000000000019',
     supplier_item_name: 'CI CONNECT FT 20R C 390/-',
-    nickname: 'Capstan Connect FT 20R',
+    nickname: 'CI Connect',
     hsn: '24022090',
     uom: 'PAC',
     current_purchase_ref_price: 392.86,
@@ -65,7 +65,7 @@ export const DEFAULT_17_PRODUCTS: Product[] = [
   {
     id: 'b0000000-0000-0000-0000-000000000013',
     supplier_item_name: 'CI Double Burst FS-BDG-ND 20BE',
-    nickname: 'Double Burst 20s',
+    nickname: 'CI Double Burst 20s',
     hsn: '24022090',
     uom: 'PAC',
     current_purchase_ref_price: 431.56,
@@ -91,7 +91,7 @@ export const DEFAULT_17_PRODUCTS: Product[] = [
   {
     id: 'b0000000-0000-0000-0000-000000000018',
     supplier_item_name: 'GOLD FLAKE FX SPECIAL 2-POD',
-    nickname: 'Gold Flake FX Special 2-Pod',
+    nickname: 'FX Special',
     hsn: '24022090',
     uom: 'PAC',
     current_purchase_ref_price: 337.30,
@@ -104,7 +104,7 @@ export const DEFAULT_17_PRODUCTS: Product[] = [
   {
     id: 'b0000000-0000-0000-0000-000000000007',
     supplier_item_name: 'GOLD FL FT-10BE MD+NPCT-FF',
-    nickname: 'Gold Flake Lights 10s',
+    nickname: 'Filter',
     hsn: '24022090',
     uom: 'PAC',
     current_purchase_ref_price: 116.57,
@@ -143,7 +143,7 @@ export const DEFAULT_17_PRODUCTS: Product[] = [
   {
     id: 'b0000000-0000-0000-0000-000000000011',
     supplier_item_name: 'Indie Mint 10BE 115',
-    nickname: 'Indie Mint 10s',
+    nickname: 'Indie Mint',
     hsn: '24022090',
     uom: 'PAC',
     current_purchase_ref_price: 114.09,
@@ -234,7 +234,7 @@ export const DEFAULT_17_PRODUCTS: Product[] = [
   {
     id: 'b0000000-0000-0000-0000-000000000012',
     supplier_item_name: 'WAVE COOL MINT 10R C 96',
-    nickname: 'Wave Cool Mint 10R',
+    nickname: 'Wave Cool Mint',
     hsn: '24022090',
     uom: 'PAC',
     current_purchase_ref_price: 87.00,
@@ -247,7 +247,7 @@ export const DEFAULT_17_PRODUCTS: Product[] = [
   {
     id: 'b0000000-0000-0000-0000-000000000015',
     supplier_item_name: 'WAVE COOL MINT DLX FT 10BE',
-    nickname: 'Wave Cool Mint DLX 10',
+    nickname: 'Wave Cool Mint DLX',
     hsn: '24022090',
     uom: 'PAC',
     current_purchase_ref_price: 53.00,
