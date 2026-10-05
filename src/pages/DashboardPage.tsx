@@ -23,6 +23,7 @@ import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { PurchaseInvoice, Product, PurchaseItem } from '../types';
 import { dbService } from '../services/dbService';
 import { useToast } from '../context/ToastContext';
+import { getTodayIST } from '../utils/dateUtils';
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -76,29 +77,32 @@ export const DashboardPage: React.FC = () => {
 
   const matchesDateFilter = (invoiceDate: string, filter: string) => {
     if (filter === 'ALL') return true;
-    const d = new Date(invoiceDate);
-    if (Number.isNaN(d.getTime())) return false;
-    const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (!invoiceDate) return false;
+    const invDateStr = invoiceDate.slice(0, 10);
+    const todayIST = getTodayIST();
 
     if (filter === 'TODAY') {
-      return d >= startOfToday;
+      return invDateStr === todayIST;
     }
     if (filter === 'THIS_WEEK') {
-      const startOfWeek = new Date(startOfToday);
-      startOfWeek.setDate(startOfToday.getDate() - startOfToday.getDay());
-      return d >= startOfWeek;
+      const todayDate = new Date();
+      const currentDay = todayDate.getDay();
+      const weekStartDate = new Date(todayDate);
+      weekStartDate.setDate(todayDate.getDate() - currentDay);
+      const weekStartStr = getTodayIST(weekStartDate);
+      return invDateStr >= weekStartStr && invDateStr <= todayIST;
     }
     if (filter === 'THIS_MONTH') {
-      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      return invDateStr.slice(0, 7) === todayIST.slice(0, 7);
     }
     if (filter === 'LAST_MONTH') {
-      const lastMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
-      const lastMonthYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
-      return d.getMonth() === lastMonth && d.getFullYear() === lastMonthYear;
+      const today = new Date();
+      const lastMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      const lastMonthPrefix = getTodayIST(lastMonthDate).slice(0, 7);
+      return invDateStr.slice(0, 7) === lastMonthPrefix;
     }
     if (filter === 'THIS_YEAR') {
-      return d.getFullYear() === now.getFullYear();
+      return invDateStr.slice(0, 4) === todayIST.slice(0, 4);
     }
     return true;
   };

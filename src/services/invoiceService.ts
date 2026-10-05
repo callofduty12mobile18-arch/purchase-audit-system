@@ -1,4 +1,5 @@
 import { InvoiceFormData, InvoiceFormItem } from '../types';
+import { getTodayIST, generateISTInvoiceNumber } from '../utils/dateUtils';
 
 export const createBlankInvoiceItem = (): InvoiceFormItem => ({
   item_name: '',
@@ -26,12 +27,12 @@ export const createBlankInvoiceItem = (): InvoiceFormItem => ({
 export const createBlankInvoice = (): InvoiceFormData => ({
   supplier_name: 'AYYAPPA ENTERPRISES',
   supplier_gstin: '33AABFA2949R1Z5',
-  invoice_number: `INV-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`,
+  invoice_number: generateISTInvoiceNumber(),
   invoice_name: '',
-  invoice_date: new Date().toISOString().slice(0, 10),
+  invoice_date: getTodayIST(),
   payment_mode: 'CASH',
   payment_status: 'PAID',
-  cheque_date: new Date().toISOString().slice(0, 10),
+  cheque_date: getTodayIST(),
   subtotal: 0,
   taxable_amount: 0,
   cgst: 0,
@@ -42,3 +43,4 @@ export const createBlankInvoice = (): InvoiceFormData => ({
   grand_total: 0,
   items: [createBlankInvoiceItem()],
 });
+

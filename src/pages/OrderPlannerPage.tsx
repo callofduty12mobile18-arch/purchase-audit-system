@@ -25,6 +25,7 @@ import { Select } from '../components/ui/Select';
 import { Badge } from '../components/ui/Badge';
 import { Supplier, Product, PurchaseInvoice } from '../types';
 import { dbService } from '../services/dbService';
+import { getTodayIST } from '../utils/dateUtils';
 
 interface OrderPlanRow {
   product_id: string;
@@ -301,7 +302,7 @@ export const OrderPlannerPage: React.FC = () => {
   const handlePrint = () => {
     const originalTitle = document.title;
     const supplierClean = selectedSupplier?.name ? selectedSupplier.name.replace(/[^a-zA-Z0-9]/g, '_') : 'Ayyappa_Enterprises';
-    const dateStr = new Date().toISOString().split('T')[0];
+    const dateStr = getTodayIST();
     document.title = `Wholesale_Order_Estimate_${supplierClean}_${dateStr}`;
     window.print();
     setTimeout(() => {

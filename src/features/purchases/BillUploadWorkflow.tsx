@@ -22,6 +22,7 @@ import { InvoiceFormData, InvoiceFormItem, PurchaseInvoice, Supplier, Product } 
 import { createBlankInvoice, createBlankInvoiceItem } from '../../services/invoiceService';
 import { dbService } from '../../services/dbService';
 import { useToast } from '../../context/ToastContext';
+import { getTodayIST, generateISTInvoiceNumber, formatISTTimestamp } from '../../utils/dateUtils';
 
 export const MEMO_NAME_OPTIONS = [
   'RAMACHANDRAN',
@@ -63,12 +64,14 @@ export const BillUploadWorkflow: React.FC = () => {
         supplier_name: 'AYYAPPA ENTERPRISES',
         supplier_gstin: '33AABFA2949R1Z5',
         invoice_name: prev.invoice_name || 'RAMACHANDRAN',
-        invoice_number: prev.invoice_number || `INV-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`,
+        invoice_date: prev.invoice_date || getTodayIST(),
+        invoice_number: prev.invoice_number || generateISTInvoiceNumber(),
         payment_mode: prev.payment_mode === 'CHEQUE' ? 'CHEQUE' : 'CASH',
         payment_status: prev.payment_status === 'CHEQUE' ? 'CHEQUE' : 'PAID',
-        cheque_date: prev.cheque_date || prev.invoice_date || new Date().toISOString().slice(0, 10)
+        cheque_date: prev.cheque_date || prev.invoice_date || getTodayIST()
       }));
     } catch (err: any) {
+
       console.error('Failed to load suppliers/products:', err);
       toastError('Failed to load catalog', err.message || 'Check database connection.');
     } finally {
@@ -307,7 +310,7 @@ export const BillUploadWorkflow: React.FC = () => {
       return;
     }
 
-    const finalInvoiceNumber = formData.invoice_number?.trim() || `INV-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const finalInvoiceNumber = formData.invoice_number?.trim() || generateISTInvoiceNumber();
 
     const submissionData: InvoiceFormData = {
       ...formData,
@@ -938,7 +941,7 @@ export const BillUploadWorkflow: React.FC = () => {
             <div className="p-3 bg-[#F5F7FF] rounded-xl text-xs space-y-1.5 font-mono">
               <div>Invoice Date: <strong>{existingDuplicate.invoice_date}</strong></div>
               <div>Grand Total: <strong>₹{existingDuplicate.grand_total.toFixed(2)}</strong></div>
-              <div>Created At: <strong>{new Date(existingDuplicate.created_at).toLocaleString()}</strong></div>
+              <div>Created At: <strong>{formatISTTimestamp(existingDuplicate.created_at)}</strong></div>
             </div>
           )}
 

@@ -9,6 +9,7 @@ import { CardSkeleton } from '../components/ui/LoadingSkeleton';
 import { ErrorState } from '../components/ui/ErrorState';
 import { Product, PurchaseItem, PriceHistory } from '../types';
 import { dbService } from '../services/dbService';
+import { formatISTTimestamp } from '../utils/dateUtils';
 
 export const ProductDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -188,7 +189,7 @@ export const ProductDetailPage: React.FC = () => {
                   </div>
                 </div>
                 <span className="font-mono text-[11px] text-[#6C7383]">
-                  {new Date(change.changed_at).toLocaleString()}
+                  {formatISTTimestamp(change.changed_at)}
                 </span>
               </div>
             ))}

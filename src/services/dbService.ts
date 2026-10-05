@@ -1,4 +1,5 @@
 import { supabase } from '../integrations/supabase/client';
+import { getTodayIST, generateISTInvoiceNumber } from '../utils/dateUtils';
 import {
   Supplier,
   Product,
@@ -767,7 +768,7 @@ export const dbService = {
       });
     }
 
-    const invoiceNumber = extractedData.invoice_number?.trim() || `INV-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const invoiceNumber = extractedData.invoice_number?.trim() || generateISTInvoiceNumber();
 
     const validPaymentModes = ['CASH', 'UPI', 'BANK_TRANSFER', 'CREDIT', 'CHEQUE', 'OTHER'];
     const safePaymentMode = (extractedData.payment_mode && validPaymentModes.includes(extractedData.payment_mode))
@@ -783,7 +784,7 @@ export const dbService = {
       supplier: supplier,
       invoice_number: invoiceNumber,
       invoice_name: extractedData.invoice_name?.trim() || undefined,
-      invoice_date: extractedData.invoice_date,
+      invoice_date: extractedData.invoice_date || getTodayIST(),
       payment_mode: safePaymentMode,
       payment_status: safePaymentStatus,
       cheque_date: extractedData.cheque_date,

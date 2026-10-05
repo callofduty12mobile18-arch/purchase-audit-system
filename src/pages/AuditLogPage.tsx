@@ -25,6 +25,7 @@ import { Modal } from '../components/ui/Modal';
 import { AuditLog } from '../types';
 import { dbService } from '../services/dbService';
 import { useToast } from '../context/ToastContext';
+import { getTodayIST } from '../utils/dateUtils';
 
 type FilterCategory = 'ALL' | 'INVOICES' | 'PRODUCTS' | 'SUPPLIERS';
 
@@ -76,7 +77,7 @@ export const AuditLogPage: React.FC = () => {
       const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(logs, null, 2));
       const downloadAnchor = document.createElement('a');
       downloadAnchor.setAttribute('href', dataStr);
-      downloadAnchor.setAttribute('download', `audit_trail_export_${new Date().toISOString().slice(0, 10)}.json`);
+      downloadAnchor.setAttribute('download', `audit_trail_export_${getTodayIST()}.json`);
       document.body.appendChild(downloadAnchor);
       downloadAnchor.click();
       downloadAnchor.remove();
@@ -92,6 +93,7 @@ export const AuditLogPage: React.FC = () => {
       const d = new Date(ts);
       if (isNaN(d.getTime())) return ts;
       return d.toLocaleString('en-IN', {
+        timeZone: 'Asia/Kolkata',
         day: '2-digit',
         month: 'short',
         year: 'numeric',
