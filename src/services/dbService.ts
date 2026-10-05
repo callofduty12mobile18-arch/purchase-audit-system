@@ -878,7 +878,7 @@ export const dbService = {
   },
 
   deleteInvoice: async (id: string): Promise<boolean> => {
-    // 1. Fetch current invoices to obtain the target invoice number
+    // 1. Fetch current invoices to obtain the target invoice metadata for audit logging
     const invoices = await dbService.getInvoices();
     const targetInvoice = invoices.find(inv => inv.id === id);
 
@@ -886,27 +886,34 @@ export const dbService = {
     const updatedInvoices = invoices.filter(inv => inv.id !== id);
     setLocalData(LOCAL_STORAGE_KEY_INVOICES, updatedInvoices);
 
-    // 3. Remove any audit logs associated with this specific invoice from local storage cache
-    const currentAudit = getLocalData<AuditLog[]>(LOCAL_STORAGE_KEY_AUDIT, []);
-    const updatedAudit = currentAudit.filter(
-      a => a.entity_id !== id && (!targetInvoice?.invoice_number || !a.reason?.includes(targetInvoice.invoice_number))
-    );
-    setLocalData(LOCAL_STORAGE_KEY_AUDIT, updatedAudit);
-
-    // 4. Delete from Supabase remote database
+    // 3. Delete from Supabase remote database
     try {
       await supabase.from('purchase_items').delete().eq('purchase_invoice_id', id);
       await supabase.from('purchase_invoice_documents').delete().eq('purchase_invoice_id', id);
-      await supabase.from('audit_logs').delete().eq('entity_id', id);
-      if (targetInvoice?.invoice_number) {
-        await supabase.from('audit_logs').delete().ilike('reason', `%${targetInvoice.invoice_number}%`);
-      }
       const { error } = await supabase.from('purchase_invoices').delete().eq('id', id);
       if (error) {
         console.warn('Supabase delete invoice note:', error.message);
       }
     } catch (e) {
       console.warn('Supabase delete invoice exception:', e);
+    }
+
+    // 4. Record permanent immutable audit trail event for deletion
+    if (targetInvoice) {
+      await dbService.logAudit(
+        'INVOICE_DELETED',
+        'purchase_invoices',
+        id,
+        {
+          invoice_number: targetInvoice.invoice_number,
+          supplier_name: targetInvoice.supplier?.name,
+          grand_total: targetInvoice.grand_total,
+          item_count: targetInvoice.items?.length || 0,
+          invoice_date: targetInvoice.invoice_date
+        },
+        null,
+        `Deleted purchase invoice #${targetInvoice.invoice_number} (₹${targetInvoice.grand_total.toFixed(2)})`
+      );
     }
 
     return true;
@@ -960,34 +967,23 @@ export const dbService = {
     // 1. Read existing local audit logs
     const localLogs = getLocalData<AuditLog[]>(LOCAL_STORAGE_KEY_AUDIT, []);
 
-    // 2. Fetch remote logs and active invoices in parallel
+    // 2. Fetch remote logs
     let remoteLogs: AuditLog[] = [];
-    let remoteInvoices: { id: string; invoice_number?: string }[] = [];
 
     try {
-      const [logsRes, invsRes] = await Promise.all([
-        supabase.from('audit_logs').select('*').order('timestamp', { ascending: false }),
-        supabase.from('purchase_invoices').select('id, invoice_number')
-      ]);
+      const { data, error } = await supabase
+        .from('audit_logs')
+        .select('*')
+        .order('timestamp', { ascending: false });
 
-      if (!logsRes.error && logsRes.data) {
-        remoteLogs = logsRes.data as AuditLog[];
-      }
-      if (!invsRes.error && invsRes.data) {
-        remoteInvoices = invsRes.data;
+      if (!error && data) {
+        remoteLogs = data as AuditLog[];
       }
     } catch (e) {
       console.warn('Supabase audit logs fetch error:', e);
     }
 
-    // Combine remote active invoices with local active invoices so local invoices are never treated as orphans
-    const localInvoices = getLocalData<PurchaseInvoice[]>(LOCAL_STORAGE_KEY_INVOICES, []);
-    const allActiveInvoicesMap = new Map<string, { id: string; invoice_number?: string }>();
-    remoteInvoices.forEach(inv => { if (inv?.id) allActiveInvoicesMap.set(inv.id, inv); });
-    localInvoices.forEach(inv => { if (inv?.id) allActiveInvoicesMap.set(inv.id, inv); });
-    const allActiveInvoices = Array.from(allActiveInvoicesMap.values());
-
-    // 3. Merge local and remote logs cleanly by unique ID (preserving all product/supplier/system updates)
+    // 3. Merge local and remote logs cleanly by unique ID (Audit trail is immutable and append-only)
     const mergedMap = new Map<string, AuditLog>();
 
     // Remote logs first
@@ -995,52 +991,19 @@ export const dbService = {
       if (l && l.id) mergedMap.set(l.id, l);
     });
 
-    // Local logs next (if not already present or preserves local state)
+    // Local logs next (if not already present)
     localLogs.forEach(l => {
-      if (l && l.id) {
-        if (!mergedMap.has(l.id)) {
-          mergedMap.set(l.id, l);
-        }
+      if (l && l.id && !mergedMap.has(l.id)) {
+        mergedMap.set(l.id, l);
       }
     });
 
     let allLogs = Array.from(mergedMap.values());
 
-    // 4. Prune only orphan INVOICE logs (e.g., invoices that were explicitly deleted)
-    // IMPORTANT: NEVER prune product logs, supplier logs, price logs, or other non-invoice events!
-    const activeInvoiceIds = new Set(allActiveInvoices.map(i => i.id));
-    const activeInvoiceNumbers = new Set(
-      allActiveInvoices.map(i => (i.invoice_number || '').trim().toLowerCase()).filter(Boolean)
-    );
-
-    const isInvoiceLog = (l: AuditLog) =>
-      l.entity_type === 'purchase_invoices' ||
-      l.action === 'INVOICE_CONFIRMED' ||
-      l.action === 'INVOICE_CREATED' ||
-      l.action === 'INVOICE_DELETED' ||
-      l.entity_type?.toLowerCase().includes('invoice');
-
-    const orphanLogIds: string[] = [];
-
+    // Clean up any historical invoice item product update logs
     allLogs = allLogs.filter(l => {
-      // Clean up auto-generated redundant invoice product logs
       if (l.action === 'PRODUCT_UPDATED' && (l.reason?.startsWith('Invoice #') || l.reason?.toLowerCase().includes('invoice #'))) {
-        orphanLogIds.push(l.id);
         return false;
-      }
-
-      if (isInvoiceLog(l)) {
-        // If there are zero active invoices across both remote and local, prune old invoice logs
-        if (allActiveInvoices.length === 0) {
-          orphanLogIds.push(l.id);
-          return false;
-        }
-        const matchesId = l.entity_id && activeInvoiceIds.has(l.entity_id);
-        const matchesNumber = l.reason && Array.from(activeInvoiceNumbers).some(num => num && l.reason?.toLowerCase().includes(num));
-        if (!matchesId && !matchesNumber) {
-          orphanLogIds.push(l.id);
-          return false;
-        }
       }
       return true;
     });
@@ -1050,19 +1013,8 @@ export const dbService = {
       (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     );
 
-    // Save cleaned, merged logs to localStorage
+    // Save merged logs to localStorage
     setLocalData(LOCAL_STORAGE_KEY_AUDIT, allLogs);
-
-    // Background clean up of remote orphan logs if any
-    if (orphanLogIds.length > 0) {
-      (async () => {
-        try {
-          await supabase.from('audit_logs').delete().in('id', orphanLogIds);
-        } catch (err) {
-          console.warn('Orphan audit log cleanup note:', err);
-        }
-      })();
-    }
 
     return allLogs;
   },
