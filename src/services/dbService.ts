@@ -902,11 +902,38 @@ export const dbService = {
       if (!error && data) {
         const map = new Map<string, AuditLog>();
         data.forEach(item => map.set(item.id, item as AuditLog));
+        const unsynced: AuditLog[] = [];
         local.forEach(item => {
           if (!map.has(item.id)) {
             map.set(item.id, item);
+            unsynced.push(item);
           }
         });
+
+        // Sync local-only records to remote in background
+        if (unsynced.length > 0) {
+          (async () => {
+            try {
+              await supabase
+                .from('audit_logs')
+                .upsert(
+                  unsynced.map(u => ({
+                    id: u.id,
+                    action: u.action,
+                    entity_type: u.entity_type,
+                    entity_id: (u.entity_id && u.entity_id.length === 36 && u.entity_id.includes('-')) ? u.entity_id : null,
+                    old_value: u.old_value,
+                    new_value: u.new_value,
+                    reason: u.reason,
+                    timestamp: u.timestamp
+                  }))
+                );
+            } catch (err) {
+              console.warn('Audit logs background sync note:', err);
+            }
+          })();
+        }
+
         const merged = Array.from(map.values()).sort(
           (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
         );
@@ -932,8 +959,21 @@ export const dbService = {
     const now = new Date().toISOString();
     const id = generateUUID();
     const validEntityId = (entityId && entityId.length === 36 && entityId.includes('-')) ? entityId : undefined;
+
+    let userEmail = 'admin@audit.local';
+    let userId: string | undefined = undefined;
+    try {
+      const { data } = await supabase.auth.getSession();
+      if (data?.session?.user) {
+        userEmail = data.session.user.email || userEmail;
+        userId = data.session.user.id;
+      }
+    } catch {}
+
     const newLog: AuditLog = {
       id,
+      user_id: userId,
+      user_email: userEmail,
       action,
       entity_type: entityType,
       entity_id: entityId,
@@ -949,7 +989,7 @@ export const dbService = {
     setLocalData(LOCAL_STORAGE_KEY_AUDIT, updatedLogs);
 
     try {
-      await supabase
+      const { error } = await supabase
         .from('audit_logs')
         .insert({
           id,
@@ -961,6 +1001,9 @@ export const dbService = {
           reason,
           timestamp: now
         });
+      if (error) {
+        console.warn('Audit log remote insert note:', error.message);
+      }
     } catch (e) {
       console.warn('Audit log sync note:', e);
     }
