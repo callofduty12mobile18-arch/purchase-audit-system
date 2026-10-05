@@ -28,6 +28,20 @@ export const PurchasesPage: React.FC = () => {
 
   useEffect(() => {
     loadInvoices();
+
+    const handleFocusSync = () => {
+      if (document.visibilityState === 'visible') {
+        loadInvoices(true);
+      }
+    };
+
+    window.addEventListener('visibilitychange', handleFocusSync);
+    window.addEventListener('focus', handleFocusSync);
+
+    return () => {
+      window.removeEventListener('visibilitychange', handleFocusSync);
+      window.removeEventListener('focus', handleFocusSync);
+    };
   }, []);
 
   const handleDeleteInvoice = async () => {
@@ -46,18 +60,24 @@ export const PurchasesPage: React.FC = () => {
     }
   };
 
-  const loadInvoices = async () => {
-    setLoading(true);
+  const loadInvoices = async (isBackgroundSync = false) => {
+    if (!isBackgroundSync) {
+      setLoading(true);
+    }
     setFetchError(null);
     try {
       const data = await dbService.getInvoices();
       setInvoices(data);
     } catch (err: any) {
       const msg = err.message || 'Failed to retrieve purchase invoices from database.';
-      setFetchError(msg);
-      toastError('Database Error', msg);
+      if (!isBackgroundSync) {
+        setFetchError(msg);
+        toastError('Database Error', msg);
+      }
     } finally {
-      setLoading(false);
+      if (!isBackgroundSync) {
+        setLoading(false);
+      }
     }
   };
 

@@ -31,10 +31,26 @@ export const AnalyticsPage: React.FC = () => {
 
   useEffect(() => {
     loadAnalyticsData();
+
+    const handleFocusSync = () => {
+      if (document.visibilityState === 'visible') {
+        loadAnalyticsData(true);
+      }
+    };
+
+    window.addEventListener('visibilitychange', handleFocusSync);
+    window.addEventListener('focus', handleFocusSync);
+
+    return () => {
+      window.removeEventListener('visibilitychange', handleFocusSync);
+      window.removeEventListener('focus', handleFocusSync);
+    };
   }, []);
 
-  const loadAnalyticsData = async () => {
-    setLoading(true);
+  const loadAnalyticsData = async (isBackgroundSync = false) => {
+    if (!isBackgroundSync) {
+      setLoading(true);
+    }
     setFetchError(null);
     try {
       const invs = await dbService.getInvoices();
@@ -42,9 +58,13 @@ export const AnalyticsPage: React.FC = () => {
       setInvoices(invs);
       setProducts(prods);
     } catch (err: any) {
-      setFetchError(err.message || 'Failed to load procurement analytics.');
+      if (!isBackgroundSync) {
+        setFetchError(err.message || 'Failed to load procurement analytics.');
+      }
     } finally {
-      setLoading(false);
+      if (!isBackgroundSync) {
+        setLoading(false);
+      }
     }
   };
 

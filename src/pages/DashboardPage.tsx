@@ -39,6 +39,20 @@ export const DashboardPage: React.FC = () => {
 
   useEffect(() => {
     loadDashboardData();
+
+    const handleFocusSync = () => {
+      if (document.visibilityState === 'visible') {
+        loadDashboardData(true);
+      }
+    };
+
+    window.addEventListener('visibilitychange', handleFocusSync);
+    window.addEventListener('focus', handleFocusSync);
+
+    return () => {
+      window.removeEventListener('visibilitychange', handleFocusSync);
+      window.removeEventListener('focus', handleFocusSync);
+    };
   }, []);
 
   const handleDeleteInvoice = async () => {
@@ -57,8 +71,10 @@ export const DashboardPage: React.FC = () => {
     }
   };
 
-  const loadDashboardData = async () => {
-    setLoading(true);
+  const loadDashboardData = async (isBackgroundSync = false) => {
+    if (!isBackgroundSync) {
+      setLoading(true);
+    }
     setFetchError(null);
     try {
       const [invs, prods] = await Promise.all([
@@ -69,9 +85,13 @@ export const DashboardPage: React.FC = () => {
       setInvoices(invs);
       setProducts(prods);
     } catch (err: any) {
-      setFetchError(err.message || 'Failed to fetch executive dashboard metrics.');
+      if (!isBackgroundSync) {
+        setFetchError(err.message || 'Failed to fetch executive dashboard metrics.');
+      }
     } finally {
-      setLoading(false);
+      if (!isBackgroundSync) {
+        setLoading(false);
+      }
     }
   };
 

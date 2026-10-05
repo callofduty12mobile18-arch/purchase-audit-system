@@ -37,4 +37,8 @@ ocr-service/*/__pycache__/
 __pycache__/
 *.py[cod]
 *$py.class
-.pytest_cache/
+# IDE & Agent tools
+.gemini/
+.agent/
+.agents/
+.gsd/

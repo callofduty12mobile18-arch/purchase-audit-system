@@ -297,9 +297,9 @@ const LOCAL_STORAGE_KEY_PRICE_HISTORY = 'ramachandran_price_history_v1';
 const getLocalData = <T>(key: string, fallback: T): T => {
   try {
     const raw = localStorage.getItem(key);
-    if (!raw) return fallback;
+    if (raw === null || raw === undefined) return fallback;
     const parsed = JSON.parse(raw);
-    return (Array.isArray(parsed) && parsed.length > 0) ? (parsed as unknown as T) : fallback;
+    return parsed as T;
   } catch {
     return fallback;
   }
@@ -344,9 +344,10 @@ export const dbService = {
         .from('suppliers')
         .select('*')
         .order('name');
-      if (!error && data && data.length > 0) {
-        setLocalData(LOCAL_STORAGE_KEY_SUPPLIERS, data);
-        return data as Supplier[];
+      if (!error && data !== null) {
+        const suppliers = data.length > 0 ? (data as Supplier[]) : DEFAULT_SUPPLIERS;
+        setLocalData(LOCAL_STORAGE_KEY_SUPPLIERS, suppliers);
+        return suppliers;
       }
     } catch (e) {
       console.warn('Supabase suppliers fetch note:', e);
@@ -445,20 +446,24 @@ export const dbService = {
 
   getProducts: async (): Promise<Product[]> => {
     let prods: Product[] = [];
+    let remoteSuccess = false;
     try {
       const { data, error } = await supabase
         .from('products')
         .select('*, category:categories(*)')
         .order('nickname');
-      if (!error && data && data.length > 0) {
+      if (!error && data !== null) {
         prods = data as Product[];
+        remoteSuccess = true;
       }
     } catch (e) {
       console.warn('Supabase products fetch note:', e);
     }
 
-    if (prods.length === 0) {
+    if (!remoteSuccess) {
       prods = getLocalData<Product[]>(LOCAL_STORAGE_KEY_PRODUCTS, DEFAULT_PRODUCTS);
+    } else if (prods.length === 0) {
+      prods = [...DEFAULT_PRODUCTS];
     }
 
     // Ensure all default products exist and rates are up to date
@@ -596,59 +601,31 @@ export const dbService = {
 
   // --- INVOICES & PURCHASES ---
   getInvoices: async (): Promise<PurchaseInvoice[]> => {
-    const localInvoices = getLocalData<PurchaseInvoice[]>(LOCAL_STORAGE_KEY_INVOICES, []);
-    let remoteInvoices: PurchaseInvoice[] = [];
-
     try {
       const { data, error } = await supabase
         .from('purchase_invoices')
         .select('*, supplier:suppliers(*), items:purchase_items(*, product:products(*))')
         .order('invoice_date', { ascending: false });
 
-      if (!error && data) {
-        remoteInvoices = data as PurchaseInvoice[];
+      if (!error && data !== null) {
+        const remoteInvoices = (data as PurchaseInvoice[]).sort(
+          (a, b) => new Date(b.invoice_date || b.created_at || 0).getTime() - new Date(a.invoice_date || a.created_at || 0).getTime()
+        );
+        // Authoritative remote state overwrites local cache cleanly
+        setLocalData(LOCAL_STORAGE_KEY_INVOICES, remoteInvoices);
+        return remoteInvoices;
       }
     } catch (e) {
       console.warn('Supabase invoices fetch note:', e);
     }
 
-    // Merge remote and local invoices cleanly by unique ID
-    const invMap = new Map<string, PurchaseInvoice>();
-    remoteInvoices.forEach(inv => {
-      if (inv && inv.id) {
-        const local = localInvoices.find(l => l.id === inv.id);
-        if ((!inv.items || inv.items.length === 0) && local?.items && local.items.length > 0) {
-          inv.items = local.items;
-        }
-        if (!inv.invoice_name && local?.invoice_name) {
-          inv.invoice_name = local.invoice_name;
-        }
-        invMap.set(inv.id, inv);
-      }
-    });
-
-    localInvoices.forEach(inv => {
-      if (inv && inv.id && !invMap.has(inv.id)) {
-        invMap.set(inv.id, inv);
-      }
-    });
-
-    const merged = Array.from(invMap.values()).sort(
-      (a, b) => new Date(b.invoice_date || b.created_at || 0).getTime() - new Date(a.invoice_date || a.created_at || 0).getTime()
-    );
-
-    setLocalData(LOCAL_STORAGE_KEY_INVOICES, merged);
-    return merged;
+    // Only fallback to local storage if network request failed (offline)
+    return getLocalData<PurchaseInvoice[]>(LOCAL_STORAGE_KEY_INVOICES, []);
   },
 
   getInvoiceById: async (id: string): Promise<PurchaseInvoice | null> => {
     if (!id) return null;
 
-    // 1. Check local cache first
-    const localInvoices = getLocalData<PurchaseInvoice[]>(LOCAL_STORAGE_KEY_INVOICES, []);
-    const localMatch = localInvoices.find(inv => inv.id === id);
-
-    // 2. Fetch directly from Supabase for fresh data
     try {
       const { data, error } = await supabase
         .from('purchase_invoices')
@@ -656,30 +633,30 @@ export const dbService = {
         .eq('id', id)
         .maybeSingle();
 
-      if (!error && data) {
-        const freshInvoice = data as PurchaseInvoice;
-        if ((!freshInvoice.items || freshInvoice.items.length === 0) && localMatch?.items && localMatch.items.length > 0) {
-          freshInvoice.items = localMatch.items;
+      if (!error) {
+        if (data) {
+          const freshInvoice = data as PurchaseInvoice;
+          const localInvoices = getLocalData<PurchaseInvoice[]>(LOCAL_STORAGE_KEY_INVOICES, []);
+          const updated = [freshInvoice, ...localInvoices.filter(i => i.id !== id)];
+          setLocalData(LOCAL_STORAGE_KEY_INVOICES, updated);
+          return freshInvoice;
+        } else {
+          // Record was deleted in Supabase; purge it from local cache too
+          const localInvoices = getLocalData<PurchaseInvoice[]>(LOCAL_STORAGE_KEY_INVOICES, []);
+          const filtered = localInvoices.filter(i => i.id !== id);
+          if (filtered.length !== localInvoices.length) {
+            setLocalData(LOCAL_STORAGE_KEY_INVOICES, filtered);
+          }
+          return null;
         }
-        if (!freshInvoice.invoice_name && localMatch?.invoice_name) {
-          freshInvoice.invoice_name = localMatch.invoice_name;
-        }
-        const updated = [freshInvoice, ...localInvoices.filter(i => i.id !== id)];
-        setLocalData(LOCAL_STORAGE_KEY_INVOICES, updated);
-        return freshInvoice;
       }
     } catch (e) {
       console.warn('Supabase single invoice fetch note:', e);
     }
 
-    // 3. Fallback to local cache record
-    if (localMatch) {
-      return localMatch;
-    }
-
-    // 4. Try refreshing full invoice list
-    const allInvoices = await dbService.getInvoices();
-    return allInvoices.find(inv => inv.id === id) || null;
+    // Offline fallback only when network failed
+    const localInvoices = getLocalData<PurchaseInvoice[]>(LOCAL_STORAGE_KEY_INVOICES, []);
+    return localInvoices.find(inv => inv.id === id) || null;
   },
 
   checkDuplicateInvoice: async (supplierId: string, invoiceNumber: string, invoiceDate?: string): Promise<PurchaseInvoice | null> => {
@@ -927,8 +904,8 @@ export const dbService = {
         .from('price_history')
         .select('*, product:products(*)')
         .order('changed_at', { ascending: false });
-      if (!error && data && data.length > 0) {
-        setLocalData(LOCAL_STORAGE_KEY_PRICE_HISTORY, data);
+      if (!error && data !== null) {
+        setLocalData(LOCAL_STORAGE_KEY_PRICE_HISTORY, data as PriceHistory[]);
         return data as PriceHistory[];
       }
     } catch {
@@ -965,59 +942,28 @@ export const dbService = {
 
   // --- AUDIT LOGS ---
   getAuditLogs: async (): Promise<AuditLog[]> => {
-    // 1. Read existing local audit logs
-    const localLogs = getLocalData<AuditLog[]>(LOCAL_STORAGE_KEY_AUDIT, []);
-
-    // 2. Fetch remote logs
-    let remoteLogs: AuditLog[] = [];
-
     try {
       const { data, error } = await supabase
         .from('audit_logs')
         .select('*')
         .order('timestamp', { ascending: false });
 
-      if (!error && data) {
-        remoteLogs = data as AuditLog[];
+      if (!error && data !== null) {
+        let allLogs = data as AuditLog[];
+        allLogs = allLogs.filter(l => {
+          if (l.action === 'PRODUCT_UPDATED' && (l.reason?.startsWith('Invoice #') || l.reason?.toLowerCase().includes('invoice #'))) {
+            return false;
+          }
+          return true;
+        });
+        setLocalData(LOCAL_STORAGE_KEY_AUDIT, allLogs);
+        return allLogs;
       }
     } catch (e) {
       console.warn('Supabase audit logs fetch error:', e);
     }
 
-    // 3. Merge local and remote logs cleanly by unique ID (Audit trail is immutable and append-only)
-    const mergedMap = new Map<string, AuditLog>();
-
-    // Remote logs first
-    remoteLogs.forEach(l => {
-      if (l && l.id) mergedMap.set(l.id, l);
-    });
-
-    // Local logs next (if not already present)
-    localLogs.forEach(l => {
-      if (l && l.id && !mergedMap.has(l.id)) {
-        mergedMap.set(l.id, l);
-      }
-    });
-
-    let allLogs = Array.from(mergedMap.values());
-
-    // Clean up any historical invoice item product update logs
-    allLogs = allLogs.filter(l => {
-      if (l.action === 'PRODUCT_UPDATED' && (l.reason?.startsWith('Invoice #') || l.reason?.toLowerCase().includes('invoice #'))) {
-        return false;
-      }
-      return true;
-    });
-
-    // Sort chronologically descending
-    allLogs.sort(
-      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-    );
-
-    // Save merged logs to localStorage
-    setLocalData(LOCAL_STORAGE_KEY_AUDIT, allLogs);
-
-    return allLogs;
+    return getLocalData<AuditLog[]>(LOCAL_STORAGE_KEY_AUDIT, []);
   },
 
   logAudit: async (
