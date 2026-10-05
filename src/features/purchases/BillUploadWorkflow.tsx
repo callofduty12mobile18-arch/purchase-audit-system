@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  FileText,
   Upload,
-  Camera,
   RotateCw,
   ZoomIn,
   ZoomOut,
@@ -12,56 +12,44 @@ import {
   Plus,
   ShieldAlert,
   ArrowLeft,
-  RefreshCw,
-  FileText
+  Building2,
+  Calendar,
+  DollarSign,
+  Package,
+  Layers,
+  Sparkles,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
-import { ExtractedOcrInvoice, ExtractedOcrItem, PurchaseInvoice } from '../../types';
-import { ocrService, createBlankInvoice } from '../../services/ocrService';
+import { InvoiceFormData, InvoiceFormItem, PurchaseInvoice, Supplier, Product } from '../../types';
+import { createBlankInvoice, createBlankInvoiceItem } from '../../services/invoiceService';
 import { dbService } from '../../services/dbService';
 
 export const BillUploadWorkflow: React.FC = () => {
   const navigate = useNavigate();
-  const [step, setStep] = useState<'UPLOAD' | 'PROCESSING' | 'ERROR' | 'VERIFY'>('UPLOAD');
+  const [formData, setFormData] = useState<InvoiceFormData>(createBlankInvoice());
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [showDocumentPanel, setShowDocumentPanel] = useState<boolean>(false);
   const [rotation, setRotation] = useState(0);
   const [zoom, setZoom] = useState(1);
-  const [progress, setProgress] = useState(0);
-  const [ocrResult, setOcrResult] = useState<ExtractedOcrInvoice | null>(null);
-  const [ocrError, setOcrError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [existingDuplicate, setExistingDuplicate] = useState<PurchaseInvoice | null>(null);
-  const [serviceStatus, setServiceStatus] = useState<{ isOnline: boolean; detail?: string } | null>(null);
-  const [isCheckingHealth, setIsCheckingHealth] = useState(true);
+  const [loadingInitial, setLoadingInitial] = useState(true);
+
   const isPdf = selectedFile?.type === 'application/pdf' || selectedFile?.name.toLowerCase().endsWith('.pdf');
 
-  const checkHealth = async () => {
-    setIsCheckingHealth(true);
-    try {
-      const status = await ocrService.checkServiceHealth();
-      setServiceStatus(status);
-    } catch {
-      setServiceStatus({ isOnline: false, detail: 'Waking up cloud service...' });
-    } finally {
-      setIsCheckingHealth(false);
-    }
-  };
-
   useEffect(() => {
-    checkHealth();
-    // Poll every 5 seconds until online, then every 30 seconds
-    const interval = setInterval(() => {
-      checkHealth();
-    }, serviceStatus?.isOnline ? 30000 : 5000);
-
-    return () => clearInterval(interval);
-  }, [serviceStatus?.isOnline]);
+    loadMetadata();
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -69,13 +57,29 @@ export const BillUploadWorkflow: React.FC = () => {
     };
   }, [previewUrl]);
 
-  // File Handling
+  const loadMetadata = async () => {
+    try {
+      setLoadingInitial(true);
+      const [fetchedSuppliers, fetchedProducts] = await Promise.all([
+        dbService.getSuppliers(),
+        dbService.getProducts()
+      ]);
+      setSuppliers(fetchedSuppliers);
+      setProducts(fetchedProducts);
+    } catch (err) {
+      console.error('Failed to load suppliers/products:', err);
+    } finally {
+      setLoadingInitial(false);
+    }
+  };
+
+  // File Handling for Optional Bill Attachment Preview
   const handleFileSelect = (file: File) => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setSelectedFile(file);
-    setOcrError(null);
     const url = URL.createObjectURL(file);
     setPreviewUrl(url);
+    setShowDocumentPanel(true);
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -85,35 +89,15 @@ export const BillUploadWorkflow: React.FC = () => {
     }
   };
 
-  const handleStartOcr = async () => {
-    if (!selectedFile) return;
-    setStep('PROCESSING');
-    setProgress(20);
-    setOcrError(null);
-
-    const interval = setInterval(() => {
-      setProgress((prev) => (prev < 90 ? prev + 15 : prev));
-    }, 300);
-
-    try {
-      const extracted = await ocrService.processInvoiceDocument(selectedFile);
-      clearInterval(interval);
-      setProgress(100);
-      setOcrResult(extracted);
-      setStep('VERIFY');
-    } catch (err: any) {
-      clearInterval(interval);
-      setOcrError(err?.message || 'Failed to extract text from document. OCR service may not be running.');
-      setStep('ERROR');
-    }
+  const handleRemoveAttachment = () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setSelectedFile(null);
+    setPreviewUrl(null);
+    setShowDocumentPanel(false);
   };
 
-  const handleEnterManually = () => {
-    setOcrResult(createBlankInvoice());
-    setStep('VERIFY');
-  };
-
-  const recalcFromItems = (items: ExtractedOcrItem[], roundOff = ocrResult?.round_off ?? 0) => {
+  // Mathematical Recalculations
+  const recalcFromItems = (items: InvoiceFormItem[], roundOff = formData.round_off ?? 0) => {
     const subtotal = items.reduce((sum, i) => sum + (Number(i.taxable_value) || (Number(i.invoice_amount || i.total) / 1.4)), 0);
     const cgstTotal = items.reduce((sum, i) => sum + (Number(i.cgst) || 0), 0);
     const sgstTotal = items.reduce((sum, i) => sum + (Number(i.sgst) || 0), 0);
@@ -136,18 +120,10 @@ export const BillUploadWorkflow: React.FC = () => {
     };
   };
 
-  // Helper confidence badge color
-  const getConfidenceBadge = (score: number) => {
-    if (score >= 0.9) return <Badge variant="success">High Confidence ({(score * 100).toFixed(0)}%)</Badge>;
-    if (score >= 0.7) return <Badge variant="info">Medium Confidence ({(score * 100).toFixed(0)}%)</Badge>;
-    return <Badge variant="warning">Low Confidence ({(score * 100).toFixed(0)}%)</Badge>;
-  };
+  // Header change updates
+  const handleHeaderChange = (field: keyof InvoiceFormData, value: string | number) => {
+    const updated: InvoiceFormData = { ...formData, [field]: value } as InvoiceFormData;
 
-  // Field change updates
-  const handleHeaderChange = (field: keyof ExtractedOcrInvoice, value: string | number) => {
-    if (!ocrResult) return;
-    const updated: ExtractedOcrInvoice = { ...ocrResult, [field]: value } as ExtractedOcrInvoice;
-    // Recalculate totals
     if (['subtotal', 'taxable_amount', 'cgst', 'sgst', 'igst', 'round_off'].includes(field)) {
       if (field === 'taxable_amount') {
         updated.subtotal = Number(value) || 0;
@@ -162,17 +138,41 @@ export const BillUploadWorkflow: React.FC = () => {
       updated.total_tax = Number((cgst + sgst + igst).toFixed(2));
       updated.grand_total = Number((sub + updated.total_tax + round).toFixed(2));
     }
-    setOcrResult(updated);
+    setFormData(updated);
   };
 
-  const handleItemChange = (index: number, field: keyof ExtractedOcrItem, value: string | number) => {
-    if (!ocrResult) return;
-    const items = [...ocrResult.items];
-    const item = { ...items[index], [field]: value } as ExtractedOcrItem;
+  const handleSupplierSelect = (supplierName: string) => {
+    const matched = suppliers.find(s => s.name.toLowerCase() === supplierName.toLowerCase());
+    setFormData(prev => ({
+      ...prev,
+      supplier_name: supplierName,
+      supplier_gstin: matched?.gstin || prev.supplier_gstin || ''
+    }));
+  };
+
+  const handleItemChange = (index: number, field: keyof InvoiceFormItem, value: string | number) => {
+    const items = [...formData.items];
+    const item = { ...items[index], [field]: value } as InvoiceFormItem;
 
     if (field === 'supplier_item_name' || field === 'item_name') {
       item.item_name = String(value);
       item.supplier_item_name = String(value);
+      
+      // Check if matches an existing product in catalogue
+      const matchedProd = products.find(p =>
+        p.supplier_item_name.toLowerCase() === String(value).toLowerCase() ||
+        p.nickname.toLowerCase() === String(value).toLowerCase()
+      );
+      if (matchedProd) {
+        item.hsn = matchedProd.hsn || item.hsn || '24022090';
+        item.uom = matchedProd.uom || 'PAC';
+        if (matchedProd.current_purchase_ref_price && !item.each_pack_rate) {
+          item.each_pack_rate = matchedProd.current_purchase_ref_price;
+        }
+        if (matchedProd.current_selling_price && !item.mrp_rsp) {
+          item.mrp_rsp = matchedProd.current_selling_price;
+        }
+      }
     } else if (field === 'qty' || field === 'quantity') {
       item.qty = Number(value) || 0;
       item.quantity = Number(value) || 0;
@@ -185,14 +185,11 @@ export const BillUploadWorkflow: React.FC = () => {
       item.total = Number(value) || 0;
     }
 
-    // Auto math calculation on item changes:
     // Deterministic each_pack_rate = invoice_amount / pack_qty
     const packQty = Number(item.pack_qty) || 0;
     const invAmt = Number(item.invoice_amount ?? item.total) || 0;
-    if (packQty > 0) {
+    if (packQty > 0 && invAmt > 0) {
       item.each_pack_rate = Number((invAmt / packQty).toFixed(2));
-    } else {
-      item.each_pack_rate = 0;
     }
 
     if (field === 'taxable_value') {
@@ -218,10 +215,11 @@ export const BillUploadWorkflow: React.FC = () => {
       }
     }
 
-    // Re-check validation
+    // Warnings & Validation Check
     const warnings: string[] = [];
-    if (!item.pack_qty || item.pack_qty <= 0) warnings.push('Pack quantity is missing');
-    if (!item.invoice_amount || item.invoice_amount <= 0) warnings.push('Invoice amount is missing');
+    if (!item.supplier_item_name?.trim()) warnings.push('Item description is required');
+    if (!item.pack_qty || item.pack_qty <= 0) warnings.push('Pack quantity is required');
+    if (!item.invoice_amount || item.invoice_amount <= 0) warnings.push('Invoice amount is required');
     if (item.mrp_rsp && item.each_pack_rate && item.each_pack_rate > item.mrp_rsp * 1.05) {
       warnings.push(`Each pack rate (₹${item.each_pack_rate}) exceeds MRP (₹${item.mrp_rsp})`);
     }
@@ -229,71 +227,58 @@ export const BillUploadWorkflow: React.FC = () => {
     item.validation = { valid: warnings.length === 0, warnings };
 
     items[index] = item;
-    setOcrResult({
-      ...ocrResult,
-      ...recalcFromItems(items, ocrResult.round_off),
+    setFormData({
+      ...formData,
+      ...recalcFromItems(items, formData.round_off),
     });
   };
 
   const handleAddItem = () => {
-    if (!ocrResult) return;
-    const newItem: ExtractedOcrItem = {
-      item_name: 'New Line Item',
-      supplier_item_name: 'New Line Item',
-      hsn: '24022090',
-      qty: 1,
-      quantity: 1,
-      uom: 'PAC',
-      mrp_rsp: 0,
-      pack_qty: 100,
-      invoice_amount: 0,
-      each_pack_rate: 0,
-      purchase_rate: 0,
-      gst_rate: 40,
-      taxable_value: 0,
-      cgst: 0,
-      sgst: 0,
-      igst: 0,
-      total: 0,
-      confidence: 1.0,
-      needs_review: false,
-      validation: { valid: true, warnings: [] },
-    };
-    const items = [...ocrResult.items, newItem];
-    setOcrResult({
-      ...ocrResult,
-      ...recalcFromItems(items, ocrResult.round_off),
+    const newItem = createBlankInvoiceItem();
+    const items = [...formData.items, newItem];
+    setFormData({
+      ...formData,
+      ...recalcFromItems(items, formData.round_off),
     });
   };
 
   const handleRemoveItem = (index: number) => {
-    if (!ocrResult || ocrResult.items.length <= 1) return;
-    const items = ocrResult.items.filter((_, i) => i !== index);
-    setOcrResult({ ...ocrResult, ...recalcFromItems(items, ocrResult.round_off) });
+    if (formData.items.length <= 1) return;
+    const items = formData.items.filter((_, i) => i !== index);
+    setFormData({ ...formData, ...recalcFromItems(items, formData.round_off) });
   };
 
   // Validation Checks
-  const calculatedGrandTotal = ocrResult
-    ? (ocrResult.subtotal + ocrResult.total_tax + ocrResult.round_off)
-    : 0;
-  const isTotalMismatch = ocrResult && Math.abs(calculatedGrandTotal - ocrResult.grand_total) > 0.05;
+  const calculatedGrandTotal = formData.subtotal + formData.total_tax + formData.round_off;
+  const isTotalMismatch = Math.abs(calculatedGrandTotal - formData.grand_total) > 0.05;
 
   // Duplicate Inspection & Confirmation
   const handleInitiateConfirm = async () => {
-    if (!ocrResult) return;
+    if (!formData.supplier_name.trim()) {
+      alert('Please enter or select a supplier name.');
+      return;
+    }
+    if (!formData.invoice_number.trim()) {
+      alert('Please enter an invoice number.');
+      return;
+    }
+    if (formData.items.length === 0) {
+      alert('Please enter at least one line item.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      const suppliers = await dbService.getSuppliers();
       const matchedSupplier = suppliers.find(
-        s => s.name.trim().toLowerCase() === ocrResult.supplier_name.trim().toLowerCase()
+        s => s.name.trim().toLowerCase() === formData.supplier_name.trim().toLowerCase()
       );
 
       if (matchedSupplier) {
         const duplicate = await dbService.checkDuplicateInvoice(
           matchedSupplier.id,
-          ocrResult.invoice_number,
-          ocrResult.invoice_date
+          formData.invoice_number,
+          formData.invoice_date
         );
         if (duplicate) {
           setExistingDuplicate(duplicate);
@@ -303,578 +288,510 @@ export const BillUploadWorkflow: React.FC = () => {
         }
       }
 
-      await executeSaveInvoice();
-    } catch (e) {
-      console.error('Duplicate verification error:', e);
-      alert('Failed to verify duplicate check.');
+      await executeSave();
+    } catch (err: any) {
+      console.error('Save error:', err);
+      alert(err.message || 'Failed to confirm and save purchase invoice');
       setIsSubmitting(false);
     }
   };
 
-  const executeSaveInvoice = async () => {
-    if (!ocrResult) return;
+  const executeSave = async () => {
     setIsSubmitting(true);
+    setShowDuplicateModal(false);
     try {
-      const saved = await dbService.confirmAndSaveInvoice(ocrResult, selectedFile?.name);
+      const saved = await dbService.confirmAndSaveInvoice(
+        formData,
+        selectedFile?.name || undefined
+      );
       navigate(`/purchases/${saved.id}`);
-    } catch (e) {
-      console.error('Invoice confirmation error:', e);
-      alert('Error confirming invoice save.');
+    } catch (err: any) {
+      alert(err.message || 'Error saving invoice to database');
     } finally {
       setIsSubmitting(false);
-      setShowDuplicateModal(false);
     }
   };
 
   return (
-    <div className="space-y-6">
-      {/* Step 1: Upload File Screen */}
-      {step === 'UPLOAD' && (
-        <div className="max-w-3xl mx-auto space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-center sm:text-left">
-            <div>
-              <h1 className="page-title justify-center sm:justify-start">
-                <Upload className="w-6 h-6 text-[#4B49AC]" />
-                Upload & OCR Extract Invoice
-              </h1>
-              <p className="page-subtitle mx-auto sm:mx-0">
-                Upload paper bills, receipts, or PDF invoices. High-accuracy local OCR extracts supplier info, HSN codes, rates & GST taxes.
-              </p>
-            </div>
-            <div
-              onClick={checkHealth}
-              className="flex items-center justify-center sm:justify-end gap-2 px-3.5 py-1.5 rounded-xl bg-white border border-[#ECEEF5] shadow-xs shrink-0 self-center sm:self-auto cursor-pointer hover:bg-[#F5F7FF] transition-colors"
-              title="Click to recheck service status"
-            >
-              <div
-                className={`w-2.5 h-2.5 rounded-full ${
-                  serviceStatus?.isOnline
-                    ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50'
-                    : isCheckingHealth
-                    ? 'bg-blue-500 animate-ping'
-                    : 'bg-amber-400 animate-pulse'
-                }`}
-              />
-              <span className="text-xs font-semibold text-[#1F1F2C]">
-                {serviceStatus?.isOnline
-                  ? 'OCR Engine: Online'
-                  : isCheckingHealth
-                  ? 'OCR Engine: Checking...'
-                  : 'OCR Engine: Waking up (Tap to refresh)'}
-              </span>
-            </div>
-          </div>
-
-          <div
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={handleDrop}
-            className="group relative border-2 border-dashed border-[#C8D4FF] hover:border-[#4B49AC] p-8 sm:p-12 bg-white rounded-3xl text-center transition-all duration-300 shadow-skydash hover:shadow-skydash-lg cursor-pointer"
+    <div className="space-y-6 max-w-7xl mx-auto pb-16">
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate('/purchases')}
+            icon={<ArrowLeft className="w-4 h-4" />}
+            className="mb-2 text-[#6C7383] hover:text-[#4B49AC]"
           >
-            <input
-              type="file"
-              accept="image/*,application/pdf"
-              id="file-upload-input"
-              className="hidden"
-              onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
-            />
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              id="camera-upload-input"
-              className="hidden"
-              onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
-            />
-            <label htmlFor="file-upload-input" className="cursor-pointer space-y-4 inline-block">
-              <div className="mx-auto w-16 h-16 rounded-2xl bg-[#F5F7FF] text-[#4B49AC] flex items-center justify-center shadow-md shadow-[#4B49AC]/10 group-hover:scale-105 group-hover:bg-[#4B49AC] group-hover:text-white transition-all duration-200">
-                <FileText className="w-8 h-8" />
+            Back to Invoices Ledger
+          </Button>
+          <h1 className="page-title flex items-center gap-2.5">
+            <FileText className="w-6 h-6 text-[#4B49AC]" />
+            New Purchase Invoice Entry
+          </h1>
+          <p className="page-subtitle">
+            Enter wholesale purchase bills, auto-calculate GST line items, and update inventory reference prices.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2.5">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowDocumentPanel(!showDocumentPanel)}
+            icon={showDocumentPanel ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          >
+            {showDocumentPanel ? 'Hide Bill Preview' : 'Show Bill Preview'}
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleInitiateConfirm}
+            isLoading={isSubmitting}
+            icon={<CheckCircle2 className="w-4 h-4" />}
+          >
+            Save & Confirm Invoice
+          </Button>
+        </div>
+      </div>
+
+      {/* Main Container: Split screen if document preview is open, or full-width form */}
+      <div className={`grid grid-cols-1 ${showDocumentPanel ? 'lg:grid-cols-12' : ''} gap-6`}>
+        
+        {/* LEFT COLUMN: Optional Document Attachment & Viewer */}
+        {showDocumentPanel && (
+          <div className="lg:col-span-5 space-y-4">
+            <div className="p-4 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash">
+              <div className="flex items-center justify-between pb-3 border-b border-[#ECEEF5] mb-3">
+                <div className="flex items-center gap-2">
+                  <Upload className="w-4 h-4 text-[#4B49AC]" />
+                  <span className="text-xs font-bold text-[#1F1F2C] uppercase tracking-wider">Bill Document Attachment</span>
+                </div>
+                {selectedFile && (
+                  <button
+                    onClick={handleRemoveAttachment}
+                    className="text-xs text-rose-500 hover:text-rose-700 font-semibold"
+                  >
+                    Remove
+                  </button>
+                )}
               </div>
+
+              {!selectedFile ? (
+                <div
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={handleDrop}
+                  className="p-6 border-2 border-dashed border-[#ECEEF5] hover:border-[#4B49AC] rounded-xl text-center cursor-pointer transition-colors bg-[#F5F7FF]"
+                  onClick={() => document.getElementById('bill-file-input')?.click()}
+                >
+                  <input
+                    id="bill-file-input"
+                    type="file"
+                    accept="image/*,application/pdf"
+                    className="hidden"
+                    onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+                  />
+                  <Upload className="w-8 h-8 text-[#7DA0FA] mx-auto mb-2" />
+                  <p className="text-xs font-semibold text-[#1F1F2C]">Click to browse or drop bill image / PDF</p>
+                  <p className="text-[11px] text-[#6C7383] mt-1">Useful to reference paper invoice while entering line items</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-xs text-[#6C7383] bg-[#F5F7FF] p-2 rounded-lg">
+                    <span className="truncate max-w-[200px] font-mono font-medium text-[#1F1F2C]">{selectedFile.name}</span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => setRotation((r) => (r + 90) % 360)}
+                        className="p-1 rounded hover:bg-white text-[#4B49AC]"
+                        title="Rotate 90°"
+                      >
+                        <RotateCw className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setZoom((z) => Math.min(z + 0.25, 2.5))}
+                        className="p-1 rounded hover:bg-white text-[#4B49AC]"
+                        title="Zoom In"
+                      >
+                        <ZoomIn className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setZoom((z) => Math.max(z - 0.25, 0.5))}
+                        className="p-1 rounded hover:bg-white text-[#4B49AC]"
+                        title="Zoom Out"
+                      >
+                        <ZoomOut className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="h-[560px] bg-zinc-900 rounded-xl overflow-auto flex items-center justify-center p-3 relative border border-zinc-800">
+                    {previewUrl && (
+                      isPdf ? (
+                        <iframe
+                          src={`${previewUrl}#toolbar=0`}
+                          className="w-full h-full rounded border-0 bg-white"
+                          title="PDF Preview"
+                        />
+                      ) : (
+                        <div
+                          style={{
+                            transform: `rotate(${rotation}deg) scale(${zoom})`,
+                            transition: 'transform 0.2s ease',
+                          }}
+                          className="flex items-center justify-center"
+                        >
+                          <img
+                            src={previewUrl}
+                            alt="Invoice Attachment"
+                            className="max-h-[500px] max-w-full object-contain rounded shadow-lg"
+                          />
+                        </div>
+                      )
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* RIGHT COLUMN: Invoice Header & Line Items Editor */}
+        <div className={`${showDocumentPanel ? 'lg:col-span-7' : 'w-full'} space-y-6`}>
+          
+          {/* Header Metadata Card */}
+          <div className="p-5 sm:p-6 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[#ECEEF5]">
+              <div className="flex items-center gap-2">
+                <Building2 className="w-4.5 h-4.5 text-[#4B49AC]" />
+                <h2 className="text-sm font-bold text-[#1F1F2C] uppercase tracking-wider">Invoice Header Information</h2>
+              </div>
+              <Badge variant="purple">Manual Bill Entry</Badge>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               <div>
-                <p className="text-base sm:text-lg font-bold text-[#1F1F2C] tracking-tight">
-                  Click to select or drag and drop invoice here
+                <label className="block text-xs font-semibold text-[#1F1F2C] mb-1">
+                  Supplier Name <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    list="suppliers-datalist"
+                    type="text"
+                    required
+                    placeholder="e.g. ITC LIMITED"
+                    value={formData.supplier_name}
+                    onChange={(e) => handleSupplierSelect(e.target.value)}
+                    className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#ECEEF5] text-xs text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC]"
+                  />
+                  <datalist id="suppliers-datalist">
+                    {suppliers.map((s) => (
+                      <option key={s.id} value={s.name} />
+                    ))}
+                  </datalist>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#1F1F2C] mb-1">Supplier GSTIN</label>
+                <input
+                  type="text"
+                  placeholder="33AAAAA0000A1Z5"
+                  value={formData.supplier_gstin || ''}
+                  onChange={(e) => handleHeaderChange('supplier_gstin', e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#ECEEF5] text-xs font-mono text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#1F1F2C] mb-1">
+                  Invoice Number <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. INV-2026-081"
+                  value={formData.invoice_number}
+                  onChange={(e) => handleHeaderChange('invoice_number', e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#ECEEF5] text-xs font-mono font-bold text-[#4B49AC] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#1F1F2C] mb-1">
+                  Invoice Date <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={formData.invoice_date}
+                  onChange={(e) => handleHeaderChange('invoice_date', e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#ECEEF5] text-xs font-mono text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#1F1F2C] mb-1">Payment Mode</label>
+                <select
+                  value={formData.payment_mode}
+                  onChange={(e) => handleHeaderChange('payment_mode', e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#ECEEF5] text-xs text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC]"
+                >
+                  <option value="BANK_TRANSFER">Bank Transfer (NEFT/RTGS)</option>
+                  <option value="UPI">UPI</option>
+                  <option value="CASH">Cash</option>
+                  <option value="CREDIT">Credit (Accounts Payable)</option>
+                  <option value="CHEQUE">Cheque</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#1F1F2C] mb-1">Payment Status</label>
+                <select
+                  value={formData.payment_status}
+                  onChange={(e) => handleHeaderChange('payment_status', e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#ECEEF5] text-xs text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC]"
+                >
+                  <option value="PAID">Paid</option>
+                  <option value="UNPAID">Unpaid</option>
+                  <option value="PARTIALLY_PAID">Partially Paid</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Line Items Table Card */}
+          <div className="p-5 sm:p-6 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[#ECEEF5]">
+              <div>
+                <h3 className="text-sm font-bold text-[#1F1F2C] uppercase tracking-wider flex items-center gap-2">
+                  <Package className="w-4 h-4 text-[#4B49AC]" />
+                  Line Items Entry ({formData.items.length})
+                </h3>
+                <p className="text-[11px] text-[#6C7383]">
+                  Rate per pack is automatically derived from <code>invoice_amount / pack_qty</code>.
                 </p>
-                <p className="text-xs text-[#6C7383] mt-1">Supports JPG, PNG, PDF scans up to 15MB</p>
-              </div>
-            </label>
-          </div>
-
-          <div className="flex items-center justify-center gap-4">
-            <div className="h-px bg-[#ECEEF5] flex-1" />
-            <span className="text-xs text-[#8F93A0] uppercase tracking-widest font-bold font-mono px-2">OR DIRECT CAMERA</span>
-            <div className="h-px bg-[#ECEEF5] flex-1" />
-          </div>
-
-          <div className="text-center">
-            <Button
-              variant="outline"
-              size="lg"
-              className="w-full sm:w-auto px-8 py-3 rounded-xl font-bold shadow-sm"
-              icon={<Camera className="w-5 h-5 text-[#7DA0FA]" />}
-              onClick={() => document.getElementById('camera-upload-input')?.click()}
-            >
-              Scan Document with Mobile Camera
-            </Button>
-          </div>
-
-          {selectedFile && (
-            <div className="p-5 bg-white border border-[#ECEEF5] rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-skydash animate-in fade-in">
-              <div className="flex items-center gap-3.5 min-w-0">
-                <div className="p-3 rounded-xl bg-[#F5F7FF] border border-[#D5DCED] text-[#4B49AC] shrink-0">
-                  <FileText className="w-6 h-6" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-bold text-[#1F1F2C] truncate">{selectedFile.name}</p>
-                  <p className="text-xs text-[#6C7383] font-mono mt-0.5">{(selectedFile.size / 1024).toFixed(1)} KB • Ready for OCR</p>
-                </div>
               </div>
               <Button
-                variant="primary"
-                className="w-full sm:w-auto px-6 py-2.5 font-bold shadow-md shadow-[#4B49AC]/25"
-                onClick={handleStartOcr}
-              >
-                Extract Invoice Data
-              </Button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Step 2: Processing Indicator */}
-      {step === 'PROCESSING' && (
-        <div className="max-w-xl mx-auto py-16 text-center space-y-6 bg-white p-8 rounded-3xl border border-[#ECEEF5] shadow-skydash">
-          <div className="relative w-24 h-24 mx-auto">
-            <div className="absolute inset-0 rounded-full border-4 border-[#7DA0FA]/30 animate-ping" />
-            <div className="w-24 h-24 rounded-full border-4 border-[#4B49AC] border-t-transparent animate-spin flex items-center justify-center">
-              <RefreshCw className="w-8 h-8 text-[#4B49AC]" />
-            </div>
-          </div>
-          <div>
-            <h3 className="text-xl font-bold text-[#1F1F2C] tracking-tight">Extracting Document Data...</h3>
-            <p className="text-xs sm:text-sm text-[#6C7383] mt-1.5">Analyzing vendor GSTIN, invoice number, line item snapshots & GST rates</p>
-          </div>
-          <div className="w-full bg-[#F5F7FF] rounded-full h-2.5 overflow-hidden border border-[#ECEEF5]">
-            <div
-              className="bg-[#4B49AC] h-full rounded-full transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Step 2b: OCR Error Screen */}
-      {step === 'ERROR' && (
-        <div className="max-w-xl mx-auto py-12 px-6 bg-white border border-[#ECEEF5] rounded-3xl text-center space-y-6 shadow-skydash animate-in fade-in">
-          <div className="w-16 h-16 rounded-2xl bg-rose-50 border border-rose-200 text-rose-500 mx-auto flex items-center justify-center">
-            <AlertTriangle className="w-8 h-8" />
-          </div>
-          <div className="space-y-2">
-            <h3 className="text-lg font-bold text-[#1F1F2C] tracking-tight">OCR Extraction Unavailable</h3>
-            <p className="text-xs text-[#6C7383] leading-relaxed max-w-md mx-auto">
-              {ocrError || 'Could not connect to the OCR processing engine.'}
-            </p>
-          </div>
-          <div className="p-3.5 bg-[#F5F7FF] border border-[#ECEEF5] rounded-xl text-left">
-            <p className="text-xs text-[#6C7383] font-mono">
-              <span className="text-[#1F1F2C] font-bold">Options:</span> You can retry the automated OCR or proceed immediately using manual entry.
-            </p>
-          </div>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-            <Button
-              variant="outline"
-              size="md"
-              className="w-full sm:w-auto"
-              onClick={() => setStep('UPLOAD')}
-            >
-              Choose Another File
-            </Button>
-            <Button
-              variant="outline"
-              size="md"
-              className="w-full sm:w-auto"
-              icon={<RefreshCw className="w-4 h-4" />}
-              onClick={handleStartOcr}
-            >
-              Retry OCR
-            </Button>
-            <Button
-              variant="primary"
-              size="md"
-              className="w-full sm:w-auto font-bold shadow-md shadow-[#4B49AC]/25"
-              icon={<Plus className="w-4 h-4" />}
-              onClick={handleEnterManually}
-            >
-              Enter Manually
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Step 3: Verification Split View Screen */}
-      {step === 'VERIFY' && ocrResult && (
-        <div className="space-y-4">
-          {/* Top Bar Header */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 bg-white border border-[#ECEEF5] rounded-2xl shadow-skydash">
-            <div className="flex items-start gap-3">
-              <Button variant="ghost" size="sm" onClick={() => setStep('UPLOAD')} icon={<ArrowLeft className="w-4 h-4" />}>
-                Back
-              </Button>
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2.5">
-                  <h2 className="text-base sm:text-lg font-bold text-[#1F1F2C] tracking-tight">Verify Extracted Invoice</h2>
-                  {getConfidenceBadge(ocrResult.overall_confidence)}
-                </div>
-                <p className="text-xs text-[#6C7383] mt-0.5">Validate extracted rates and quantities against the original document.</p>
-              </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
-              <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setStep('UPLOAD')}>
-                Cancel / Re-upload
-              </Button>
-              <Button
-                variant="primary"
+                variant="outline"
                 size="sm"
-                className="w-full sm:w-auto font-bold shadow-md shadow-[#4B49AC]/25"
+                onClick={handleAddItem}
+                icon={<Plus className="w-3.5 h-3.5" />}
+              >
+                Add Line Item
+              </Button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse min-w-[700px]">
+                <thead>
+                  <tr className="bg-[#F5F7FF] text-[#6C7383] uppercase text-[10px] font-bold border-b border-[#ECEEF5]">
+                    <th className="py-2.5 px-3 w-8">#</th>
+                    <th className="py-2.5 px-3 min-w-[200px]">Item Description</th>
+                    <th className="py-2.5 px-3 w-24">HSN</th>
+                    <th className="py-2.5 px-3 w-20 text-right">Packs</th>
+                    <th className="py-2.5 px-3 w-24 text-right">MRP (₹)</th>
+                    <th className="py-2.5 px-3 w-28 text-right">Bill Total (₹)</th>
+                    <th className="py-2.5 px-3 w-24 text-right">Each Pack Rate</th>
+                    <th className="py-2.5 px-3 w-10 text-center"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#ECEEF5]">
+                  {formData.items.map((item, idx) => (
+                    <tr key={idx} className="hover:bg-[#F8F9FE] transition-colors">
+                      <td className="py-2 px-3 font-mono text-[#6C7383] text-center font-bold">
+                        {idx + 1}
+                      </td>
+                      <td className="py-2 px-3">
+                        <input
+                          type="text"
+                          placeholder="e.g. CI Ice Burst 10M"
+                          value={item.supplier_item_name || item.item_name || ''}
+                          onChange={(e) => handleItemChange(idx, 'supplier_item_name', e.target.value)}
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-[#F5F7FF] border border-[#ECEEF5] text-xs font-medium text-[#1F1F2C] focus:outline-none focus:ring-1 focus:ring-[#4B49AC]"
+                        />
+                      </td>
+                      <td className="py-2 px-3">
+                        <input
+                          type="text"
+                          placeholder="24022090"
+                          value={item.hsn || ''}
+                          onChange={(e) => handleItemChange(idx, 'hsn', e.target.value)}
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-[#F5F7FF] border border-[#ECEEF5] text-xs font-mono text-[#6C7383] focus:outline-none focus:ring-1 focus:ring-[#4B49AC]"
+                        />
+                      </td>
+                      <td className="py-2 px-3 text-right">
+                        <input
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={item.pack_qty || ''}
+                          onChange={(e) => handleItemChange(idx, 'pack_qty', e.target.value)}
+                          className="w-full px-2.5 py-1.5 text-right rounded-lg bg-[#F5F7FF] border border-[#ECEEF5] text-xs font-mono font-semibold text-[#1F1F2C] focus:outline-none focus:ring-1 focus:ring-[#4B49AC]"
+                        />
+                      </td>
+                      <td className="py-2 px-3 text-right">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          placeholder="0.00"
+                          value={item.mrp_rsp || ''}
+                          onChange={(e) => handleItemChange(idx, 'mrp_rsp', e.target.value)}
+                          className="w-full px-2.5 py-1.5 text-right rounded-lg bg-[#F5F7FF] border border-[#ECEEF5] text-xs font-mono text-[#1F1F2C] focus:outline-none focus:ring-1 focus:ring-[#4B49AC]"
+                        />
+                      </td>
+                      <td className="py-2 px-3 text-right">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          placeholder="0.00"
+                          value={item.invoice_amount || item.total || ''}
+                          onChange={(e) => handleItemChange(idx, 'invoice_amount', e.target.value)}
+                          className="w-full px-2.5 py-1.5 text-right rounded-lg bg-[#F5F7FF] border border-[#ECEEF5] text-xs font-mono font-bold text-[#4B49AC] focus:outline-none focus:ring-1 focus:ring-[#4B49AC]"
+                        />
+                      </td>
+                      <td className="py-2 px-3 text-right font-mono font-bold text-[#1F1F2C]">
+                        ₹{item.each_pack_rate?.toFixed(2) || '0.00'}
+                      </td>
+                      <td className="py-2 px-3 text-center">
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveItem(idx)}
+                          disabled={formData.items.length <= 1}
+                          className="p-1 text-[#8F93A0] hover:text-rose-600 disabled:opacity-30 transition-colors"
+                          title="Delete line item"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleAddItem}
+              icon={<Plus className="w-3.5 h-3.5" />}
+              className="w-full justify-center py-2 text-xs"
+            >
+              Add Another Line Item
+            </Button>
+          </div>
+
+          {/* Financial Totals & Balance Summary */}
+          <div className="p-5 sm:p-6 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash space-y-4">
+            <h3 className="text-sm font-bold text-[#1F1F2C] uppercase tracking-wider pb-3 border-b border-[#ECEEF5] flex items-center gap-2">
+              <DollarSign className="w-4 h-4 text-[#4B49AC]" />
+              Tax & Grand Total Summary
+            </h3>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+              <div className="p-3.5 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5]">
+                <span className="text-[#6C7383] block text-[11px] font-semibold">Taxable Subtotal</span>
+                <span className="font-mono text-base font-bold text-[#1F1F2C] mt-1 block">
+                  ₹{formData.subtotal.toFixed(2)}
+                </span>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5]">
+                <span className="text-[#6C7383] block text-[11px] font-semibold">Total GST (CGST+SGST)</span>
+                <span className="font-mono text-base font-bold text-[#7DA0FA] mt-1 block">
+                  ₹{formData.total_tax.toFixed(2)}
+                </span>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5]">
+                <label className="text-[#6C7383] block text-[11px] font-semibold mb-1">Round Off (₹)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={formData.round_off}
+                  onChange={(e) => handleHeaderChange('round_off', e.target.value)}
+                  className="w-full px-2.5 py-1 rounded bg-white border border-[#ECEEF5] font-mono text-xs font-semibold text-[#1F1F2C]"
+                />
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-[#4B49AC]/10 border border-[#4B49AC]/30">
+                <span className="text-[#4B49AC] block text-[11px] font-bold uppercase tracking-wider">Grand Total</span>
+                <span className="font-mono text-lg font-bold text-[#4B49AC] mt-1 block">
+                  ₹{formData.grand_total.toFixed(2)}
+                </span>
+              </div>
+            </div>
+
+            {isTotalMismatch && (
+              <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2.5 text-xs text-amber-800">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <strong>Calculated Total Discrepancy:</strong> Sum of (Subtotal + GST + Round Off) = ₹{calculatedGrandTotal.toFixed(2)}, which differs from Grand Total ₹{formData.grand_total.toFixed(2)}.
+                </div>
+              </div>
+            )}
+
+            <div className="pt-2 flex justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => navigate('/purchases')}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
                 onClick={handleInitiateConfirm}
                 isLoading={isSubmitting}
                 icon={<CheckCircle2 className="w-4 h-4" />}
+                className="px-6 shadow-md shadow-[#4B49AC]/25"
               >
-                Confirm & Save Invoice
+                Save & Confirm Purchase Invoice
               </Button>
             </div>
           </div>
-
-          {isTotalMismatch && (
-            <div className="p-4 bg-amber-50 border border-amber-200 text-amber-900 text-xs rounded-2xl flex items-start gap-3 shadow-sm">
-              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-              <span>
-                <strong className="text-amber-950">Calculation Mismatch Detected:</strong> Calculated total (₹{calculatedGrandTotal.toFixed(2)}) differs from extracted total (₹{ocrResult.grand_total.toFixed(2)}). Please review individual line items below.
-              </span>
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:h-[calc(100vh-220px)] lg:min-h-[620px]">
-            {/* LEFT COLUMN: Original Document Viewer */}
-            <div className="lg:col-span-5 bg-white border border-[#ECEEF5] rounded-2xl flex flex-col overflow-hidden shadow-skydash min-h-[280px] lg:min-h-0">
-              <div className="flex items-center justify-between px-4 py-3 bg-[#F5F7FF] border-b border-[#ECEEF5]">
-                <span className="text-xs font-bold text-[#4B49AC] uppercase tracking-wider">Original Bill Scan</span>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => setZoom(prev => Math.max(0.5, prev - 0.25))}
-                    className="p-1.5 rounded-lg text-[#6C7383] hover:text-[#4B49AC] hover:bg-white transition-colors"
-                    title="Zoom Out"
-                  >
-                    <ZoomOut className="w-4 h-4" />
-                  </button>
-                  <span className="text-xs text-[#6C7383] font-mono px-1.5">{Math.round(zoom * 100)}%</span>
-                  <button
-                    onClick={() => setZoom(prev => Math.min(2.5, prev + 0.25))}
-                    className="p-1.5 rounded-lg text-[#6C7383] hover:text-[#4B49AC] hover:bg-white transition-colors"
-                    title="Zoom In"
-                  >
-                    <ZoomIn className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setRotation(prev => (prev + 90) % 360)}
-                    className="p-1.5 rounded-lg text-[#6C7383] hover:text-[#4B49AC] hover:bg-white transition-colors ml-1"
-                    title="Rotate 90°"
-                  >
-                    <RotateCw className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-[#F8F9FE]">
-                {previewUrl ? (
-                  isPdf ? (
-                    <iframe
-                      src={previewUrl}
-                      title="PDF Invoice Document"
-                      className="w-full h-full min-h-[480px] rounded-xl border border-[#ECEEF5] bg-white shadow-md"
-                    />
-                  ) : (
-                    <img
-                      src={previewUrl}
-                      alt="Invoice Preview"
-                      className="max-w-full transition-transform duration-200 rounded-xl shadow-md border border-[#ECEEF5]"
-                      style={{
-                        transform: `scale(${zoom}) rotate(${rotation}deg)`,
-                        transformOrigin: 'center center'
-                      }}
-                    />
-                  )
-                ) : (
-                  <div className="text-[#8F93A0] text-xs font-mono">No preview loaded</div>
-                )}
-              </div>
-            </div>
-
-            {/* RIGHT COLUMN: Editable Verification Form */}
-            <div className="lg:col-span-7 bg-white border border-[#ECEEF5] rounded-2xl flex flex-col overflow-hidden shadow-skydash min-h-[50vh] lg:min-h-0">
-              <div className="p-4 bg-[#F5F7FF] border-b border-[#ECEEF5] flex items-center justify-between">
-                <span className="text-xs font-bold text-[#4B49AC] uppercase tracking-wider">Extracted Header & Items Data</span>
-                <Badge variant="info">Interactive Editor</Badge>
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-5 space-y-6">
-                {/* Header Inputs */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Input
-                    label="Supplier Name"
-                    value={ocrResult.supplier_name}
-                    onChange={(e) => handleHeaderChange('supplier_name', e.target.value)}
-                  />
-                  <Input
-                    label="Supplier GSTIN"
-                    value={ocrResult.supplier_gstin || ''}
-                    onChange={(e) => handleHeaderChange('supplier_gstin', e.target.value)}
-                  />
-                  <Input
-                    label="Invoice Number"
-                    value={ocrResult.invoice_number}
-                    onChange={(e) => handleHeaderChange('invoice_number', e.target.value)}
-                  />
-                  <Input
-                    label="Invoice Date"
-                    type="date"
-                    value={ocrResult.invoice_date}
-                    onChange={(e) => handleHeaderChange('invoice_date', e.target.value)}
-                  />
-                  <Select
-                    label="Payment Mode"
-                    value={ocrResult.payment_mode}
-                    onChange={(e) => handleHeaderChange('payment_mode', e.target.value as any)}
-                    options={[
-                      { value: 'BANK_TRANSFER', label: 'Bank Transfer / NEFT' },
-                      { value: 'UPI', label: 'UPI / GPay / PhonePe' },
-                      { value: 'CASH', label: 'Cash' },
-                      { value: 'CREDIT', label: 'Credit' },
-                      { value: 'CHEQUE', label: 'Cheque' },
-                    ]}
-                  />
-                  <Select
-                    label="Payment Status"
-                    value={ocrResult.payment_status}
-                    onChange={(e) => handleHeaderChange('payment_status', e.target.value as any)}
-                    options={[
-                      { value: 'PAID', label: 'Paid' },
-                      { value: 'UNPAID', label: 'Unpaid' },
-                    ]}
-                  />
-                </div>
-
-                {/* Line Items Table */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-[#1F1F2C]">
-                      Line Items ({ocrResult.items.length})
-                    </h4>
-                    <Button variant="outline" size="sm" onClick={handleAddItem} icon={<Plus className="w-3.5 h-3.5" />}>
-                      Add Item
-                    </Button>
-                  </div>
-
-                  <div className="space-y-4">
-                    {ocrResult.items.map((item, idx) => (
-                      <div
-                        key={idx}
-                        className={`p-4 rounded-2xl border transition-all ${
-                          item.needs_review
-                            ? 'bg-amber-50/50 border-amber-300 shadow-sm ring-1 ring-amber-300'
-                            : 'bg-white border-[#ECEEF5] shadow-xs'
-                        } space-y-3.5 relative group`}
-                      >
-                        {/* Item Card Top Bar */}
-                        <div className="flex items-center justify-between gap-2 border-b border-[#ECEEF5] pb-2.5">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-mono font-bold text-[#4B49AC] px-2.5 py-0.5 rounded-lg bg-[#F5F7FF] border border-[#D5DCED]">
-                              #{idx + 1}
-                            </span>
-                            {item.needs_review ? (
-                              <Badge variant="warning">⚠️ Requires Review</Badge>
-                            ) : (
-                              <Badge variant="success">✓ Verified</Badge>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {getConfidenceBadge(item.confidence)}
-                            <button
-                              onClick={() => handleRemoveItem(idx)}
-                              className="text-[#8F93A0] hover:text-rose-600 p-1.5 rounded-lg hover:bg-[#F5F7FF] transition-colors"
-                              title="Delete Item"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Row Validation Warnings */}
-                        {item.validation?.warnings && item.validation.warnings.length > 0 && (
-                          <div className="px-3 py-1.5 bg-amber-100/70 border border-amber-300 text-amber-900 rounded-xl text-xs flex items-center gap-2">
-                            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                            <span className="font-medium">{item.validation.warnings.join(' • ')}</span>
-                          </div>
-                        )}
-
-                        {/* PRIMARY 6-COLUMN WHOLESALE GRID */}
-                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
-                          <div className="sm:col-span-4">
-                            <Input
-                              label="Item"
-                              value={item.item_name || item.supplier_item_name}
-                              onChange={(e) => handleItemChange(idx, 'item_name', e.target.value)}
-                            />
-                          </div>
-                          <div className="sm:col-span-1">
-                            <Input
-                              label="Qty"
-                              type="number"
-                              step="0.1"
-                              value={item.qty ?? item.quantity}
-                              onChange={(e) => handleItemChange(idx, 'qty', parseFloat(e.target.value) || 0)}
-                            />
-                          </div>
-                          <div className="sm:col-span-2">
-                            <Input
-                              label="MRP / RSP (₹)"
-                              type="number"
-                              step="0.01"
-                              value={item.mrp_rsp ?? 0}
-                              onChange={(e) => handleItemChange(idx, 'mrp_rsp', parseFloat(e.target.value) || 0)}
-                            />
-                          </div>
-                          <div className="sm:col-span-1">
-                            <Input
-                              label="Pack Qty"
-                              type="number"
-                              step="1"
-                              value={item.pack_qty ?? 0}
-                              onChange={(e) => handleItemChange(idx, 'pack_qty', parseFloat(e.target.value) || 0)}
-                            />
-                          </div>
-                          <div className="sm:col-span-2">
-                            <Input
-                              label="Invoice Amount (₹)"
-                              type="number"
-                              step="0.01"
-                              className="font-bold text-[#1F1F2C]"
-                              value={item.invoice_amount ?? item.total}
-                              onChange={(e) => handleItemChange(idx, 'invoice_amount', parseFloat(e.target.value) || 0)}
-                            />
-                          </div>
-                          <div className="sm:col-span-2">
-                            <label className="block text-xs font-semibold text-[#1F1F2C] mb-1.5">Each Pack Rate</label>
-                            <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-[#F5F7FF] border border-[#7DA0FA]/50 shadow-xs min-h-[38px]">
-                              <span className="text-sm font-extrabold text-[#4B49AC] font-mono">
-                                ₹{(item.each_pack_rate || (item.pack_qty ? (item.invoice_amount ?? item.total) / item.pack_qty : 0)).toFixed(2)}
-                              </span>
-                              <span className="text-[9px] text-[#6C7383] font-semibold uppercase tracking-wider">₹/PAC</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* SECONDARY ROW: HSN, UOM, Base Rate, GST %, Taxable */}
-                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-1.5 text-xs border-t border-[#ECEEF5]">
-                          <Input
-                            label="HSN / SAC"
-                            value={item.hsn || ''}
-                            onChange={(e) => handleItemChange(idx, 'hsn', e.target.value)}
-                          />
-                          <Input
-                            label="UOM"
-                            value={item.uom}
-                            onChange={(e) => handleItemChange(idx, 'uom', e.target.value)}
-                          />
-                          <Input
-                            label="Base Rate (₹)"
-                            type="number"
-                            step="0.01"
-                            value={item.purchase_rate}
-                            onChange={(e) => handleItemChange(idx, 'purchase_rate', parseFloat(e.target.value) || 0)}
-                          />
-                          <Input
-                            label="GST %"
-                            type="number"
-                            value={item.gst_rate}
-                            onChange={(e) => handleItemChange(idx, 'gst_rate', parseFloat(e.target.value) || 0)}
-                          />
-                          <Input
-                            label="Taxable (₹)"
-                            type="number"
-                            readOnly
-                            className="bg-[#F8F9FE] text-[#6C7383]"
-                            value={item.taxable_value}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Totals Breakdown */}
-                <div className="p-4 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5] space-y-2.5 text-xs">
-                  <div className="flex justify-between text-[#6C7383]">
-                    <span>Taxable Subtotal:</span>
-                    <span className="font-mono text-[#1F1F2C] font-semibold">₹{ocrResult.subtotal.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-[#6C7383]">
-                    <span>CGST + SGST Tax:</span>
-                    <span className="font-mono text-[#1F1F2C] font-semibold">₹{ocrResult.total_tax.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-[#6C7383] items-center">
-                    <span>Round Off:</span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      className="w-24 text-right bg-white border border-[#D5DCED] rounded-lg px-2.5 py-1.5 text-[#1F1F2C] font-mono focus:border-[#4B49AC] focus:ring-1 focus:ring-[#4B49AC]"
-                      value={ocrResult.round_off}
-                      onChange={(e) => handleHeaderChange('round_off', parseFloat(e.target.value) || 0)}
-                    />
-                  </div>
-                  <div className="flex justify-between text-sm font-bold text-[#1F1F2C] pt-2.5 border-t border-[#ECEEF5]">
-                    <span>Grand Total:</span>
-                    <span className="font-mono text-[#4B49AC] text-base font-bold">₹{ocrResult.grand_total.toFixed(2)}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
-      )}
+      </div>
 
       {/* Duplicate Invoice Warning Modal */}
       <Modal
         isOpen={showDuplicateModal}
         onClose={() => setShowDuplicateModal(false)}
-        title="Possible Duplicate Invoice Detected"
+        title="Potential Duplicate Purchase Invoice"
         size="md"
-        footer={
-          <>
-            <Button variant="outline" onClick={() => setShowDuplicateModal(false)}>
-              Cancel
-            </Button>
-            <Button variant="danger" onClick={executeSaveInvoice} isLoading={isSubmitting}>
-              Continue & Save Anyway
-            </Button>
-          </>
-        }
       >
-        <div className="space-y-4">
-          <div className="p-4 bg-rose-50 border border-rose-200 text-rose-900 text-xs rounded-xl flex items-start gap-2.5">
-            <ShieldAlert className="w-5 h-5 shrink-0 text-rose-600" />
+        <div className="space-y-4 text-sm">
+          <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
+            <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
             <div>
-              <p className="font-bold text-rose-950">Duplicate Match Found:</p>
-              <p className="mt-0.5">
-                An invoice from <strong>{ocrResult?.supplier_name}</strong> with invoice number <strong>{ocrResult?.invoice_number}</strong> already exists in the database.
+              <h4 className="font-bold text-amber-900">Invoice #{formData.invoice_number} Already Exists</h4>
+              <p className="text-xs text-amber-800 mt-1">
+                A verified purchase invoice with this exact invoice number and supplier was recorded in the database.
               </p>
             </div>
           </div>
+
           {existingDuplicate && (
-            <div className="p-3.5 bg-[#F5F7FF] border border-[#ECEEF5] rounded-xl text-xs space-y-1">
-              <p><strong className="text-[#6C7383]">Existing Invoice Date:</strong> {existingDuplicate.invoice_date}</p>
-              <p><strong className="text-[#6C7383]">Grand Total:</strong> ₹{existingDuplicate.grand_total.toFixed(2)}</p>
+            <div className="p-3 bg-[#F5F7FF] rounded-xl text-xs space-y-1.5 font-mono">
+              <div>Invoice Date: <strong>{existingDuplicate.invoice_date}</strong></div>
+              <div>Grand Total: <strong>₹{existingDuplicate.grand_total.toFixed(2)}</strong></div>
+              <div>Created At: <strong>{new Date(existingDuplicate.created_at).toLocaleString()}</strong></div>
             </div>
           )}
+
+          <div className="flex justify-end gap-3 pt-3">
+            <Button variant="outline" size="sm" onClick={() => setShowDuplicateModal(false)}>
+              Cancel & Review
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={executeSave}
+              isLoading={isSubmitting}
+            >
+              Proceed & Save Anyway
+            </Button>
+          </div>
         </div>
       </Modal>
     </div>

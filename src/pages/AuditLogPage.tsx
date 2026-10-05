@@ -85,7 +85,7 @@ export const AuditLogPage: React.FC = () => {
             System Audit Stream
           </h1>
           <p className="page-subtitle">
-            Immutable append-only record of all supplier edits, product nickname changes, OCR verifications & price adjustments
+            Immutable append-only record of all supplier edits, product nickname changes, invoice confirmations & price adjustments
           </p>
         </div>
 

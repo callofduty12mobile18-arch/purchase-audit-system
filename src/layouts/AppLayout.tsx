@@ -32,7 +32,7 @@ export const AppLayout: React.FC = () => {
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Invoices', href: '/purchases', icon: Receipt },
-    { name: 'Scan Bill', href: '/purchases/import', icon: FileUp, highlight: true },
+    { name: 'New Invoice', href: '/purchases/import', icon: PlusCircle, highlight: true },
     { name: 'Suppliers', href: '/suppliers', icon: Building2 },
     { name: 'Products', href: '/products', icon: Package },
     { name: 'Price History', href: '/price-history', icon: TrendingUp },
@@ -91,9 +91,9 @@ export const AppLayout: React.FC = () => {
             size="sm"
             className="px-3 py-1.5 text-xs font-semibold rounded-lg shadow-sm"
             onClick={() => navigate('/purchases/import')}
-            icon={<FileUp className="w-3.5 h-3.5" />}
+            icon={<PlusCircle className="w-3.5 h-3.5" />}
           >
-            Scan
+            + Bill
           </Button>
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -152,7 +152,7 @@ export const AppLayout: React.FC = () => {
             }}
             icon={<PlusCircle className="w-4 h-4" />}
           >
-            Scan / Upload Bill
+            New Purchase Invoice
           </Button>
 
           <form onSubmit={handleSearchSubmit} className="md:hidden relative">
@@ -241,9 +241,9 @@ export const AppLayout: React.FC = () => {
               size="sm"
               className="rounded-xl px-3.5 py-1.5 text-xs"
               onClick={() => navigate('/purchases/import')}
-              icon={<FileUp className="w-3.5 h-3.5" />}
+              icon={<PlusCircle className="w-3.5 h-3.5" />}
             >
-              Upload Invoice
+              New Invoice
             </Button>
             <div className="h-4 w-px bg-[#ECEEF5]" />
             <div className="w-8 h-8 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5] flex items-center justify-center text-[#6C7383] hover:text-[#4B49AC] cursor-pointer transition-colors">

@@ -7,7 +7,7 @@ import {
   PurchaseItem,
   PriceHistory,
   AuditLog,
-  ExtractedOcrInvoice
+  InvoiceFormData
 } from '../types';
 
 export const dbService = {
@@ -177,7 +177,7 @@ export const dbService = {
     return saved;
   },
 
-  // --- INVOICES & OCR VERIFICATION ---
+  // --- INVOICES & PURCHASES ---
   getInvoices: async (): Promise<PurchaseInvoice[]> => {
     const { data, error } = await supabase
       .from('purchase_invoices')
@@ -225,7 +225,7 @@ export const dbService = {
     return (data as PurchaseInvoice) || null;
   },
 
-  confirmAndSaveInvoice: async (extractedData: ExtractedOcrInvoice, documentPath?: string): Promise<PurchaseInvoice> => {
+  confirmAndSaveInvoice: async (extractedData: InvoiceFormData, documentPath?: string): Promise<PurchaseInvoice> => {
     const suppliers = await dbService.getSuppliers();
     const products = await dbService.getProducts();
 
@@ -258,7 +258,7 @@ export const dbService = {
       round_off: extractedData.round_off,
       grand_total: extractedData.grand_total,
       verification_status: 'VERIFIED' as const,
-      ocr_status: 'COMPLETED' as const,
+      ocr_status: 'MANUAL' as const,
       created_at: now,
       updated_at: now
     };
@@ -383,7 +383,7 @@ export const dbService = {
       invoiceId,
       null,
       { invoice_number: savedInvoice.invoice_number, grand_total: savedInvoice.grand_total, item_count: itemsToInsert.length },
-      `Confirmed OCR verified invoice #${savedInvoice.invoice_number} from ${supplier.name}`
+      `Confirmed purchase invoice #${savedInvoice.invoice_number} from ${supplier.name}`
     );
 
     // Return complete invoice with items

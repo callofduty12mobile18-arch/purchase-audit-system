@@ -223,7 +223,7 @@ export const ProductsPage: React.FC = () => {
             required
             value={editingProduct.supplier_item_name}
             onChange={(e) => setEditingProduct({ ...editingProduct, supplier_item_name: e.target.value })}
-            helperText="Exact string extracted by OCR from bills (e.g. 'GFK RED NBUNDLE')"
+            helperText="Exact string written on purchase bills (e.g. 'GFK RED NBUNDLE')"
           />
 
           <div className="grid grid-cols-2 gap-4">

@@ -73,10 +73,10 @@ export const SettingsPage: React.FC = () => {
             </div>
             <div className="flex items-center justify-between py-2.5">
               <span className="text-[#6C7383] flex items-center gap-2.5">
-                <Server className="w-4 h-4 text-[#4B49AC]" /> OCR Engine
+                <Server className="w-4 h-4 text-[#4B49AC]" /> Invoice Processing
               </span>
               <span className="text-xs text-[#1F1F2C] font-mono font-medium">
-                PaddleOCR v4 Microservice + Tesseract Fallback
+                Direct Manual Entry & Verified Audit Trail
               </span>
             </div>
           </div>

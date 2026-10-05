@@ -159,8 +159,8 @@ export interface InvoiceValidation {
   warnings: string[];
 }
 
-// Extracted OCR Data Interface
-export interface ExtractedOcrItem {
+// Invoice Form Data & Items
+export interface InvoiceFormItem {
   item_name?: string;
   supplier_item_name: string;
   qty?: number;
@@ -182,19 +182,19 @@ export interface ExtractedOcrItem {
   discount?: number;
   total_tax?: number;
   total: number;
-  confidence: number; // 0.0 to 1.0
+  confidence?: number;
   needs_review?: boolean;
   validation?: RowValidation;
 }
 
-export interface ExtractedOcrInvoice {
+export interface InvoiceFormData {
   supplier_name: string;
   supplier_gstin?: string;
   invoice_number: string;
   invoice_date: string;
   payment_mode: PaymentMode;
   payment_status: PaymentStatus;
-  items: ExtractedOcrItem[];
+  items: InvoiceFormItem[];
   total_items?: number;
   total_packs?: number;
   subtotal: number;
@@ -205,7 +205,7 @@ export interface ExtractedOcrInvoice {
   total_tax: number;
   round_off: number;
   grand_total: number;
-  overall_confidence: number;
+  overall_confidence?: number;
   field_confidence?: {
     supplier_name?: number;
     supplier_gstin?: number;
@@ -218,3 +218,7 @@ export interface ExtractedOcrInvoice {
   needs_review?: boolean;
   raw_text?: string;
 }
+
+// Aliases for compatibility
+export type ExtractedOcrItem = InvoiceFormItem;
+export type ExtractedOcrInvoice = InvoiceFormData;

@@ -123,7 +123,7 @@ export const PurchasesPage: React.FC = () => {
             Purchase Invoices Ledger
           </h1>
           <p className="page-subtitle">
-            Immutable verified purchase invoices, original OCR scans, and tax breakups.
+            Audited purchase invoices, attached bill documents, and itemized GST tax breakdowns.
           </p>
         </div>
         <Button
@@ -131,7 +131,7 @@ export const PurchasesPage: React.FC = () => {
           onClick={() => navigate('/purchases/import')}
           icon={<FileUp className="w-4 h-4" />}
         >
-          Scan / Upload Bill
+          New Purchase Invoice
         </Button>
       </div>
 
