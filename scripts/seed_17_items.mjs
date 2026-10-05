@@ -211,7 +211,7 @@ async function seed() {
   console.log('🚀 Starting import of 17 items into Supabase...');
 
   // Authenticate as admin user
-  const email = 'admin@audit.local';
+  const email = 'admin@audit.com';
   const password = 'Password@123456';
 
   let { data: authData, error: authErr } = await supabase.auth.signInWithPassword({
