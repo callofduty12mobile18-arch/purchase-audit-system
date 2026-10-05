@@ -34,7 +34,7 @@ export const AppLayout: React.FC = () => {
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Invoices', href: '/purchases', icon: Receipt },
-    { name: 'New Invoice', href: '/purchases/import', icon: PlusCircle, highlight: true },
+    { name: 'New Invoice', href: '/purchases/import', icon: PlusCircle },
     { name: 'Suppliers', href: '/suppliers', icon: Building2 },
     { name: 'Products', href: '/products', icon: Package },
     { name: 'Analytics', href: '/analytics', icon: LineChart },
@@ -190,9 +190,6 @@ export const AppLayout: React.FC = () => {
                 >
                   <item.icon className={`w-4.5 h-4.5 shrink-0 transition-transform group-hover:scale-110 ${isActive ? 'text-white' : 'text-[#8F93A0] group-hover:text-[#4B49AC]'}`} />
                   <span className="flex-1 truncate">{item.name}</span>
-                  {item.highlight && (
-                    <span className={`inline-block w-2 h-2 rounded-full ${isActive ? 'bg-white' : 'bg-[#7DA0FA] animate-pulse'}`} />
-                  )}
                 </NavLink>
               );
             })}
