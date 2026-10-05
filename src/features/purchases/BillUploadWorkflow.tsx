@@ -10,7 +10,8 @@ import {
   DollarSign,
   Package,
   Receipt,
-  Calendar
+  Calendar,
+  Eye
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
@@ -25,6 +26,8 @@ export const BillUploadWorkflow: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [savedInvoice, setSavedInvoice] = useState<PurchaseInvoice | null>(null);
   const [existingDuplicate, setExistingDuplicate] = useState<PurchaseInvoice | null>(null);
   const [, setLoadingInitial] = useState(true);
 
@@ -304,7 +307,8 @@ export const BillUploadWorkflow: React.FC = () => {
     setShowDuplicateModal(false);
     try {
       const saved = await dbService.confirmAndSaveInvoice(overrideData || formData);
-      navigate(`/purchases/${saved.id}`);
+      setSavedInvoice(saved);
+      setShowSuccessModal(true);
     } catch (err: any) {
       alert(err.message || 'Error saving invoice to database');
     } finally {
@@ -313,7 +317,7 @@ export const BillUploadWorkflow: React.FC = () => {
   };
 
   return (
-    <div className="space-y-5 sm:space-y-6 max-w-6xl mx-auto pb-16">
+    <div className="space-y-5 sm:space-y-6 max-w-6xl mx-auto pb-24 md:pb-16">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
         <div>
@@ -348,9 +352,9 @@ export const BillUploadWorkflow: React.FC = () => {
             onClick={handleInitiateConfirm}
             isLoading={isSubmitting}
             icon={<CheckCircle2 className="w-4 h-4" />}
-            className="flex-1 sm:flex-none justify-center shadow-md shadow-[#4B49AC]/25"
+            className="flex-1 sm:flex-none justify-center shadow-md shadow-[#4B49AC]/25 font-bold"
           >
-            Save & Confirm
+            Save this Invoice
           </Button>
         </div>
       </div>
@@ -365,10 +369,6 @@ export const BillUploadWorkflow: React.FC = () => {
               <Building2 className="w-4.5 h-4.5 text-[#4B49AC]" />
               <h2 className="text-xs sm:text-sm font-bold text-[#1F1F2C] uppercase tracking-wider">Invoice Header Information</h2>
             </div>
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Verified Supplier</span>
-            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
@@ -379,17 +379,17 @@ export const BillUploadWorkflow: React.FC = () => {
               </label>
               <div className="w-full px-3.5 py-2.5 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5] text-xs sm:text-sm font-bold text-[#1F1F2C] flex items-center justify-between">
                 <span>AYYAPPA ENTERPRISES</span>
-                <span className="text-[10px] uppercase font-bold text-[#4B49AC] bg-white px-2 py-0.5 rounded-md border border-[#ECEEF5]">Static</span>
+                <span className="text-[10px] uppercase font-bold text-[#4B49AC] bg-white px-2 py-0.5 rounded-md border border-[#ECEEF5]">Distributor</span>
               </div>
             </div>
 
-            {/* Static Supplier GSTIN */}
+            {/* Static Supplier Agency */}
             <div>
               <label className="block text-xs font-semibold text-[#6C7383] uppercase tracking-wider mb-1">
-                Supplier GSTIN
+                Supplier Agency
               </label>
-              <div className="w-full px-3.5 py-2.5 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5] text-xs sm:text-sm font-mono font-bold text-[#4B49AC]">
-                33AABFA2949R1Z5
+              <div className="w-full px-3.5 py-2.5 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5] text-xs sm:text-sm font-semibold text-[#1F1F2C]">
+                ITC Authorized Agency
               </div>
             </div>
 
@@ -776,13 +776,33 @@ export const BillUploadWorkflow: React.FC = () => {
               variant="primary"
               onClick={handleInitiateConfirm}
               isLoading={isSubmitting}
-              icon={<CheckCircle2 className="w-4 h-4" />}
-              className="w-full sm:w-auto justify-center px-6 shadow-md shadow-[#4B49AC]/25 text-sm font-semibold"
+              icon={<CheckCircle2 className="w-5 h-5" />}
+              className="w-full sm:w-auto justify-center px-8 py-3 text-sm font-bold shadow-lg shadow-[#4B49AC]/30 bg-[#4B49AC] hover:bg-[#3f3da0] text-white"
             >
-              Save & Confirm Purchase Invoice
+              Save this Invoice
             </Button>
           </div>
         </div>
+      </div>
+
+      {/* Mobile Sticky Bottom Bar */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 p-3.5 bg-white/95 backdrop-blur-md border-t border-[#ECEEF5] shadow-2xl z-30 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <span className="text-[10px] uppercase font-bold text-[#6C7383] block">Invoice Total</span>
+          <span className="font-mono text-base font-black text-[#4B49AC] block truncate">
+            ₹{formData.grand_total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </span>
+        </div>
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={handleInitiateConfirm}
+          isLoading={isSubmitting}
+          icon={<CheckCircle2 className="w-4 h-4" />}
+          className="shadow-lg shadow-[#4B49AC]/30 font-bold px-5"
+        >
+          Save this Invoice
+        </Button>
       </div>
 
       {/* Duplicate Invoice Warning Modal */}
@@ -798,7 +818,7 @@ export const BillUploadWorkflow: React.FC = () => {
             <div>
               <h4 className="font-bold text-amber-900">Invoice #{formData.invoice_number} Already Exists</h4>
               <p className="text-xs text-amber-800 mt-1">
-                A verified purchase invoice with this exact invoice number and supplier was recorded in the database.
+                A purchase invoice with this exact invoice number and supplier was already recorded in the database.
               </p>
             </div>
           </div>
@@ -820,9 +840,92 @@ export const BillUploadWorkflow: React.FC = () => {
               size="sm"
               onClick={() => executeSave()}
               isLoading={isSubmitting}
-              className="w-full sm:w-auto justify-center"
+              className="w-full sm:w-auto justify-center font-semibold"
             >
               Proceed & Save Anyway
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Save Success Popup Modal */}
+      <Modal
+        isOpen={showSuccessModal}
+        onClose={() => {
+          setShowSuccessModal(false);
+          if (savedInvoice) navigate(`/purchases/${savedInvoice.id}`);
+        }}
+        title="Invoice Saved"
+        size="md"
+      >
+        <div className="text-center py-2 space-y-4">
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-emerald-50 border-2 border-emerald-200 flex items-center justify-center text-emerald-600 shadow-sm animate-in zoom-in-75 duration-300">
+            <CheckCircle2 className="w-10 h-10" />
+          </div>
+
+          <div>
+            <h3 className="text-lg font-bold text-[#1F1F2C]">
+              Invoice Saved Successfully!
+            </h3>
+            <p className="text-xs text-[#6C7383] mt-1">
+              Purchase invoice has been recorded in your database ledger.
+            </p>
+          </div>
+
+          {savedInvoice && (
+            <div className="p-4 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5] text-left text-xs space-y-2 font-mono">
+              <div className="flex justify-between pb-1.5 border-b border-[#ECEEF5]">
+                <span className="text-[#6C7383]">Invoice #:</span>
+                <span className="font-bold text-[#1F1F2C]">{savedInvoice.invoice_number}</span>
+              </div>
+              <div className="flex justify-between pb-1.5 border-b border-[#ECEEF5]">
+                <span className="text-[#6C7383]">Supplier:</span>
+                <span className="font-bold text-[#1F1F2C]">{savedInvoice.supplier?.name || 'AYYAPPA ENTERPRISES'}</span>
+              </div>
+              <div className="flex justify-between pb-1.5 border-b border-[#ECEEF5]">
+                <span className="text-[#6C7383]">Total Items:</span>
+                <span className="font-bold text-[#1F1F2C]">
+                  {savedInvoice.items?.length || 0} Products ({savedInvoice.items?.reduce((s, it) => s + (Number(it.quantity) || 0), 0) || 0} packs)
+                </span>
+              </div>
+              <div className="flex justify-between pb-1.5 border-b border-[#ECEEF5]">
+                <span className="text-[#6C7383]">Payment:</span>
+                <span className="font-bold text-[#1F1F2C]">{savedInvoice.payment_mode} ({savedInvoice.payment_status})</span>
+              </div>
+              <div className="flex justify-between pt-1 text-sm">
+                <span className="font-bold text-[#1F1F2C]">Grand Total Paid:</span>
+                <span className="font-bold text-[#4B49AC] text-base">₹{savedInvoice.grand_total.toFixed(2)}</span>
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setShowSuccessModal(false);
+                setSavedInvoice(null);
+                setFormData(createBlankInvoice());
+                loadMetadata();
+              }}
+              icon={<Plus className="w-3.5 h-3.5" />}
+              className="flex-1 justify-center"
+            >
+              Add Another Invoice
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => {
+                setShowSuccessModal(false);
+                if (savedInvoice) navigate(`/purchases/${savedInvoice.id}`);
+                else navigate('/purchases');
+              }}
+              icon={<Eye className="w-3.5 h-3.5" />}
+              className="flex-1 justify-center shadow-md shadow-[#4B49AC]/20 font-semibold"
+            >
+              View Invoice Details
             </Button>
           </div>
         </div>
