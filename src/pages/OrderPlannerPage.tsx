@@ -17,7 +17,8 @@ import {
   Calendar,
   Layers,
   Check,
-  Percent
+  Percent,
+  X
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
@@ -207,7 +208,7 @@ export const OrderPlannerPage: React.FC = () => {
     );
   };
 
-  // Quick preset adder (e.g. +10, +50, +100)
+  // Quick preset adder (e.g. +10, +50, -10)
   const handleAddPreset = (productId: string, delta: number) => {
     const row = planRows.find(r => r.product_id === productId);
     if (row) {
@@ -311,20 +312,20 @@ export const OrderPlannerPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto pb-16">
+    <div className="space-y-5 max-w-6xl mx-auto pb-28 md:pb-16">
       {/* Header Bar */}
-      <div className="no-print flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="no-print flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
         <div>
-          <h1 className="page-title flex items-center gap-2.5">
+          <h1 className="page-title flex items-center gap-2.5 text-xl sm:text-2xl font-black text-[#1F1F2C]">
             <ShoppingCart className="w-6 h-6 text-[#4B49AC]" />
             Wholesale Order Planner
           </h1>
-          <p className="page-subtitle">
-            All catalog products are listed below. Simply enter the desired pack quantities to calculate exact landed amounts.
+          <p className="page-subtitle text-xs sm:text-sm text-[#6C7383] mt-0.5">
+            Configure pack quantities to calculate exact landed order amounts for distributor agencies.
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
           {isProformaMode ? (
             <>
               <Button
@@ -332,6 +333,7 @@ export const OrderPlannerPage: React.FC = () => {
                 size="sm"
                 onClick={() => setIsProformaMode(false)}
                 icon={<ArrowLeft className="w-4 h-4" />}
+                className="flex-1 sm:flex-none justify-center"
               >
                 Back to Edit
               </Button>
@@ -340,6 +342,7 @@ export const OrderPlannerPage: React.FC = () => {
                 size="sm"
                 onClick={handlePrint}
                 icon={<Printer className="w-4 h-4" />}
+                className="flex-1 sm:flex-none justify-center shadow-md shadow-[#4B49AC]/20"
               >
                 Save as PDF / Print
               </Button>
@@ -352,8 +355,9 @@ export const OrderPlannerPage: React.FC = () => {
                   size="sm"
                   onClick={handleResetAll}
                   icon={<RotateCcw className="w-4 h-4" />}
+                  className="flex-1 sm:flex-none justify-center"
                 >
-                  Reset Quantities
+                  Reset (0)
                 </Button>
               )}
               <Button
@@ -362,8 +366,9 @@ export const OrderPlannerPage: React.FC = () => {
                 disabled={orderedItems.length === 0}
                 onClick={() => setIsProformaMode(true)}
                 icon={<FileDown className="w-4 h-4" />}
+                className="flex-1 sm:flex-none justify-center shadow-md shadow-[#4B49AC]/20 font-bold"
               >
-                Generate PO Estimate ({orderedItems.length})
+                Generate PO ({orderedItems.length})
               </Button>
             </>
           )}
@@ -371,16 +376,16 @@ export const OrderPlannerPage: React.FC = () => {
       </div>
 
       {!isProformaMode ? (
-        <div className="no-print space-y-5">
-          {/* Top Control Strip */}
+        <div className="no-print space-y-4">
+          {/* Top Control Card */}
           <div className="p-4 sm:p-5 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-12 gap-3.5 items-end">
               {/* Agency Selector */}
               <div className="md:col-span-5">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-[#6C7383] mb-1.5">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-[#6C7383] mb-1.5">
                   Distributor Agency *
                 </label>
-                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5]">
+                <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5] focus-within:border-[#4B49AC] focus-within:ring-2 focus-within:ring-[#4B49AC]/20 transition-all">
                   <Building2 className="w-4 h-4 text-[#4B49AC] shrink-0" />
                   <select
                     value={selectedSupplierId}
@@ -398,7 +403,7 @@ export const OrderPlannerPage: React.FC = () => {
 
               {/* Quick Search */}
               <div className="md:col-span-4">
-                <label className="block text-xs font-semibold uppercase tracking-wider text-[#6C7383] mb-1.5">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-[#6C7383] mb-1.5">
                   Search Catalog Products
                 </label>
                 <div className="relative">
@@ -408,18 +413,27 @@ export const OrderPlannerPage: React.FC = () => {
                     placeholder="Search by nickname, invoice text..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-white border border-[#ECEEF5] text-xs sm:text-sm text-[#1F1F2C] placeholder-[#8F93A0] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC] shadow-xs font-medium"
+                    className="w-full pl-9 pr-8 py-2.5 rounded-xl bg-white border border-[#ECEEF5] text-xs sm:text-sm text-[#1F1F2C] placeholder-[#8F93A0] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC] shadow-xs font-medium"
                   />
+                  {search && (
+                    <button
+                      type="button"
+                      onClick={() => setSearch('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[#8F93A0] hover:text-[#1F1F2C] rounded-md"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
               </div>
 
-              {/* Quick Preset Buttons */}
+              {/* Quick Action Presets (Last Bill / All 10s / Reset) */}
               <div className="md:col-span-3 flex items-center gap-2">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={handleLoadLastBillQuantities}
-                  className="flex-1 text-xs justify-center"
+                  className="flex-1 text-xs justify-center font-semibold bg-[#F5F7FF] border-[#ECEEF5] hover:bg-[#EEF2FF] hover:text-[#4B49AC]"
                   icon={<Sparkles className="w-3.5 h-3.5 text-[#7978E9]" />}
                   title="Copy quantities from last confirmed invoice"
                 >
@@ -429,8 +443,8 @@ export const OrderPlannerPage: React.FC = () => {
                   variant="outline"
                   size="sm"
                   onClick={handleSetAllDefault}
-                  className="flex-1 text-xs justify-center"
-                  icon={<Layers className="w-3.5 h-3.5" />}
+                  className="flex-1 text-xs justify-center font-semibold bg-[#F5F7FF] border-[#ECEEF5] hover:bg-[#EEF2FF] hover:text-[#4B49AC]"
+                  icon={<Layers className="w-3.5 h-3.5 text-[#4B49AC]" />}
                   title="Fill all items with 10 packs"
                 >
                   All 10s
@@ -439,11 +453,11 @@ export const OrderPlannerPage: React.FC = () => {
             </div>
 
             {/* Filter Tabs Strip */}
-            <div className="flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-[#ECEEF5]">
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-3 border-t border-[#ECEEF5]">
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
                 {(
                   [
-                    { id: 'ALL', label: 'All Catalog Products', count: planRows.length },
+                    { id: 'ALL', label: 'All Catalog', count: planRows.length },
                     { id: 'ORDERED', label: 'In Current Order', count: orderedItems.length },
                     { id: 'ZERO', label: 'Unordered (0 Packs)', count: planRows.length - orderedItems.length }
                   ] as const
@@ -469,14 +483,163 @@ export const OrderPlannerPage: React.FC = () => {
                 ))}
               </div>
 
-              <div className="text-xs text-[#6C7383] font-mono">
+              <div className="text-xs text-[#6C7383] font-mono shrink-0">
                 Showing <strong className="text-[#1F1F2C]">{filteredRows.length}</strong> of {planRows.length} products
               </div>
             </div>
           </div>
 
-          {/* Product Order Table (Matches Products Page Look & Feel) */}
-          <div className="rounded-2xl border border-[#ECEEF5] bg-white shadow-skydash overflow-hidden">
+          {/* 1. MOBILE RESPONSIVE CARDS VIEW (md:hidden) */}
+          <div className="md:hidden space-y-3">
+            {loading ? (
+              <div className="p-8 rounded-2xl bg-white border border-[#ECEEF5] text-center text-xs text-[#6C7383] shadow-skydash">
+                Loading products catalog...
+              </div>
+            ) : filteredRows.length === 0 ? (
+              <div className="p-8 rounded-2xl bg-white border border-[#ECEEF5] text-center text-xs text-[#6C7383] shadow-skydash">
+                No products match your search or filter.
+              </div>
+            ) : (
+              filteredRows.map((row, idx) => {
+                const isSelected = row.quantity > 0;
+                return (
+                  <div
+                    key={row.product_id}
+                    className={`p-4 rounded-2xl border transition-all duration-200 ${
+                      isSelected
+                        ? 'bg-[#F0F3FF]/70 border-[#4B49AC] shadow-md shadow-[#4B49AC]/10 ring-1 ring-[#4B49AC]/20'
+                        : 'bg-white border-[#ECEEF5] shadow-skydash hover:border-[#D5DCED]'
+                    }`}
+                  >
+                    {/* Top Row: Index, Nickname & Active Tag */}
+                    <div className="flex items-start justify-between gap-2.5 pb-2.5 border-b border-[#ECEEF5]">
+                      <div className="flex items-start gap-2.5 min-w-0">
+                        <span className="w-6 h-6 rounded-lg bg-[#ECEEF5] text-[#6C7383] font-mono text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                          {idx + 1}
+                        </span>
+                        <div className="min-w-0">
+                          <h3 className="font-bold text-[#1F1F2C] text-sm leading-tight truncate">
+                            {row.product.nickname}
+                          </h3>
+                          <p className="text-[11px] text-[#6C7383] font-mono truncate mt-0.5" title={row.product.supplier_item_name}>
+                            "{row.product.supplier_item_name}"
+                          </p>
+                        </div>
+                      </div>
+
+                      {isSelected && (
+                        <span className="shrink-0 px-2 py-0.5 rounded-full text-[11px] font-mono font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                          <Check className="w-3 h-3 text-emerald-700" />
+                          {row.quantity} Packs
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Middle Row: Rate & Computed Line Total */}
+                    <div className="grid grid-cols-2 gap-2.5 py-2.5 text-xs">
+                      <div className="p-2.5 rounded-xl bg-white border border-[#ECEEF5] space-y-0.5 shadow-xs">
+                        <span className="text-[10px] uppercase font-bold text-[#8F93A0] tracking-wider block">
+                          Purchase Ref Rate
+                        </span>
+                        <div className="flex items-baseline gap-1">
+                          <span className="font-mono font-bold text-sm text-[#4B49AC]">
+                            ₹{row.purchase_rate.toFixed(2)}
+                          </span>
+                          <span className="text-[10px] text-[#8F93A0] font-mono">
+                            {row.rate_source === 'SUPPLIER_LAST' ? 'Last Bill' : 'Ref'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="p-2.5 rounded-xl bg-white border border-[#ECEEF5] space-y-0.5 text-right shadow-xs">
+                        <span className="text-[10px] uppercase font-bold text-[#8F93A0] tracking-wider block">
+                          Line Total
+                        </span>
+                        <span className={`font-mono font-bold text-sm block ${isSelected ? 'text-[#1F1F2C]' : 'text-[#8F93A0]'}`}>
+                          ₹{row.total.toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Bottom Row: Full Touch Stepper Controls */}
+                    <div className="pt-2 border-t border-[#ECEEF5]">
+                      <div className="flex items-center justify-between gap-1.5">
+                        {/* -10 Preset */}
+                        <button
+                          type="button"
+                          onClick={() => handleAddPreset(row.product_id, -10)}
+                          disabled={row.quantity <= 0}
+                          className="px-2.5 h-9 rounded-xl bg-white border border-[#ECEEF5] text-[#6C7383] text-xs font-bold disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 transition-all hover:bg-[#F5F7FF] hover:text-[#4B49AC] shadow-xs"
+                          title="Decrease by 10"
+                        >
+                          -10
+                        </button>
+
+                        {/* -1 Stepper */}
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateQuantity(row.product_id, row.quantity - 1)}
+                          disabled={row.quantity <= 0}
+                          className="w-9 h-9 rounded-xl bg-white border border-[#ECEEF5] text-[#6C7383] flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 transition-all hover:bg-[#F5F7FF] hover:text-[#4B49AC] shadow-xs"
+                          title="Decrease by 1"
+                        >
+                          <Minus className="w-4 h-4" />
+                        </button>
+
+                        {/* Centered Number Input */}
+                        <input
+                          type="number"
+                          min="0"
+                          value={row.quantity === 0 ? '' : row.quantity}
+                          placeholder="0"
+                          onChange={(e) => handleUpdateQuantity(row.product_id, parseInt(e.target.value) || 0)}
+                          onFocus={(e) => e.target.select()}
+                          className={`flex-1 min-w-0 max-w-[80px] h-9 px-2 rounded-xl border text-center font-mono font-bold text-base focus:outline-none transition-all ${
+                            isSelected
+                              ? 'bg-white border-[#4B49AC] text-[#4B49AC] ring-2 ring-[#4B49AC]/20 shadow-xs'
+                              : 'bg-white border-[#ECEEF5] text-[#1F1F2C]'
+                          }`}
+                        />
+
+                        {/* +1 Stepper */}
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateQuantity(row.product_id, row.quantity + 1)}
+                          className="w-9 h-9 rounded-xl bg-white border border-[#ECEEF5] text-[#4B49AC] flex items-center justify-center active:scale-95 transition-all hover:bg-[#EEF2FF] hover:text-[#4B49AC] shadow-xs"
+                          title="Increase by 1"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+
+                        {/* +10 Preset */}
+                        <button
+                          type="button"
+                          onClick={() => handleAddPreset(row.product_id, 10)}
+                          className="px-2.5 h-9 rounded-xl bg-[#F0F3FF] border border-[#D5DCED] text-[#4B49AC] text-xs font-bold active:scale-95 transition-all hover:bg-[#4B49AC] hover:text-white shadow-xs"
+                          title="Add 10 Packs"
+                        >
+                          +10
+                        </button>
+
+                        {/* +50 Preset */}
+                        <button
+                          type="button"
+                          onClick={() => handleAddPreset(row.product_id, 50)}
+                          className="px-2.5 h-9 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5] text-[#6C7383] text-xs font-bold active:scale-95 transition-all hover:bg-[#7978E9] hover:text-white shadow-xs"
+                          title="Add 50 Packs"
+                        >
+                          +50
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* 2. DESKTOP RESPONSIVE TABLE VIEW (hidden md:block) */}
+          <div className="hidden md:block rounded-2xl border border-[#ECEEF5] bg-white shadow-skydash overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead className="bg-[#F5F7FF] text-[11px] font-bold text-[#6C7383] uppercase tracking-wider border-b border-[#ECEEF5]">
@@ -484,7 +647,7 @@ export const OrderPlannerPage: React.FC = () => {
                     <th className="px-4 py-3.5 text-center w-12">#</th>
                     <th className="px-4 py-3.5">Product Alias / Nickname</th>
                     <th className="px-4 py-3.5 text-right w-36">Purchase Ref Rate</th>
-                    <th className="px-4 py-3.5 text-center w-64">Order Packs (Quantity)</th>
+                    <th className="px-4 py-3.5 text-center w-72">Order Packs (Quantity)</th>
                     <th className="px-4 py-3.5 text-right w-36">Line Total (₹)</th>
                   </tr>
                 </thead>
@@ -601,7 +764,7 @@ export const OrderPlannerPage: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() => handleAddPreset(row.product_id, 10)}
-                                className="px-2 h-7 rounded-lg bg-[#F5F7FF] text-[#4B49AC] hover:bg-[#4B49AC] hover:text-white font-bold text-xs border border-[#ECEEF5] transition-all"
+                                className="px-2 h-7 rounded-lg bg-[#F0F3FF] text-[#4B49AC] hover:bg-[#4B49AC] hover:text-white font-bold text-xs border border-[#D5DCED] transition-all"
                                 title="Add 10 Packs"
                               >
                                 +10
@@ -640,8 +803,8 @@ export const OrderPlannerPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Sticky / Live Order Summary Card */}
-          <div className="p-5 rounded-2xl bg-gradient-to-r from-[#4B49AC] via-[#5C59BE] to-[#7978E9] text-white shadow-skydash-primary flex flex-col md:flex-row md:items-center justify-between gap-5">
+          {/* 3. DESKTOP LIVE ORDER SUMMARY BANNER (hidden md:flex) */}
+          <div className="hidden md:flex p-5 rounded-2xl bg-gradient-to-r from-[#4B49AC] via-[#5C59BE] to-[#7978E9] text-white shadow-skydash-primary items-center justify-between gap-5">
             <div className="flex items-center gap-4">
               <div className="p-3.5 rounded-2xl bg-white/20 text-white backdrop-blur-md shrink-0 shadow-sm">
                 <Wallet className="w-7 h-7" />
@@ -661,8 +824,8 @@ export const OrderPlannerPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 shrink-0">
-              <div className="text-left sm:text-right">
+            <div className="flex items-center gap-4 shrink-0">
+              <div className="text-right">
                 <span className="text-[11px] uppercase font-bold text-white/80 tracking-wider block">
                   Total Amount Needed
                 </span>
@@ -683,19 +846,41 @@ export const OrderPlannerPage: React.FC = () => {
               </Button>
             </div>
           </div>
+
+          {/* 4. MOBILE STICKY BOTTOM BAR (md:hidden) */}
+          <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-[#ECEEF5] p-3.5 shadow-2xl pb-safe flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <span className="text-[10px] uppercase font-bold text-[#6C7383] block truncate">
+                {orderedItems.length} SKUs • {totalPacksOrdered} Packs
+              </span>
+              <span className="font-mono text-base font-black text-[#4B49AC] block truncate">
+                ₹{grandTotalRounded.toFixed(2)}
+              </span>
+            </div>
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={orderedItems.length === 0}
+              onClick={() => setIsProformaMode(true)}
+              className="shadow-lg shadow-[#4B49AC]/30 font-bold px-4 py-2 text-xs shrink-0 bg-[#4B49AC] hover:bg-[#3f3da0] text-white"
+              icon={<FileDown className="w-4 h-4" />}
+            >
+              Generate PO ({orderedItems.length})
+            </Button>
+          </div>
         </div>
       ) : (
         /* ULTRA-CLEAN CORPORATE PRINTABLE DOCUMENT VIEW */
-        <div className="printable-container">
-          <div className="printable-document max-w-4xl mx-auto bg-white text-black rounded-none p-6 sm:p-8 space-y-6 shadow-none border border-black">
+        <div className="printable-container space-y-4">
+          <div className="printable-document max-w-4xl mx-auto bg-white text-black rounded-xl sm:rounded-none p-4 sm:p-8 space-y-6 shadow-sm sm:shadow-none border border-zinc-200 sm:border-black overflow-hidden">
             {/* Header / Brand Title */}
-            <div className="flex justify-between items-center border-b-2 border-black pb-5">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b-2 border-black pb-5">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-black text-white flex items-center justify-center font-black text-lg">
+                <div className="w-10 h-10 bg-black text-white flex items-center justify-center font-black text-lg shrink-0">
                   AP
                 </div>
                 <div>
-                  <h1 className="text-xl font-black tracking-tight text-black uppercase">
+                  <h1 className="text-lg sm:text-xl font-black tracking-tight text-black uppercase">
                     AUDIT & ORDER PLANNER
                   </h1>
                   <span className="text-[10px] font-mono tracking-widest text-zinc-600 uppercase block">
@@ -704,8 +889,8 @@ export const OrderPlannerPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="text-right">
-                <span className="px-3 py-1 bg-black text-white rounded-none font-mono text-xs font-bold uppercase">
+              <div className="text-left sm:text-right">
+                <span className="px-3 py-1 bg-black text-white rounded-none font-mono text-[11px] sm:text-xs font-bold uppercase inline-block">
                   WHOLESALE ORDER ESTIMATE
                 </span>
                 <p className="text-xs font-mono text-zinc-700 mt-1">Ref #: EST-{Date.now().toString().slice(-6)}</p>
@@ -714,7 +899,7 @@ export const OrderPlannerPage: React.FC = () => {
             </div>
 
             {/* Vendor & Buyer Metadata */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 p-4 bg-zinc-50 border border-zinc-300 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 p-4 bg-zinc-50 border border-zinc-300 text-xs">
               <div>
                 <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider block mb-1">
                   TARGET DISTRIBUTOR AGENCY
@@ -740,8 +925,8 @@ export const OrderPlannerPage: React.FC = () => {
             </div>
 
             {/* Line Items Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
+            <div className="overflow-x-auto -mx-4 sm:mx-0">
+              <table className="w-full text-left text-xs border-collapse min-w-[500px]">
                 <thead>
                   <tr className="bg-zinc-100 border-b-2 border-black text-black uppercase text-[10px] font-bold">
                     <th className="py-2.5 px-3">#</th>
@@ -808,12 +993,12 @@ export const OrderPlannerPage: React.FC = () => {
             </div>
 
             {/* Footer Signature */}
-            <div className="pt-8 flex justify-between items-end text-[11px] text-zinc-600 border-t border-zinc-300">
+            <div className="pt-6 sm:pt-8 flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 text-[11px] text-zinc-600 border-t border-zinc-300">
               <div>
                 <p>System Generated Order Estimate</p>
                 <p className="font-mono text-[10px]">Timestamp: {formatISTTimestamp(new Date())}</p>
               </div>
-              <div className="text-right">
+              <div className="text-left sm:text-right">
                 <div className="h-10 border-b border-black w-48 mb-1"></div>
                 <p className="font-bold text-black">Authorized Signature</p>
               </div>
