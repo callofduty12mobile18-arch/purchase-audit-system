@@ -182,68 +182,22 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 
 
 -- ==============================================================================
--- 4. ROW LEVEL SECURITY (RLS) POLICIES
+-- 4. PERMISSIONS & ROW LEVEL SECURITY (RLS) POLICIES
 -- ==============================================================================
-ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE suppliers ENABLE ROW LEVEL SECURITY;
-ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
-ALTER TABLE products ENABLE ROW LEVEL SECURITY;
-ALTER TABLE purchase_invoices ENABLE ROW LEVEL SECURITY;
-ALTER TABLE purchase_invoice_documents ENABLE ROW LEVEL SECURITY;
-ALTER TABLE purchase_items ENABLE ROW LEVEL SECURITY;
-ALTER TABLE price_history ENABLE ROW LEVEL SECURITY;
-ALTER TABLE stock_transactions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE profiles DISABLE ROW LEVEL SECURITY;
+ALTER TABLE suppliers DISABLE ROW LEVEL SECURITY;
+ALTER TABLE categories DISABLE ROW LEVEL SECURITY;
+ALTER TABLE products DISABLE ROW LEVEL SECURITY;
+ALTER TABLE purchase_invoices DISABLE ROW LEVEL SECURITY;
+ALTER TABLE purchase_invoice_documents DISABLE ROW LEVEL SECURITY;
+ALTER TABLE purchase_items DISABLE ROW LEVEL SECURITY;
+ALTER TABLE price_history DISABLE ROW LEVEL SECURITY;
+ALTER TABLE stock_transactions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE audit_logs DISABLE ROW LEVEL SECURITY;
 
-DO $$ BEGIN
-    DROP POLICY IF EXISTS "Allow full access on profiles" ON profiles;
-    CREATE POLICY "Allow full access on profiles" ON profiles FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-EXCEPTION WHEN undefined_object THEN null; END $$;
-
-DO $$ BEGIN
-    DROP POLICY IF EXISTS "Allow full access on suppliers" ON suppliers;
-    CREATE POLICY "Allow full access on suppliers" ON suppliers FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-EXCEPTION WHEN undefined_object THEN null; END $$;
-
-DO $$ BEGIN
-    DROP POLICY IF EXISTS "Allow full access on categories" ON categories;
-    CREATE POLICY "Allow full access on categories" ON categories FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-EXCEPTION WHEN undefined_object THEN null; END $$;
-
-DO $$ BEGIN
-    DROP POLICY IF EXISTS "Allow full access on products" ON products;
-    CREATE POLICY "Allow full access on products" ON products FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-EXCEPTION WHEN undefined_object THEN null; END $$;
-
-DO $$ BEGIN
-    DROP POLICY IF EXISTS "Allow full access on purchase_invoices" ON purchase_invoices;
-    CREATE POLICY "Allow full access on purchase_invoices" ON purchase_invoices FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-EXCEPTION WHEN undefined_object THEN null; END $$;
-
-DO $$ BEGIN
-    DROP POLICY IF EXISTS "Allow full access on purchase_invoice_documents" ON purchase_invoice_documents;
-    CREATE POLICY "Allow full access on purchase_invoice_documents" ON purchase_invoice_documents FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-EXCEPTION WHEN undefined_object THEN null; END $$;
-
-DO $$ BEGIN
-    DROP POLICY IF EXISTS "Allow full access on purchase_items" ON purchase_items;
-    CREATE POLICY "Allow full access on purchase_items" ON purchase_items FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-EXCEPTION WHEN undefined_object THEN null; END $$;
-
-DO $$ BEGIN
-    DROP POLICY IF EXISTS "Allow full access on price_history" ON price_history;
-    CREATE POLICY "Allow full access on price_history" ON price_history FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-EXCEPTION WHEN undefined_object THEN null; END $$;
-
-DO $$ BEGIN
-    DROP POLICY IF EXISTS "Allow full access on stock_transactions" ON stock_transactions;
-    CREATE POLICY "Allow full access on stock_transactions" ON stock_transactions FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-EXCEPTION WHEN undefined_object THEN null; END $$;
-
-DO $$ BEGIN
-    DROP POLICY IF EXISTS "Allow full access on audit_logs" ON audit_logs;
-    CREATE POLICY "Allow full access on audit_logs" ON audit_logs FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-EXCEPTION WHEN undefined_object THEN null; END $$;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, postgres;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, postgres;
+GRANT ALL ON ALL ROUTINES IN SCHEMA public TO anon, authenticated, postgres;
 
 
 -- ==============================================================================

@@ -492,15 +492,16 @@ export const dbService = {
     setLocalData(LOCAL_STORAGE_KEY_PRODUCTS, updatedList);
 
     // Sync to Supabase
-    supabase
-      .from('products')
-      .upsert(savedProd)
-      .then(
-        ({ error }) => {
-          if (error) console.warn('Supabase product upsert note:', error.message);
-        },
-        () => {}
-      );
+    try {
+      const { error } = await supabase
+        .from('products')
+        .upsert(savedProd);
+      if (error) {
+        console.warn('Supabase product upsert note:', error.message);
+      }
+    } catch (e) {
+      console.warn('Supabase product upsert exception:', e);
+    }
 
     if (
       oldPrice !== undefined &&
