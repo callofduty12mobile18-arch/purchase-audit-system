@@ -5,8 +5,6 @@ import {
   PlusCircle,
   Receipt,
   Package,
-  TrendingUp,
-  Building2,
 } from 'lucide-react';
 import { StatCard } from '../components/ui/StatCard';
 import { Card } from '../components/ui/Card';
@@ -174,8 +172,8 @@ export const DashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Metrics Row (Skydash 4 Vibrant Color Cards) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+      {/* Metrics Row (2 Prominent Cards) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
         <StatCard
           color="blue"
           title="Total Purchase Value"
@@ -184,22 +182,6 @@ export const DashboardPage: React.FC = () => {
           change={visibleInvoices.length > 0 ? `${visibleInvoices.length} Invoices` : undefined}
           changeType="positive"
           icon={<Receipt className="w-5 h-5" />}
-        />
-        <StatCard
-          color="indigo"
-          title="Total GST Tax Audited"
-          value={`₹${totalGstPaid.toFixed(2)}`}
-          subtitle="Input tax ledger"
-          change="Audited"
-          changeType="neutral"
-          icon={<TrendingUp className="w-5 h-5" />}
-        />
-        <StatCard
-          color="purple"
-          title="Top Supplier"
-          value={topSupplierName}
-          subtitle="Highest procurement volume"
-          icon={<Building2 className="w-5 h-5" />}
         />
         <StatCard
           color="coral"
