@@ -751,6 +751,7 @@ export const dbService = {
       supplier_id: supplier.id,
       supplier: supplier,
       invoice_number: invoiceNumber,
+      invoice_name: extractedData.invoice_name?.trim() || undefined,
       invoice_date: extractedData.invoice_date,
       payment_mode: safePaymentMode,
       payment_status: safePaymentStatus,

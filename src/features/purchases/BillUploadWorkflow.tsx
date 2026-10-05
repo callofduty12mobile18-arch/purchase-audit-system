@@ -437,7 +437,7 @@ export const BillUploadWorkflow: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
             {/* Static Supplier Name */}
             <div>
               <label className="block text-xs font-semibold text-[#6C7383] uppercase tracking-wider mb-1">
@@ -457,6 +457,20 @@ export const BillUploadWorkflow: React.FC = () => {
               <div className="w-full px-3.5 py-2.5 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5] text-xs sm:text-sm font-semibold text-[#1F1F2C]">
                 ITC Authorized Agency
               </div>
+            </div>
+
+            {/* Custom Invoice / Memo Name */}
+            <div>
+              <label className="block text-xs font-semibold text-[#1F1F2C] mb-1">
+                Invoice / Memo Name
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Weekly ITC Stock, Bill #1024"
+                value={formData.invoice_name || ''}
+                onChange={(e) => handleHeaderChange('invoice_name', e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#ECEEF5] text-xs sm:text-sm text-[#1F1F2C] placeholder-[#8F93A0] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC] shadow-xs"
+              />
             </div>
 
             {/* Invoice Date */}
@@ -963,6 +977,12 @@ export const BillUploadWorkflow: React.FC = () => {
                 <span className="text-[#6C7383]">Invoice #:</span>
                 <span className="font-bold text-[#1F1F2C]">{savedInvoice.invoice_number}</span>
               </div>
+              {savedInvoice.invoice_name && (
+                <div className="flex justify-between pb-1.5 border-b border-[#ECEEF5]">
+                  <span className="text-[#6C7383]">Invoice Name / Memo:</span>
+                  <span className="font-bold text-[#4B49AC]">{savedInvoice.invoice_name}</span>
+                </div>
+              )}
               <div className="flex justify-between pb-1.5 border-b border-[#ECEEF5]">
                 <span className="text-[#6C7383]">Supplier:</span>
                 <span className="font-bold text-[#1F1F2C]">{savedInvoice.supplier?.name || 'AYYAPPA ENTERPRISES'}</span>

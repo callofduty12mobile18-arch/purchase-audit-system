@@ -89,6 +89,7 @@ export interface PurchaseInvoice {
   supplier_id: string;
   supplier?: Supplier;
   invoice_number: string;
+  invoice_name?: string;
   invoice_date: string;
   payment_mode: PaymentMode;
   payment_status: PaymentStatus;
@@ -193,6 +194,7 @@ export interface InvoiceFormData {
   supplier_name: string;
   supplier_gstin?: string;
   invoice_number: string;
+  invoice_name?: string;
   invoice_date: string;
   payment_mode: PaymentMode;
   payment_status: PaymentStatus;

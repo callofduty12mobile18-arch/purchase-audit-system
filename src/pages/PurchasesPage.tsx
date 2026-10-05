@@ -55,13 +55,20 @@ export const PurchasesPage: React.FC = () => {
     {
       header: 'Invoice #',
       cell: (row: PurchaseInvoice) => (
-        <span
-          onClick={() => navigate(`/purchases/${row.id}`)}
-          className="font-mono text-[#4B49AC] font-bold hover:underline cursor-pointer flex items-center gap-1.5"
-        >
-          <Receipt className="w-3.5 h-3.5 text-[#7DA0FA]" />
-          {row.invoice_number}
-        </span>
+        <div className="space-y-0.5">
+          <span
+            onClick={() => navigate(`/purchases/${row.id}`)}
+            className="font-mono text-[#4B49AC] font-bold hover:underline cursor-pointer flex items-center gap-1.5"
+          >
+            <Receipt className="w-3.5 h-3.5 text-[#7DA0FA]" />
+            {row.invoice_number}
+          </span>
+          {row.invoice_name && (
+            <span className="text-[11px] text-[#6C7383] font-medium block truncate max-w-[170px]" title={row.invoice_name}>
+              {row.invoice_name}
+            </span>
+          )}
+        </div>
       )
     },
     {
