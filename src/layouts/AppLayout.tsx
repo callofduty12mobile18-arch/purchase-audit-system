@@ -110,15 +110,6 @@ export const AppLayout: React.FC = () => {
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <Button
-              variant="primary"
-              size="sm"
-              className="px-3 py-1.5 text-xs font-semibold rounded-lg shadow-sm"
-              onClick={() => navigate('/purchases/import')}
-              icon={<PlusCircle className="w-3.5 h-3.5" />}
-            >
-              + Bill
-            </Button>
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="tap-target p-2 rounded-xl text-[#6C7383] hover:text-[#4B49AC] hover:bg-[#F5F7FF] border border-[#ECEEF5] transition-colors"
@@ -265,17 +256,7 @@ export const AppLayout: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-3.5">
-              <Button
-                variant="outline"
-                size="sm"
-                className="rounded-xl px-3.5 py-1.5 text-xs"
-                onClick={() => navigate('/purchases/import')}
-                icon={<PlusCircle className="w-3.5 h-3.5" />}
-              >
-                New Invoice
-              </Button>
-              <div className="h-4 w-px bg-[#ECEEF5]" />
-              <div className="w-8 h-8 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5] flex items-center justify-center text-[#6C7383] hover:text-[#4B49AC] cursor-pointer transition-colors">
+              <div className="w-8 h-8 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5] flex items-center justify-center text-[#6C7383] hover:text-[#4B49AC] cursor-pointer transition-colors" title="Notifications">
                 <Bell className="w-4 h-4" />
               </div>
             </div>
