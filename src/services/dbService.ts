@@ -545,24 +545,70 @@ export const dbService = {
 
   // --- INVOICES & PURCHASES ---
   getInvoices: async (): Promise<PurchaseInvoice[]> => {
+    const localInvoices = getLocalData<PurchaseInvoice[]>(LOCAL_STORAGE_KEY_INVOICES, []);
     try {
       const { data, error } = await supabase
         .from('purchase_invoices')
         .select('*, supplier:suppliers(*), items:purchase_items(*, product:products(*))')
         .order('invoice_date', { ascending: false });
+
       if (!error && data) {
-        setLocalData(LOCAL_STORAGE_KEY_INVOICES, data);
-        return data as PurchaseInvoice[];
+        // Merge Supabase data with any locally saved invoices by ID
+        const mergedMap = new Map<string, PurchaseInvoice>();
+        (data as PurchaseInvoice[]).forEach(inv => {
+          if (inv && inv.id) mergedMap.set(inv.id, inv);
+        });
+        localInvoices.forEach(inv => {
+          if (inv && inv.id && !mergedMap.has(inv.id)) {
+            mergedMap.set(inv.id, inv);
+          }
+        });
+
+        const merged = Array.from(mergedMap.values()).sort(
+          (a, b) => new Date(b.invoice_date || b.created_at).getTime() - new Date(a.invoice_date || a.created_at).getTime()
+        );
+        setLocalData(LOCAL_STORAGE_KEY_INVOICES, merged);
+        return merged;
       }
     } catch (e) {
       console.warn('Supabase invoices fetch note:', e);
     }
-    return getLocalData<PurchaseInvoice[]>(LOCAL_STORAGE_KEY_INVOICES, []);
+    return localInvoices;
   },
 
   getInvoiceById: async (id: string): Promise<PurchaseInvoice | null> => {
-    const invoices = await dbService.getInvoices();
-    return invoices.find(inv => inv.id === id) || null;
+    if (!id) return null;
+
+    // 1. Check local cache first
+    const localInvoices = getLocalData<PurchaseInvoice[]>(LOCAL_STORAGE_KEY_INVOICES, []);
+    const localMatch = localInvoices.find(inv => inv.id === id);
+
+    // 2. Fetch directly from Supabase for fresh data
+    try {
+      const { data, error } = await supabase
+        .from('purchase_invoices')
+        .select('*, supplier:suppliers(*), items:purchase_items(*, product:products(*))')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (!error && data) {
+        const freshInvoice = data as PurchaseInvoice;
+        const updated = [freshInvoice, ...localInvoices.filter(i => i.id !== id)];
+        setLocalData(LOCAL_STORAGE_KEY_INVOICES, updated);
+        return freshInvoice;
+      }
+    } catch (e) {
+      console.warn('Supabase single invoice fetch note:', e);
+    }
+
+    // 3. Fallback to local cache record
+    if (localMatch) {
+      return localMatch;
+    }
+
+    // 4. Try refreshing full invoice list
+    const allInvoices = await dbService.getInvoices();
+    return allInvoices.find(inv => inv.id === id) || null;
   },
 
   checkDuplicateInvoice: async (supplierId: string, invoiceNumber: string, invoiceDate?: string): Promise<PurchaseInvoice | null> => {
@@ -577,6 +623,7 @@ export const dbService = {
   },
 
   confirmAndSaveInvoice: async (extractedData: InvoiceFormData, _documentPath?: string): Promise<PurchaseInvoice> => {
+    const now = new Date().toISOString();
     const suppliers = await dbService.getSuppliers();
     let supplier = suppliers.find(
       s => s.name.trim().toLowerCase() === extractedData.supplier_name.trim().toLowerCase()
@@ -587,20 +634,38 @@ export const dbService = {
         name: extractedData.supplier_name,
         gstin: extractedData.supplier_gstin
       });
+    } else {
+      // Ensure the supplier exists in Supabase remote table to prevent FK constraint failure
+      try {
+        await supabase.from('suppliers').upsert({
+          id: supplier.id,
+          name: supplier.name,
+          gstin: supplier.gstin || '',
+          address: supplier.address || '',
+          phone: supplier.phone || '',
+          email: supplier.email || '',
+          payment_terms: supplier.payment_terms || 'CREDIT',
+          notes: supplier.notes || '',
+          is_active: supplier.is_active ?? true,
+          updated_at: now
+        });
+      } catch (e) {
+        console.warn('Supplier remote sync note:', e);
+      }
     }
 
-    const now = new Date().toISOString();
     const invoiceId = generateUUID();
 
     // 1. Process and Insert Line Items & Auto-map Products
     const itemsToInsert: PurchaseItem[] = [];
 
     for (const itemData of extractedData.items) {
-      const effectiveRate = itemData.each_pack_rate || itemData.purchase_rate || 0;
-      const effectiveQty = itemData.pack_qty || itemData.quantity || itemData.qty || 1;
-      const sellingPrice = itemData.mrp_rsp || Math.round(effectiveRate * 1.3);
+      const effectiveRate = Number(itemData.each_pack_rate || itemData.purchase_rate) || 0;
+      const effectiveQty = Number(itemData.pack_qty || itemData.quantity || itemData.qty) || 1;
+      const sellingPrice = Number(itemData.mrp_rsp) || Math.round(effectiveRate * 1.3);
 
       const savedProduct = await dbService.saveProduct({
+        id: itemData.product_id,
         supplier_item_name: itemData.supplier_item_name || itemData.item_name,
         nickname: itemData.item_name || itemData.supplier_item_name,
         hsn: itemData.hsn,
@@ -622,12 +687,12 @@ export const dbService = {
         quantity: effectiveQty,
         uom_snapshot: itemData.uom || 'PAC',
         purchase_rate: effectiveRate,
-        gst_rate: itemData.gst_rate || 40,
-        taxable_value: itemData.taxable_value || 0,
-        cgst: itemData.cgst || 0,
-        sgst: itemData.sgst || 0,
-        igst: itemData.igst || 0,
-        total: itemData.invoice_amount || itemData.total || (effectiveRate * effectiveQty),
+        gst_rate: Number(itemData.gst_rate) || 40,
+        taxable_value: Number(itemData.taxable_value) || 0,
+        cgst: Number(itemData.cgst) || 0,
+        sgst: Number(itemData.sgst) || 0,
+        igst: Number(itemData.igst) || 0,
+        total: Number(itemData.invoice_amount || itemData.total || (effectiveRate * effectiveQty)),
         created_at: now
       });
     }
@@ -666,16 +731,16 @@ export const dbService = {
       updated_at: now
     };
 
-    // Update local cache
-    const currentInvoices = await dbService.getInvoices();
+    // Update local cache immediately
+    const currentInvoices = getLocalData<PurchaseInvoice[]>(LOCAL_STORAGE_KEY_INVOICES, []);
     const updatedInvoices = [newInvoice, ...currentInvoices.filter(i => i.id !== invoiceId)];
     setLocalData(LOCAL_STORAGE_KEY_INVOICES, updatedInvoices);
 
-    // Sync to Supabase
+    // Sync to Supabase in parallel
     try {
       const { error: invErr } = await supabase
         .from('purchase_invoices')
-        .insert({
+        .upsert({
           id: invoiceId,
           supplier_id: supplier.id,
           invoice_number: invoiceNumber,
@@ -697,11 +762,11 @@ export const dbService = {
         });
 
       if (invErr) {
-        console.error('Supabase purchase_invoices insert error:', invErr);
+        console.error('Supabase purchase_invoices upsert error:', invErr);
       } else {
         const { error: itemsErr } = await supabase
           .from('purchase_items')
-          .insert(
+          .upsert(
             itemsToInsert.map((i, idx) => ({
               id: i.id,
               purchase_invoice_id: invoiceId,
@@ -722,7 +787,7 @@ export const dbService = {
             }))
           );
         if (itemsErr) {
-          console.error('Supabase purchase_items insert error:', itemsErr);
+          console.error('Supabase purchase_items upsert error:', itemsErr);
         }
       }
     } catch (err) {

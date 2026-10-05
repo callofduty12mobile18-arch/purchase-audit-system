@@ -164,6 +164,7 @@ export interface InvoiceValidation {
 export interface InvoiceFormItem {
   item_name?: string;
   supplier_item_name: string;
+  product_id?: string;
   qty?: number;
   quantity: number;
   mrp_rsp?: number;
