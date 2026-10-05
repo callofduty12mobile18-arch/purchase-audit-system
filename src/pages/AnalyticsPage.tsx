@@ -124,23 +124,6 @@ export const AnalyticsPage: React.FC = () => {
       cell: (row: { nickname: string; spend: number; totalPacks: number }) => (
         <span className="font-mono text-xs font-bold text-[#4B49AC]">₹{row.spend.toFixed(2)}</span>
       )
-    },
-    {
-      header: 'Share %',
-      cell: (row: { nickname: string; spend: number; totalPacks: number }) => {
-        const percent = totalSpend > 0 ? (row.spend / totalSpend) * 100 : 0;
-        return (
-          <div className="flex items-center gap-2">
-            <div className="w-16 bg-[#ECEEF5] rounded-full h-1.5 overflow-hidden">
-              <div
-                className="bg-[#4B49AC] h-1.5 rounded-full"
-                style={{ width: `${Math.min(100, Math.max(0, percent))}%` }}
-              />
-            </div>
-            <span className="font-mono text-xs text-[#6C7383]">{percent.toFixed(1)}%</span>
-          </div>
-        );
-      }
     }
   ];
 
@@ -338,7 +321,7 @@ export const AnalyticsPage: React.FC = () => {
       {/* SKU Table Breakdown */}
       <Card
         title="Product Procurement Breakdown"
-        subtitle="Ranked summary of all purchased items and their respective spend share"
+        subtitle="Ranked summary of all purchased items and procurement expenditure"
       >
         <Table
           columns={productTableColumns}
