@@ -40,6 +40,7 @@ export const AuditLogPage: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<FilterCategory>('ALL');
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
   const [copied, setCopied] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   useEffect(() => {
     loadLogs();
@@ -295,6 +296,63 @@ export const AuditLogPage: React.FC = () => {
     );
   };
 
+  const extractLogBusinessDetails = (log: AuditLog) => {
+    const rawNew = (log.new_value || {}) as Record<string, any>;
+    const rawOld = (log.old_value || {}) as Record<string, any>;
+
+    // Invoice Number
+    let invoiceNumber = rawNew.invoice_number || rawOld.invoice_number;
+    if (!invoiceNumber && log.reason) {
+      const match = log.reason.match(/#([A-Za-z0-9\-_/]+)/);
+      if (match) invoiceNumber = match[1];
+    }
+
+    // Supplier
+    let supplier = rawNew.supplier_name || rawOld.supplier_name;
+    if (!supplier && log.entity_type === 'suppliers') {
+      supplier = rawNew.name || rawOld.name;
+    }
+    if (!supplier && log.reason) {
+      const match = log.reason.match(/from\s+([A-Za-z0-9\s&._-]+?)(?:\s*\(|$)/i);
+      if (match) supplier = match[1].trim();
+    }
+
+    // Product Name (if product event)
+    let productName = rawNew.nickname || rawNew.supplier_item_name || rawOld.nickname || rawOld.supplier_item_name;
+    if (!productName && log.entity_type === 'products' && log.reason) {
+      const match = log.reason.match(/(?:product|update):\s*([A-Za-z0-9\s&._-]+?)(?:\s*\(|$)/i);
+      if (match) productName = match[1].trim();
+    }
+
+    // Amount
+    let amount: number | undefined = undefined;
+    if (typeof rawNew.grand_total === 'number') amount = rawNew.grand_total;
+    else if (typeof rawOld.grand_total === 'number') amount = rawOld.grand_total;
+    else if (typeof rawNew.current_purchase_ref_price === 'number') amount = rawNew.current_purchase_ref_price;
+    else if (typeof rawOld.current_purchase_ref_price === 'number') amount = rawOld.current_purchase_ref_price;
+    else if (log.reason) {
+      const match = log.reason.match(/₹([0-9,]+(?:\.[0-9]{2})?)/);
+      if (match) amount = parseFloat(match[1].replace(/,/g, ''));
+    }
+
+    // Item Count
+    let itemCount: number | undefined = undefined;
+    if (typeof rawNew.item_count === 'number') itemCount = rawNew.item_count;
+    else if (typeof rawOld.item_count === 'number') itemCount = rawOld.item_count;
+    else if (Array.isArray(rawNew.items)) itemCount = rawNew.items.length;
+    else if (Array.isArray(rawOld.items)) itemCount = rawOld.items.length;
+
+    return {
+      invoiceNumber,
+      supplier,
+      productName,
+      amount,
+      itemCount,
+      performedBy: log.user_email || 'Administrator',
+      description: log.reason || 'System record audit event'
+    };
+  };
+
   return (
     <div className="space-y-6 pb-12">
       {/* Header & Title */}
@@ -305,7 +363,7 @@ export const AuditLogPage: React.FC = () => {
             System Audit Trail & Security Logs
           </h1>
           <p className="page-subtitle">
-            Append-only cryptographic event logs recording all invoice approvals, price calibrations, and database changes.
+            Append-only event logs recording all invoice confirmations, price updates, and database actions.
           </p>
         </div>
 
@@ -408,7 +466,10 @@ export const AuditLogPage: React.FC = () => {
           columns={columns}
           data={filteredLogs}
           keyExtractor={(row) => row.id}
-          onRowClick={(row) => setSelectedLog(row)}
+          onRowClick={(row) => {
+            setSelectedLog(row);
+            setShowAdvanced(false);
+          }}
           isLoading={loading}
           isError={fetchError}
           onRetry={() => loadLogs()}
@@ -420,139 +481,188 @@ export const AuditLogPage: React.FC = () => {
         />
       </div>
 
-      {/* Interactive Audit Detail & Diff Modal */}
-      {selectedLog && (
-        <Modal
-          isOpen={!!selectedLog}
-          onClose={() => setSelectedLog(null)}
-          title="Audit Trail Event Details"
-          subtitle={`Cryptographic Event Record #${selectedLog.id.slice(0, 12)}`}
-          size="lg"
-          footer={
-            <div className="w-full flex items-center justify-between gap-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => copyPayload(selectedLog)}
-                icon={copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-              >
-                {copied ? 'Copied' : 'Copy JSON Payload'}
-              </Button>
+      {/* Simplified Business Audit Detail Modal */}
+      {selectedLog && (() => {
+        const details = extractLogBusinessDetails(selectedLog);
+        const isInvoice = selectedLog.entity_type === 'purchase_invoices' || selectedLog.action.toLowerCase().includes('invoice');
+        const isDeleted = selectedLog.action.includes('DELETE') || selectedLog.action.includes('VOID');
 
-              <div className="flex items-center gap-2">
-                {selectedLog.entity_type === 'purchase_invoices' && (
+        return (
+          <Modal
+            isOpen={!!selectedLog}
+            onClose={() => setSelectedLog(null)}
+            title="Audit Log Details"
+            subtitle={`Recorded on ${formatTimestamp(selectedLog.timestamp)}`}
+            size="md"
+            footer={
+              <div className="w-full flex items-center justify-end gap-2.5">
+                {isInvoice && !isDeleted && (
                   <Button
                     variant="primary"
                     size="sm"
                     onClick={() => {
+                      const targetId = selectedLog.entity_id;
                       setSelectedLog(null);
-                      navigate('/invoices');
+                      if (targetId && targetId.length === 36 && targetId.includes('-')) {
+                        navigate(`/purchases/${targetId}`);
+                      } else {
+                        navigate('/purchases');
+                      }
                     }}
                     icon={<ExternalLink className="w-3.5 h-3.5" />}
                   >
-                    View Invoices
-                  </Button>
-                )}
-                {selectedLog.entity_type === 'products' && (
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => {
-                      setSelectedLog(null);
-                      navigate('/products');
-                    }}
-                    icon={<ExternalLink className="w-3.5 h-3.5" />}
-                  >
-                    View Catalog
-                  </Button>
-                )}
-                {selectedLog.entity_type === 'suppliers' && (
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => {
-                      setSelectedLog(null);
-                      navigate('/suppliers');
-                    }}
-                    icon={<ExternalLink className="w-3.5 h-3.5" />}
-                  >
-                    View Suppliers
+                    View Invoice
                   </Button>
                 )}
                 <Button variant="outline" size="sm" onClick={() => setSelectedLog(null)}>
                   Close
                 </Button>
               </div>
-            </div>
-          }
-        >
-          <div className="space-y-5">
-            {/* Top Event Summary Banner */}
-            <div className="p-4 rounded-2xl bg-[#F5F7FF] border border-[#ECEEF5] space-y-3">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <div className="flex items-center gap-2">
+            }
+          >
+            <div className="space-y-4">
+              {/* Status Badge & Description Banner */}
+              <div className="p-4 rounded-2xl bg-[#F5F7FF] border border-[#ECEEF5] space-y-2.5">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <span className="text-xs font-semibold text-[#6C7383]">Action / Status</span>
                   <Badge variant={getActionBadgeVariant(selectedLog.action)}>
-                    {selectedLog.action}
+                    {selectedLog.action.replace(/_/g, ' ')}
                   </Badge>
-                  <span className="text-xs font-mono font-bold text-[#1F1F2C] uppercase tracking-wider">
-                    {selectedLog.entity_type}
-                  </span>
                 </div>
-                <div className="flex items-center gap-1.5 text-xs text-[#6C7383] font-mono">
-                  <Calendar className="w-3.5 h-3.5 text-[#8F93A0]" />
-                  <span>{formatTimestamp(selectedLog.timestamp)}</span>
-                </div>
-              </div>
 
-              {selectedLog.reason && (
-                <div className="p-3 rounded-xl bg-white border border-[#ECEEF5]">
+                <div className="pt-2 border-t border-[#ECEEF5]/80">
                   <span className="text-[10px] uppercase font-bold tracking-wider text-[#8F93A0] block mb-0.5">
-                    Audit Note / Reason
+                    Description
                   </span>
-                  <p className="text-xs font-semibold text-[#1F1F2C]">
-                    {selectedLog.reason}
+                  <p className="text-xs sm:text-sm font-semibold text-[#1F1F2C] leading-relaxed">
+                    {details.description}
                   </p>
                 </div>
-              )}
+              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                <div className="flex items-center gap-2 text-[#6C7383]">
-                  <span className="font-semibold text-[#1F1F2C]">Entity UUID:</span>
-                  <span className="font-mono text-[11px] truncate">{selectedLog.entity_id || selectedLog.id}</span>
+              {/* Essential Business Details Grid */}
+              <div className="grid grid-cols-2 gap-2.5">
+                {/* 1. Invoice Number (or Entity Name) */}
+                <div className="p-3 rounded-xl bg-white border border-[#ECEEF5] space-y-0.5 shadow-xs">
+                  <span className="text-[10px] uppercase font-bold text-[#8F93A0] tracking-wider flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-[#4B49AC]" />
+                    {isInvoice ? 'Invoice #' : 'Reference'}
+                  </span>
+                  <p className="text-xs font-bold text-[#1F1F2C] truncate font-mono">
+                    {details.invoiceNumber ? `#${details.invoiceNumber}` : (details.productName || details.supplier || 'N/A')}
+                  </p>
                 </div>
-                <div className="flex items-center gap-2 text-[#6C7383]">
-                  <span className="font-semibold text-[#1F1F2C]">Operator:</span>
-                  <span className="font-mono text-[11px]">{selectedLog.user_email || 'System Auditor'}</span>
+
+                {/* 2. Supplier / Target Entity */}
+                <div className="p-3 rounded-xl bg-white border border-[#ECEEF5] space-y-0.5 shadow-xs">
+                  <span className="text-[10px] uppercase font-bold text-[#8F93A0] tracking-wider flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-[#4B49AC]" />
+                    Supplier
+                  </span>
+                  <p className="text-xs font-bold text-[#1F1F2C] truncate">
+                    {details.supplier || 'AYYAPPA ENTERPRISES'}
+                  </p>
+                </div>
+
+                {/* 3. Amount */}
+                <div className="p-3 rounded-xl bg-white border border-[#ECEEF5] space-y-0.5 shadow-xs">
+                  <span className="text-[10px] uppercase font-bold text-[#8F93A0] tracking-wider flex items-center gap-1.5">
+                    <span className="font-sans font-bold text-[#57B657] text-xs">₹</span>
+                    Amount
+                  </span>
+                  <p className="text-xs sm:text-sm font-bold text-[#1F1F2C]">
+                    {details.amount !== undefined ? `₹${details.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+                  </p>
+                </div>
+
+                {/* 4. Item Count */}
+                <div className="p-3 rounded-xl bg-white border border-[#ECEEF5] space-y-0.5 shadow-xs">
+                  <span className="text-[10px] uppercase font-bold text-[#8F93A0] tracking-wider flex items-center gap-1.5">
+                    <Package className="w-3.5 h-3.5 text-[#4B49AC]" />
+                    Item Count
+                  </span>
+                  <p className="text-xs font-bold text-[#1F1F2C]">
+                    {details.itemCount !== undefined ? `${details.itemCount} Items` : '—'}
+                  </p>
+                </div>
+
+                {/* 5. Date & Time */}
+                <div className="p-3 rounded-xl bg-white border border-[#ECEEF5] space-y-0.5 shadow-xs col-span-2 sm:col-span-1">
+                  <span className="text-[10px] uppercase font-bold text-[#8F93A0] tracking-wider flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-[#4B49AC]" />
+                    Date & Time
+                  </span>
+                  <p className="text-xs font-mono font-medium text-[#1F1F2C]">
+                    {formatTimestamp(selectedLog.timestamp)}
+                  </p>
+                </div>
+
+                {/* 6. Performed By */}
+                <div className="p-3 rounded-xl bg-white border border-[#ECEEF5] space-y-0.5 shadow-xs col-span-2 sm:col-span-1">
+                  <span className="text-[10px] uppercase font-bold text-[#8F93A0] tracking-wider flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5 text-[#4B49AC]" />
+                    Performed By
+                  </span>
+                  <p className="text-xs font-mono text-[#6C7383] truncate font-medium">
+                    {details.performedBy}
+                  </p>
                 </div>
               </div>
-            </div>
 
-            {/* Visual Diff Section */}
-            {renderDiffView(selectedLog)}
-
-            {/* Raw JSON Payload Block */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <h5 className="text-xs font-bold uppercase tracking-wider text-[#6C7383] flex items-center gap-1.5">
-                  <FileCode2 className="w-4 h-4 text-[#4B49AC]" />
-                  Raw Metadata Payload
-                </h5>
+              {/* Collapsible Advanced Technical Details (Admin) */}
+              <div className="pt-2 border-t border-[#ECEEF5]">
                 <button
                   type="button"
-                  onClick={() => copyPayload(selectedLog)}
-                  className="text-xs text-[#4B49AC] hover:underline font-semibold flex items-center gap-1"
+                  onClick={() => setShowAdvanced(!showAdvanced)}
+                  className="w-full flex items-center justify-between p-2.5 rounded-xl bg-[#F8F9FE] hover:bg-[#EEF2FF] text-[#6C7383] hover:text-[#4B49AC] transition-all text-xs font-semibold border border-[#ECEEF5]"
                 >
-                  <Copy className="w-3.5 h-3.5" />
-                  Copy JSON
+                  <span className="flex items-center gap-2">
+                    <FileCode2 className="w-3.5 h-3.5 text-[#4B49AC]" />
+                    Advanced Details (Admin)
+                  </span>
+                  <span className="text-[11px] font-mono text-[#8F93A0]">
+                    {showAdvanced ? '▲ Hide' : '▼ View Technical Logs'}
+                  </span>
                 </button>
+
+                {showAdvanced && (
+                  <div className="mt-3 space-y-3 p-3.5 bg-[#F8F9FE] rounded-xl border border-[#ECEEF5] animate-in fade-in duration-150">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                      <div className="text-[#6C7383]">
+                        <span className="font-semibold text-[#1F1F2C]">Event ID: </span>
+                        <span className="font-mono text-[10px] break-all">{selectedLog.id}</span>
+                      </div>
+                      <div className="text-[#6C7383]">
+                        <span className="font-semibold text-[#1F1F2C]">Entity UUID: </span>
+                        <span className="font-mono text-[10px] break-all">{selectedLog.entity_id || 'N/A'}</span>
+                      </div>
+                    </div>
+
+                    {renderDiffView(selectedLog)}
+
+                    <div className="space-y-1.5 pt-2 border-t border-[#ECEEF5]">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#8F93A0]">Raw JSON Payload</span>
+                        <button
+                          type="button"
+                          onClick={() => copyPayload(selectedLog)}
+                          className="text-xs text-[#4B49AC] hover:underline font-semibold flex items-center gap-1"
+                        >
+                          {copied ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                          {copied ? 'Copied' : 'Copy JSON'}
+                        </button>
+                      </div>
+                      <pre className="p-2.5 bg-slate-900 text-emerald-400 rounded-lg font-mono text-[10px] overflow-x-auto border border-slate-800 max-h-40 leading-normal">
+                        {JSON.stringify(selectedLog, null, 2)}
+                      </pre>
+                    </div>
+                  </div>
+                )}
               </div>
-              <pre className="p-3.5 bg-slate-900 text-emerald-400 rounded-xl font-mono text-[11px] overflow-x-auto border border-slate-800 leading-relaxed max-h-56">
-                {JSON.stringify(selectedLog, null, 2)}
-              </pre>
             </div>
-          </div>
-        </Modal>
-      )}
+          </Modal>
+        );
+      })()}
     </div>
   );
 };
