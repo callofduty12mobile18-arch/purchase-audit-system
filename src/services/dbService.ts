@@ -593,6 +593,9 @@ export const dbService = {
 
   // --- INVOICES & PURCHASES ---
   getInvoices: async (): Promise<PurchaseInvoice[]> => {
+    const localInvoices = getLocalData<PurchaseInvoice[]>(LOCAL_STORAGE_KEY_INVOICES, []);
+    let remoteInvoices: PurchaseInvoice[] = [];
+
     try {
       const { data, error } = await supabase
         .from('purchase_invoices')
@@ -600,13 +603,30 @@ export const dbService = {
         .order('invoice_date', { ascending: false });
 
       if (!error && data) {
-        setLocalData(LOCAL_STORAGE_KEY_INVOICES, data);
-        return data as PurchaseInvoice[];
+        remoteInvoices = data as PurchaseInvoice[];
       }
     } catch (e) {
       console.warn('Supabase invoices fetch note:', e);
     }
-    return getLocalData<PurchaseInvoice[]>(LOCAL_STORAGE_KEY_INVOICES, []);
+
+    // Merge remote and local invoices cleanly by unique ID
+    const invMap = new Map<string, PurchaseInvoice>();
+    remoteInvoices.forEach(inv => {
+      if (inv && inv.id) invMap.set(inv.id, inv);
+    });
+
+    localInvoices.forEach(inv => {
+      if (inv && inv.id && !invMap.has(inv.id)) {
+        invMap.set(inv.id, inv);
+      }
+    });
+
+    const merged = Array.from(invMap.values()).sort(
+      (a, b) => new Date(b.invoice_date || b.created_at || 0).getTime() - new Date(a.invoice_date || a.created_at || 0).getTime()
+    );
+
+    setLocalData(LOCAL_STORAGE_KEY_INVOICES, merged);
+    return merged;
   },
 
   getInvoiceById: async (id: string): Promise<PurchaseInvoice | null> => {
@@ -926,8 +946,7 @@ export const dbService = {
 
     // 2. Fetch remote logs and active invoices in parallel
     let remoteLogs: AuditLog[] = [];
-    let activeInvoices: { id: string; invoice_number?: string }[] = [];
-    let hasRemoteInvoicesResponse = false;
+    let remoteInvoices: { id: string; invoice_number?: string }[] = [];
 
     try {
       const [logsRes, invsRes] = await Promise.all([
@@ -939,16 +958,18 @@ export const dbService = {
         remoteLogs = logsRes.data as AuditLog[];
       }
       if (!invsRes.error && invsRes.data) {
-        activeInvoices = invsRes.data;
-        hasRemoteInvoicesResponse = true;
+        remoteInvoices = invsRes.data;
       }
     } catch (e) {
       console.warn('Supabase audit logs fetch error:', e);
     }
 
-    if (!hasRemoteInvoicesResponse) {
-      activeInvoices = getLocalData<PurchaseInvoice[]>(LOCAL_STORAGE_KEY_INVOICES, []);
-    }
+    // Combine remote active invoices with local active invoices so local invoices are never treated as orphans
+    const localInvoices = getLocalData<PurchaseInvoice[]>(LOCAL_STORAGE_KEY_INVOICES, []);
+    const allActiveInvoicesMap = new Map<string, { id: string; invoice_number?: string }>();
+    remoteInvoices.forEach(inv => { if (inv?.id) allActiveInvoicesMap.set(inv.id, inv); });
+    localInvoices.forEach(inv => { if (inv?.id) allActiveInvoicesMap.set(inv.id, inv); });
+    const allActiveInvoices = Array.from(allActiveInvoicesMap.values());
 
     // 3. Merge local and remote logs cleanly by unique ID (preserving all product/supplier/system updates)
     const mergedMap = new Map<string, AuditLog>();
@@ -969,11 +990,11 @@ export const dbService = {
 
     let allLogs = Array.from(mergedMap.values());
 
-    // 4. Prune only orphan INVOICE logs (e.g., invoices that were deleted)
+    // 4. Prune only orphan INVOICE logs (e.g., invoices that were explicitly deleted)
     // IMPORTANT: NEVER prune product logs, supplier logs, price logs, or other non-invoice events!
-    const activeInvoiceIds = new Set(activeInvoices.map(i => i.id));
+    const activeInvoiceIds = new Set(allActiveInvoices.map(i => i.id));
     const activeInvoiceNumbers = new Set(
-      activeInvoices.map(i => (i.invoice_number || '').trim().toLowerCase()).filter(Boolean)
+      allActiveInvoices.map(i => (i.invoice_number || '').trim().toLowerCase()).filter(Boolean)
     );
 
     const isInvoiceLog = (l: AuditLog) =>
@@ -987,8 +1008,8 @@ export const dbService = {
 
     allLogs = allLogs.filter(l => {
       if (isInvoiceLog(l)) {
-        // If there are zero active invoices in the database/app, all old invoice logs are orphans
-        if (activeInvoices.length === 0) {
+        // If there are zero active invoices across both remote and local, prune old invoice logs
+        if (allActiveInvoices.length === 0) {
           orphanInvoiceLogIds.push(l.id);
           return false;
         }
