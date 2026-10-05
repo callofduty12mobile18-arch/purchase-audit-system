@@ -200,20 +200,13 @@ export const AnalyticsPage: React.FC = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <StatCard
           color="blue"
           title="Total Purchase Spend"
           value={`₹${totalSpend.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
           subtitle="All verified invoices"
           icon={<TrendingUp className="w-5 h-5" />}
-        />
-        <StatCard
-          color="indigo"
-          title="Total GST Tax Paid"
-          value={`₹${totalTax.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-          subtitle="CGST + SGST + IGST audited"
-          icon={<Receipt className="w-5 h-5" />}
         />
         <StatCard
           color="purple"
