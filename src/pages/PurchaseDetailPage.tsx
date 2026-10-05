@@ -9,6 +9,7 @@ import { CardSkeleton } from '../components/ui/LoadingSkeleton';
 import { ErrorState } from '../components/ui/ErrorState';
 import { PurchaseInvoice, PurchaseItem } from '../types';
 import { dbService } from '../services/dbService';
+import { formatDisplayDate, formatISTTimestamp } from '../utils/dateUtils';
 
 export const PurchaseDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -147,7 +148,7 @@ export const PurchaseDetailPage: React.FC = () => {
                 </span>
               </div>
               <p className="text-xs text-[#6C7383] mt-0.5">
-                Recorded on {new Date(invoice.created_at).toLocaleDateString()} at {new Date(invoice.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                Recorded on {formatISTTimestamp(invoice.created_at)}
               </p>
             </div>
           </div>
@@ -181,7 +182,7 @@ export const PurchaseDetailPage: React.FC = () => {
               <Calendar className="w-3.5 h-3.5 text-[#7DA0FA]" /> Invoice & Cheque Date
             </span>
             <span className="text-sm font-mono font-bold text-[#1F1F2C] block">
-              {invoice.invoice_date}
+              {formatDisplayDate(invoice.invoice_date)}
             </span>
             <span className="text-xs text-[#6C7383] block">
               Payment Mode: <strong className="text-[#1F1F2C]">{invoice.payment_mode}</strong>

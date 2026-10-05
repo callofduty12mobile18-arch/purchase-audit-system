@@ -9,7 +9,7 @@ import { CardSkeleton } from '../components/ui/LoadingSkeleton';
 import { ErrorState } from '../components/ui/ErrorState';
 import { Product, PurchaseItem, PriceHistory } from '../types';
 import { dbService } from '../services/dbService';
-import { formatISTTimestamp } from '../utils/dateUtils';
+import { formatISTTimestamp, formatDisplayDate } from '../utils/dateUtils';
 
 export const ProductDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -82,7 +82,7 @@ export const ProductDetailPage: React.FC = () => {
   const columns = [
     {
       header: 'Purchase Date',
-      cell: (row: PurchaseItem) => <span className="text-[#1F1F2C] font-mono text-xs">{row.created_at.split('T')[0]}</span>
+      cell: (row: PurchaseItem) => <span className="text-[#1F1F2C] font-mono text-xs">{formatDisplayDate(row.created_at)}</span>
     },
     {
       header: 'Supplier Item Snapshot (Original Text)',

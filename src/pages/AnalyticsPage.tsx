@@ -20,7 +20,7 @@ import { StatCardSkeleton, CardSkeleton } from '../components/ui/LoadingSkeleton
 import { ErrorState } from '../components/ui/ErrorState';
 import { PurchaseInvoice, Product } from '../types';
 import { dbService } from '../services/dbService';
-import { getTodayIST } from '../utils/dateUtils';
+import { getTodayIST, formatDisplayMonthYear } from '../utils/dateUtils';
 
 export const AnalyticsPage: React.FC = () => {
   const [invoices, setInvoices] = useState<PurchaseInvoice[]>([]);
@@ -250,7 +250,13 @@ export const AnalyticsPage: React.FC = () => {
                         <stop offset="95%" stopColor="#4B49AC" stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <XAxis dataKey="month" stroke="#8F93A0" fontSize={11} tickLine={false} />
+                    <XAxis
+                      dataKey="month"
+                      stroke="#8F93A0"
+                      fontSize={11}
+                      tickLine={false}
+                      tickFormatter={(m) => formatDisplayMonthYear(m)}
+                    />
                     <YAxis
                       stroke="#8F93A0"
                       fontSize={11}
@@ -258,6 +264,7 @@ export const AnalyticsPage: React.FC = () => {
                       tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`}
                     />
                     <Tooltip
+                      labelFormatter={(label) => `Period: ${formatDisplayMonthYear(label)}`}
                       formatter={(val: number) => [`₹${val.toFixed(2)}`, 'Total Spend']}
                       contentStyle={{
                         backgroundColor: '#FFFFFF',

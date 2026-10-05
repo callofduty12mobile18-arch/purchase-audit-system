@@ -9,6 +9,7 @@ import { CardSkeleton } from '../components/ui/LoadingSkeleton';
 import { ErrorState } from '../components/ui/ErrorState';
 import { Supplier, PurchaseInvoice } from '../types';
 import { dbService } from '../services/dbService';
+import { formatDisplayDate } from '../utils/dateUtils';
 
 export const SupplierDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -80,7 +81,7 @@ export const SupplierDetailPage: React.FC = () => {
     },
     {
       header: 'Date',
-      cell: (row: PurchaseInvoice) => <span className="text-[#1F1F2C] font-mono text-xs">{row.invoice_date}</span>
+      cell: (row: PurchaseInvoice) => <span className="text-[#1F1F2C] font-mono text-xs">{formatDisplayDate(row.invoice_date)}</span>
     },
     {
       header: 'Items & Packs',

@@ -23,7 +23,7 @@ import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { PurchaseInvoice, Product, PurchaseItem } from '../types';
 import { dbService } from '../services/dbService';
 import { useToast } from '../context/ToastContext';
-import { getTodayIST } from '../utils/dateUtils';
+import { getTodayIST, formatDisplayDate } from '../utils/dateUtils';
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -161,7 +161,7 @@ export const DashboardPage: React.FC = () => {
     },
     {
       header: 'Invoice Date',
-      cell: (row: PurchaseInvoice) => <span className="font-mono text-[#6C7383] text-xs">{row.invoice_date}</span>
+      cell: (row: PurchaseInvoice) => <span className="font-mono text-[#6C7383] text-xs">{formatDisplayDate(row.invoice_date)}</span>
     },
     {
       header: 'Items & Packs',
@@ -316,7 +316,7 @@ export const DashboardPage: React.FC = () => {
           isOpen={!!selectedInvoice}
           onClose={() => setSelectedInvoice(null)}
           title={`Purchase Invoice #${selectedInvoice.invoice_number}`}
-          subtitle={`Recorded Bill Details • ${selectedInvoice.invoice_date}`}
+          subtitle={`Recorded Bill Details • ${formatDisplayDate(selectedInvoice.invoice_date)}`}
           size="xl"
           footer={
             <div className="w-full flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
@@ -400,7 +400,7 @@ export const DashboardPage: React.FC = () => {
                     <Calendar className="w-3 h-3 text-[#7DA0FA]" /> Date & Terms
                   </span>
                   <p className="font-bold font-mono text-[#1F1F2C]">
-                    {selectedInvoice.invoice_date}
+                    {formatDisplayDate(selectedInvoice.invoice_date)}
                   </p>
                   <p className="text-[11px] text-[#6C7383]">
                     Mode: <strong className="text-[#1F1F2C]">{selectedInvoice.payment_mode}</strong>

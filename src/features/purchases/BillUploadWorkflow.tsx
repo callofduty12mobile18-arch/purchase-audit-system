@@ -22,7 +22,7 @@ import { InvoiceFormData, InvoiceFormItem, PurchaseInvoice, Supplier, Product } 
 import { createBlankInvoice, createBlankInvoiceItem } from '../../services/invoiceService';
 import { dbService } from '../../services/dbService';
 import { useToast } from '../../context/ToastContext';
-import { getTodayIST, generateISTInvoiceNumber, formatISTTimestamp } from '../../utils/dateUtils';
+import { getTodayIST, generateISTInvoiceNumber, formatISTTimestamp, formatDisplayDate } from '../../utils/dateUtils';
 
 export const MEMO_NAME_OPTIONS = [
   'RAMACHANDRAN',
@@ -503,6 +503,9 @@ export const BillUploadWorkflow: React.FC = () => {
                 }}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#ECEEF5] text-xs sm:text-sm font-mono text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC] shadow-xs"
               />
+              <p className="text-[10px] text-[#6C7383] mt-0.5 font-mono">
+                Format: {formatDisplayDate(formData.invoice_date)} (DD/MM/YYYY)
+              </p>
             </div>
 
             {/* Payment Mode (Cash & Cheque only) */}
@@ -558,7 +561,7 @@ export const BillUploadWorkflow: React.FC = () => {
                   className="w-full sm:w-64 px-3.5 py-2 rounded-xl bg-white border border-[#7978E9]/50 text-xs sm:text-sm font-mono text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/30 focus:border-[#4B49AC] shadow-sm"
                 />
                 <p className="text-[11px] text-[#6C7383]">
-                  Scheduled clearance date for the bank to process and pass this cheque amount.
+                  Scheduled clearance date ({formatDisplayDate(formData.cheque_date || formData.invoice_date)}) for the bank to process and pass this cheque amount.
                 </p>
               </div>
             )}
@@ -939,7 +942,7 @@ export const BillUploadWorkflow: React.FC = () => {
 
           {existingDuplicate && (
             <div className="p-3 bg-[#F5F7FF] rounded-xl text-xs space-y-1.5 font-mono">
-              <div>Invoice Date: <strong>{existingDuplicate.invoice_date}</strong></div>
+              <div>Invoice Date: <strong>{formatDisplayDate(existingDuplicate.invoice_date)}</strong></div>
               <div>Grand Total: <strong>₹{existingDuplicate.grand_total.toFixed(2)}</strong></div>
               <div>Created At: <strong>{formatISTTimestamp(existingDuplicate.created_at)}</strong></div>
             </div>
@@ -998,6 +1001,10 @@ export const BillUploadWorkflow: React.FC = () => {
                   <span className="font-bold text-[#4B49AC]">{savedInvoice.invoice_name}</span>
                 </div>
               )}
+              <div className="flex justify-between pb-1.5 border-b border-[#ECEEF5]">
+                <span className="text-[#6C7383]">Invoice Date:</span>
+                <span className="font-bold text-[#1F1F2C]">{formatDisplayDate(savedInvoice.invoice_date)}</span>
+              </div>
               <div className="flex justify-between pb-1.5 border-b border-[#ECEEF5]">
                 <span className="text-[#6C7383]">Supplier:</span>
                 <span className="font-bold text-[#1F1F2C]">{savedInvoice.supplier?.name || 'AYYAPPA ENTERPRISES'}</span>

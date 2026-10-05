@@ -25,7 +25,7 @@ import { Select } from '../components/ui/Select';
 import { Badge } from '../components/ui/Badge';
 import { Supplier, Product, PurchaseInvoice } from '../types';
 import { dbService } from '../services/dbService';
-import { getTodayIST } from '../utils/dateUtils';
+import { getTodayIST, formatDisplayDate, formatISTTimestamp } from '../utils/dateUtils';
 
 interface OrderPlanRow {
   product_id: string;
@@ -709,7 +709,7 @@ export const OrderPlannerPage: React.FC = () => {
                   WHOLESALE ORDER ESTIMATE
                 </span>
                 <p className="text-xs font-mono text-zinc-700 mt-1">Ref #: EST-{Date.now().toString().slice(-6)}</p>
-                <p className="text-xs font-mono text-zinc-700">Date: {new Date().toLocaleDateString('en-IN')}</p>
+                <p className="text-xs font-mono text-zinc-700">Date: {formatDisplayDate(new Date())}</p>
               </div>
             </div>
 
@@ -811,7 +811,7 @@ export const OrderPlannerPage: React.FC = () => {
             <div className="pt-8 flex justify-between items-end text-[11px] text-zinc-600 border-t border-zinc-300">
               <div>
                 <p>System Generated Order Estimate</p>
-                <p className="font-mono text-[10px]">Timestamp: {new Date().toISOString()}</p>
+                <p className="font-mono text-[10px]">Timestamp: {formatISTTimestamp(new Date())}</p>
               </div>
               <div className="text-right">
                 <div className="h-10 border-b border-black w-48 mb-1"></div>
