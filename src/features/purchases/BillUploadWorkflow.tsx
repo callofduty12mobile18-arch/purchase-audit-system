@@ -519,7 +519,7 @@ export const BillUploadWorkflow: React.FC = () => {
                       <option value="">-- Choose Product / Cigarette --</option>
                       {products.map((p) => (
                         <option key={p.id} value={p.supplier_item_name}>
-                          {p.nickname || p.supplier_item_name} (MRP: ₹{p.current_selling_price})
+                          {p.nickname} • {p.supplier_item_name} (MRP: ₹{p.current_selling_price})
                         </option>
                       ))}
                       <option value="__custom__">+ Other / Custom Item</option>
@@ -626,7 +626,7 @@ export const BillUploadWorkflow: React.FC = () => {
                             <option value="">-- Choose Product / Cigarette --</option>
                             {products.map((p) => (
                               <option key={p.id} value={p.supplier_item_name}>
-                                {p.nickname || p.supplier_item_name} (MRP: ₹{p.current_selling_price})
+                                {p.nickname} • {p.supplier_item_name} (MRP: ₹{p.current_selling_price})
                               </option>
                             ))}
                             <option value="__custom__">+ Other / Custom Item</option>

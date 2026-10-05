@@ -106,7 +106,7 @@ export const DEFAULT_17_PRODUCTS: Product[] = [
   {
     id: 'b0000000-0000-0000-0000-000000000007',
     supplier_item_name: 'GOLD FL FT-10BE MD+NPCT-FF',
-    nickname: 'Lights 10s',
+    nickname: 'Gold Flake Lights 10s',
     hsn: '24022090',
     uom: 'PAC',
     current_purchase_ref_price: 116.57,
