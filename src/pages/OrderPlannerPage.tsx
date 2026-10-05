@@ -215,10 +215,16 @@ export const OrderPlannerPage: React.FC = () => {
   const totalGstComponent = orderItems.reduce((sum, i) => sum + i.estimated_gst, 0);
 
   // Filter products matching search bar query
-  const autocompleteSuggestions = products.filter(p =>
-    p.nickname.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.supplier_item_name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const autocompleteSuggestions = products
+    .filter(p =>
+      p.nickname.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.supplier_item_name.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .sort((a, b) => {
+      const nameA = (a.nickname || a.supplier_item_name || '').trim().toLowerCase();
+      const nameB = (b.nickname || b.supplier_item_name || '').trim().toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
 
   // Auto-generate clean PDF filename upon Save as PDF / Print
   const handlePrint = () => {

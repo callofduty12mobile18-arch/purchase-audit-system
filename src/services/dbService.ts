@@ -37,6 +37,84 @@ export const DEFAULT_SUPPLIERS: Supplier[] = [
 
 export const DEFAULT_17_PRODUCTS: Product[] = [
   {
+    id: 'b0000000-0000-0000-0000-000000000014',
+    supplier_item_name: 'AM CLUBNY COOL SLEEKSFTK',
+    nickname: 'American Club',
+    hsn: '24022090',
+    uom: 'PAC',
+    current_purchase_ref_price: 321.43,
+    current_selling_price: 360.00,
+    min_stock_level: 5,
+    is_active: true,
+    created_at: '2026-08-08T00:00:00.000Z',
+    updated_at: '2026-08-08T00:00:00.000Z'
+  },
+  {
+    id: 'b0000000-0000-0000-0000-000000000019',
+    supplier_item_name: 'CI CONNECT FT 20R C 390/-',
+    nickname: 'Capstan Connect FT 20R',
+    hsn: '24022090',
+    uom: 'PAC',
+    current_purchase_ref_price: 392.86,
+    current_selling_price: 390.00,
+    min_stock_level: 5,
+    is_active: true,
+    created_at: '2026-08-08T00:00:00.000Z',
+    updated_at: '2026-08-08T00:00:00.000Z'
+  },
+  {
+    id: 'b0000000-0000-0000-0000-000000000013',
+    supplier_item_name: 'CI Double Burst FS-BDG-ND 20BE',
+    nickname: 'Double Burst 20s',
+    hsn: '24022090',
+    uom: 'PAC',
+    current_purchase_ref_price: 431.56,
+    current_selling_price: 480.00,
+    min_stock_level: 5,
+    is_active: true,
+    created_at: '2026-08-08T00:00:00.000Z',
+    updated_at: '2026-08-08T00:00:00.000Z'
+  },
+  {
+    id: 'b0000000-0000-0000-0000-000000000009',
+    supplier_item_name: 'FLAKE GOLD CREST 10HL 70',
+    nickname: 'Flake',
+    hsn: '24022090',
+    uom: 'PAC',
+    current_purchase_ref_price: 63.99,
+    current_selling_price: 70.00,
+    min_stock_level: 5,
+    is_active: true,
+    created_at: '2026-08-08T00:00:00.000Z',
+    updated_at: '2026-08-08T00:00:00.000Z'
+  },
+  {
+    id: 'b0000000-0000-0000-0000-000000000018',
+    supplier_item_name: 'GOLD FLAKE FX SPECIAL 2-POD',
+    nickname: 'Gold Flake FX Special 2-Pod',
+    hsn: '24022090',
+    uom: 'PAC',
+    current_purchase_ref_price: 337.30,
+    current_selling_price: 390.00,
+    min_stock_level: 5,
+    is_active: true,
+    created_at: '2026-08-08T00:00:00.000Z',
+    updated_at: '2026-08-08T00:00:00.000Z'
+  },
+  {
+    id: 'b0000000-0000-0000-0000-000000000007',
+    supplier_item_name: 'GOLD FL FT-10BE MD+NPCT-FF',
+    nickname: 'Gold Flake Lights 10s',
+    hsn: '24022090',
+    uom: 'PAC',
+    current_purchase_ref_price: 116.57,
+    current_selling_price: 127.00,
+    min_stock_level: 5,
+    is_active: true,
+    created_at: '2026-08-08T00:00:00.000Z',
+    updated_at: '2026-08-08T00:00:00.000Z'
+  },
+  {
     id: 'b0000000-0000-0000-0000-000000000001',
     supplier_item_name: 'CI Ice Burst 10M 10BE',
     nickname: 'Ice Burst 10s',
@@ -63,9 +141,9 @@ export const DEFAULT_17_PRODUCTS: Product[] = [
     updated_at: '2026-08-08T00:00:00.000Z'
   },
   {
-    id: 'b0000000-0000-0000-0000-000000000003',
-    supplier_item_name: 'NC DLX FT 10BE (MD+NPCT)-FF',
-    nickname: 'Wills',
+    id: 'b0000000-0000-0000-0000-000000000011',
+    supplier_item_name: 'Indie Mint 10BE 115',
+    nickname: 'Indie Mint 10s',
     hsn: '24022090',
     uom: 'PAC',
     current_purchase_ref_price: 114.09,
@@ -115,13 +193,26 @@ export const DEFAULT_17_PRODUCTS: Product[] = [
     updated_at: '2026-08-08T00:00:00.000Z'
   },
   {
-    id: 'b0000000-0000-0000-0000-000000000007',
-    supplier_item_name: 'GOLD FL FT-10BE MD+NPCT-FF',
-    nickname: 'Gold Flake Lights 10s',
+    id: 'b0000000-0000-0000-0000-000000000010',
+    supplier_item_name: 'GFT MINI 10BE 70',
+    nickname: 'Mini 70',
     hsn: '24022090',
     uom: 'PAC',
-    current_purchase_ref_price: 116.57,
-    current_selling_price: 127.00,
+    current_purchase_ref_price: 81.35,
+    current_selling_price: 89.00,
+    min_stock_level: 5,
+    is_active: true,
+    created_at: '2026-08-08T00:00:00.000Z',
+    updated_at: '2026-08-08T00:00:00.000Z'
+  },
+  {
+    id: 'b0000000-0000-0000-0000-000000000017',
+    supplier_item_name: 'GFK MIXPOD MD+NPCT FT 10BE',
+    nickname: 'Mixpod 10s',
+    hsn: '24022090',
+    uom: 'PAC',
+    current_purchase_ref_price: 220.24,
+    current_selling_price: 240.00,
     min_stock_level: 5,
     is_active: true,
     created_at: '2026-08-08T00:00:00.000Z',
@@ -141,45 +232,6 @@ export const DEFAULT_17_PRODUCTS: Product[] = [
     updated_at: '2026-08-08T00:00:00.000Z'
   },
   {
-    id: 'b0000000-0000-0000-0000-000000000009',
-    supplier_item_name: 'FLAKE GOLD CREST 10HL 70',
-    nickname: 'Flake',
-    hsn: '24022090',
-    uom: 'PAC',
-    current_purchase_ref_price: 63.99,
-    current_selling_price: 70.00,
-    min_stock_level: 5,
-    is_active: true,
-    created_at: '2026-08-08T00:00:00.000Z',
-    updated_at: '2026-08-08T00:00:00.000Z'
-  },
-  {
-    id: 'b0000000-0000-0000-0000-000000000010',
-    supplier_item_name: 'GFT MINI 10BE 70',
-    nickname: 'Mini 70',
-    hsn: '24022090',
-    uom: 'PAC',
-    current_purchase_ref_price: 81.35,
-    current_selling_price: 89.00,
-    min_stock_level: 5,
-    is_active: true,
-    created_at: '2026-08-08T00:00:00.000Z',
-    updated_at: '2026-08-08T00:00:00.000Z'
-  },
-  {
-    id: 'b0000000-0000-0000-0000-000000000011',
-    supplier_item_name: 'Indie Mint 10BE 115',
-    nickname: 'Indie Mint 10s',
-    hsn: '24022090',
-    uom: 'PAC',
-    current_purchase_ref_price: 114.09,
-    current_selling_price: 125.00,
-    min_stock_level: 5,
-    is_active: true,
-    created_at: '2026-08-08T00:00:00.000Z',
-    updated_at: '2026-08-08T00:00:00.000Z'
-  },
-  {
     id: 'b0000000-0000-0000-0000-000000000012',
     supplier_item_name: 'WAVE COOL MINT 10R C 96',
     nickname: 'Wave Cool Mint 10R',
@@ -187,32 +239,6 @@ export const DEFAULT_17_PRODUCTS: Product[] = [
     uom: 'PAC',
     current_purchase_ref_price: 87.00,
     current_selling_price: 96.00,
-    min_stock_level: 5,
-    is_active: true,
-    created_at: '2026-08-08T00:00:00.000Z',
-    updated_at: '2026-08-08T00:00:00.000Z'
-  },
-  {
-    id: 'b0000000-0000-0000-0000-000000000013',
-    supplier_item_name: 'CI Double Burst FS-BDG-ND 20BE',
-    nickname: 'Double Burst 20s',
-    hsn: '24022090',
-    uom: 'PAC',
-    current_purchase_ref_price: 431.56,
-    current_selling_price: 480.00,
-    min_stock_level: 5,
-    is_active: true,
-    created_at: '2026-08-08T00:00:00.000Z',
-    updated_at: '2026-08-08T00:00:00.000Z'
-  },
-  {
-    id: 'b0000000-0000-0000-0000-000000000014',
-    supplier_item_name: 'AM CLUBNY COOL SLEEKSFTK',
-    nickname: 'American Club',
-    hsn: '24022090',
-    uom: 'PAC',
-    current_purchase_ref_price: 321.43,
-    current_selling_price: 360.00,
     min_stock_level: 5,
     is_active: true,
     created_at: '2026-08-08T00:00:00.000Z',
@@ -245,39 +271,13 @@ export const DEFAULT_17_PRODUCTS: Product[] = [
     updated_at: '2026-08-08T00:00:00.000Z'
   },
   {
-    id: 'b0000000-0000-0000-0000-000000000017',
-    supplier_item_name: 'GFK MIXPOD MD+NPCT FT 10BE',
-    nickname: 'Mixpod 10s',
+    id: 'b0000000-0000-0000-0000-000000000003',
+    supplier_item_name: 'NC DLX FT 10BE (MD+NPCT)-FF',
+    nickname: 'Wills',
     hsn: '24022090',
     uom: 'PAC',
-    current_purchase_ref_price: 220.24,
-    current_selling_price: 240.00,
-    min_stock_level: 5,
-    is_active: true,
-    created_at: '2026-08-08T00:00:00.000Z',
-    updated_at: '2026-08-08T00:00:00.000Z'
-  },
-  {
-    id: 'b0000000-0000-0000-0000-000000000018',
-    supplier_item_name: 'GOLD FLAKE FX SPECIAL 2-POD',
-    nickname: 'Gold Flake FX Special 2-Pod',
-    hsn: '24022090',
-    uom: 'PAC',
-    current_purchase_ref_price: 337.30,
-    current_selling_price: 390.00,
-    min_stock_level: 5,
-    is_active: true,
-    created_at: '2026-08-08T00:00:00.000Z',
-    updated_at: '2026-08-08T00:00:00.000Z'
-  },
-  {
-    id: 'b0000000-0000-0000-0000-000000000019',
-    supplier_item_name: 'CI CONNECT FT 20R C 390/-',
-    nickname: 'Capstan Connect FT 20R',
-    hsn: '24022090',
-    uom: 'PAC',
-    current_purchase_ref_price: 392.86,
-    current_selling_price: 390.00,
+    current_purchase_ref_price: 114.09,
+    current_selling_price: 125.00,
     min_stock_level: 5,
     is_active: true,
     created_at: '2026-08-08T00:00:00.000Z',
@@ -476,6 +476,12 @@ export const dbService = {
       }
     });
 
+    merged.sort((a, b) => {
+      const nameA = (a.nickname || a.supplier_item_name || '').trim().toLowerCase();
+      const nameB = (b.nickname || b.supplier_item_name || '').trim().toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+
     setLocalData(LOCAL_STORAGE_KEY_PRODUCTS, merged);
     return merged;
   },
@@ -514,9 +520,12 @@ export const dbService = {
       updated_at: now
     };
 
-    // Update local cache
-    const updatedList = currentProds.filter(p => p.id !== savedProd.id);
-    updatedList.push(savedProd);
+    // Update local cache and maintain alphabetical sort
+    const updatedList = [...currentProds.filter(p => p.id !== savedProd.id), savedProd].sort((a, b) => {
+      const nameA = (a.nickname || a.supplier_item_name || '').trim().toLowerCase();
+      const nameB = (b.nickname || b.supplier_item_name || '').trim().toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
     setLocalData(LOCAL_STORAGE_KEY_PRODUCTS, updatedList);
 
     // Sync to Supabase

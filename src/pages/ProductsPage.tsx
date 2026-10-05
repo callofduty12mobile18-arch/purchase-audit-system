@@ -69,11 +69,17 @@ export const ProductsPage: React.FC = () => {
     }
   };
 
-  const filteredProducts = products.filter(p =>
-    p.nickname.toLowerCase().includes(search.toLowerCase()) ||
-    p.supplier_item_name.toLowerCase().includes(search.toLowerCase()) ||
-    (p.hsn && p.hsn.toLowerCase().includes(search.toLowerCase()))
-  );
+  const filteredProducts = products
+    .filter(p =>
+      p.nickname.toLowerCase().includes(search.toLowerCase()) ||
+      p.supplier_item_name.toLowerCase().includes(search.toLowerCase()) ||
+      (p.hsn && p.hsn.toLowerCase().includes(search.toLowerCase()))
+    )
+    .sort((a, b) => {
+      const nameA = (a.nickname || a.supplier_item_name || '').trim().toLowerCase();
+      const nameB = (b.nickname || b.supplier_item_name || '').trim().toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
 
   const handleOpenAdd = () => {
     setEditingProduct({
