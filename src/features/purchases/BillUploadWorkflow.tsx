@@ -180,11 +180,22 @@ export const BillUploadWorkflow: React.FC = () => {
       item.qty = pQty;
       item.quantity = pQty;
 
-      const invAmt = Number(item.invoice_amount ?? item.total) || 0;
-      if (pQty > 0 && invAmt > 0) {
-        item.each_pack_rate = Number((invAmt / pQty).toFixed(2));
-      } else if (pQty > 0 && item.each_pack_rate && item.each_pack_rate > 0) {
-        item.invoice_amount = Number((item.each_pack_rate * pQty).toFixed(2));
+      const rate = Number(item.each_pack_rate || item.purchase_rate) || 0;
+      if (pQty > 0 && rate > 0) {
+        item.invoice_amount = Number((rate * pQty).toFixed(2));
+        item.total = item.invoice_amount;
+      } else if (pQty > 0 && item.invoice_amount && item.invoice_amount > 0) {
+        item.each_pack_rate = Number((item.invoice_amount / pQty).toFixed(2));
+        item.purchase_rate = item.each_pack_rate;
+      }
+    } else if (field === 'each_pack_rate' || field === 'purchase_rate') {
+      const rate = Number(value) || 0;
+      item.each_pack_rate = rate;
+      item.purchase_rate = rate;
+
+      const pQty = Number(item.pack_qty) || 0;
+      if (pQty > 0) {
+        item.invoice_amount = Number((rate * pQty).toFixed(2));
         item.total = item.invoice_amount;
       }
     } else if (field === 'mrp_rsp') {
@@ -197,6 +208,7 @@ export const BillUploadWorkflow: React.FC = () => {
       const packQty = Number(item.pack_qty) || 0;
       if (packQty > 0) {
         item.each_pack_rate = Number((invAmt / packQty).toFixed(2));
+        item.purchase_rate = item.each_pack_rate;
       }
     }
 
@@ -464,7 +476,7 @@ export const BillUploadWorkflow: React.FC = () => {
                 Line Items ({formData.items.length})
               </h3>
               <p className="text-[11px] text-[#6C7383] mt-0.5">
-                Select products from the dropdown. Rate per pack is automatically derived: <code>Bill Total ÷ Packs</code>.
+                Select products from catalog. Bill Total is automatically calculated as <code>Packs × Purchase Rate</code>.
               </p>
             </div>
             <Button
@@ -563,6 +575,19 @@ export const BillUploadWorkflow: React.FC = () => {
                     </div>
 
                     <div>
+                      <label className="block text-[10px] font-semibold text-[#6C7383] uppercase mb-1">Purchase Rate (₹) *</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={item.each_pack_rate || item.purchase_rate || ''}
+                        onChange={(e) => handleItemChange(idx, 'each_pack_rate', e.target.value)}
+                        className="w-full px-2.5 py-1.5 text-right rounded-lg bg-white border border-[#ECEEF5] text-xs font-mono font-bold text-[#4B49AC] focus:outline-none focus:ring-1 focus:ring-[#4B49AC]"
+                      />
+                    </div>
+
+                    <div>
                       <label className="block text-[10px] font-semibold text-[#6C7383] uppercase mb-1">Bill Total (₹) *</label>
                       <input
                         type="number"
@@ -571,15 +596,8 @@ export const BillUploadWorkflow: React.FC = () => {
                         placeholder="0.00"
                         value={item.invoice_amount || item.total || ''}
                         onChange={(e) => handleItemChange(idx, 'invoice_amount', e.target.value)}
-                        className="w-full px-2.5 py-1.5 text-right rounded-lg bg-white border border-[#ECEEF5] text-xs font-mono font-bold text-[#4B49AC] focus:outline-none focus:ring-1 focus:ring-[#4B49AC]"
+                        className="w-full px-2.5 py-1.5 text-right rounded-lg bg-white border border-[#ECEEF5] text-xs font-mono font-bold text-[#1F1F2C] focus:outline-none focus:ring-1 focus:ring-[#4B49AC]"
                       />
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-semibold text-[#6C7383] uppercase mb-1">Each Pack Rate</label>
-                      <div className="px-2.5 py-1.5 bg-white border border-[#ECEEF5] rounded-lg text-right font-mono font-bold text-xs text-[#1F1F2C]">
-                        ₹{item.each_pack_rate?.toFixed(2) || '0.00'}
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -593,11 +611,11 @@ export const BillUploadWorkflow: React.FC = () => {
               <thead>
                 <tr className="bg-[#F5F7FF] text-[#6C7383] uppercase text-[10px] font-bold border-b border-[#ECEEF5]">
                   <th className="py-3 px-3.5 w-10 text-center">#</th>
-                  <th className="py-3 px-3.5 min-w-[280px]">Select Product</th>
+                  <th className="py-3 px-3.5 min-w-[260px]">Select Product</th>
                   <th className="py-3 px-3.5 w-24 text-right">Packs</th>
                   <th className="py-3 px-3.5 w-28 text-right">MRP (₹)</th>
-                  <th className="py-3 px-3.5 w-32 text-right">Bill Total (₹)</th>
-                  <th className="py-3 px-3.5 w-32 text-right">Each Pack Rate</th>
+                  <th className="py-3 px-3.5 w-32 text-right">Purchase Rate (₹)</th>
+                  <th className="py-3 px-3.5 w-36 text-right">Bill Total (₹)</th>
                   <th className="py-3 px-3.5 w-12 text-center"></th>
                 </tr>
               </thead>
@@ -671,13 +689,21 @@ export const BillUploadWorkflow: React.FC = () => {
                           min="0"
                           step="0.01"
                           placeholder="0.00"
-                          value={item.invoice_amount || item.total || ''}
-                          onChange={(e) => handleItemChange(idx, 'invoice_amount', e.target.value)}
-                          className="w-full px-3 py-2 text-right rounded-xl bg-[#F5F7FF] border border-[#7978E9]/30 text-xs font-mono font-bold text-[#4B49AC] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC]"
+                          value={item.each_pack_rate || item.purchase_rate || ''}
+                          onChange={(e) => handleItemChange(idx, 'each_pack_rate', e.target.value)}
+                          className="w-full px-3 py-2 text-right rounded-xl bg-[#F5F7FF] border border-[#ECEEF5] text-xs font-mono font-bold text-[#4B49AC] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC]"
                         />
                       </td>
-                      <td className="py-2.5 px-3.5 text-right font-mono font-bold text-sm text-[#1F1F2C]">
-                        ₹{item.each_pack_rate?.toFixed(2) || '0.00'}
+                      <td className="py-2.5 px-3.5 text-right">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          placeholder="0.00"
+                          value={item.invoice_amount || item.total || ''}
+                          onChange={(e) => handleItemChange(idx, 'invoice_amount', e.target.value)}
+                          className="w-full px-3 py-2 text-right rounded-xl bg-[#F5F7FF] border border-[#7978E9]/30 text-xs font-mono font-bold text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC]"
+                        />
                       </td>
                       <td className="py-2.5 px-3.5 text-center">
                         <button
