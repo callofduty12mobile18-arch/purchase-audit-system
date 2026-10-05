@@ -28,7 +28,7 @@ export const DEFAULT_17_PRODUCTS: Product[] = [
   {
     id: 'b0000000-0000-0000-0000-000000000001',
     supplier_item_name: 'CI Ice Burst 10M 10BE',
-    nickname: 'Ice Burst 10M',
+    nickname: 'Ice Burst 10s',
     hsn: '24022090',
     uom: 'PAC',
     current_purchase_ref_price: 215.78,
@@ -41,7 +41,7 @@ export const DEFAULT_17_PRODUCTS: Product[] = [
   {
     id: 'b0000000-0000-0000-0000-000000000002',
     supplier_item_name: 'CI Ice Burst 20BE',
-    nickname: 'Ice Burst 20BE',
+    nickname: 'Ice Burst 20s',
     hsn: '24022090',
     uom: 'PAC',
     current_purchase_ref_price: 431.56,
@@ -54,7 +54,7 @@ export const DEFAULT_17_PRODUCTS: Product[] = [
   {
     id: 'b0000000-0000-0000-0000-000000000003',
     supplier_item_name: 'NC DLX FT 10BE (MD+NPCT)-FF',
-    nickname: 'Navy Cut DLX FT 10',
+    nickname: 'Wills',
     hsn: '24022090',
     uom: 'PAC',
     current_purchase_ref_price: 114.09,
@@ -67,7 +67,7 @@ export const DEFAULT_17_PRODUCTS: Product[] = [
   {
     id: 'b0000000-0000-0000-0000-000000000004',
     supplier_item_name: 'GFK RED NBUNDLE+NPCT1 10R',
-    nickname: 'Gold Flake Red 10R',
+    nickname: 'King',
     hsn: '24022090',
     uom: 'PAC',
     current_purchase_ref_price: 220.24,
@@ -80,7 +80,7 @@ export const DEFAULT_17_PRODUCTS: Product[] = [
   {
     id: 'b0000000-0000-0000-0000-000000000005',
     supplier_item_name: 'GFK RED NBUNDLE+NPCT 120R',
-    nickname: 'Gold Flake Red 20R',
+    nickname: 'King 20s',
     hsn: '24022090',
     uom: 'PAC',
     current_purchase_ref_price: 430.56,
@@ -93,7 +93,7 @@ export const DEFAULT_17_PRODUCTS: Product[] = [
   {
     id: 'b0000000-0000-0000-0000-000000000006',
     supplier_item_name: 'GFK BLUE NBUNDLE+NPCT 10R',
-    nickname: 'Gold Flake Blue 10R',
+    nickname: 'Lights',
     hsn: '24022090',
     uom: 'PAC',
     current_purchase_ref_price: 220.24,
@@ -106,7 +106,7 @@ export const DEFAULT_17_PRODUCTS: Product[] = [
   {
     id: 'b0000000-0000-0000-0000-000000000007',
     supplier_item_name: 'GOLD FL FT-10BE MD+NPCT-FF',
-    nickname: 'Gold Flake Lights 10s',
+    nickname: 'Lights 10s',
     hsn: '24022090',
     uom: 'PAC',
     current_purchase_ref_price: 116.57,
@@ -119,7 +119,7 @@ export const DEFAULT_17_PRODUCTS: Product[] = [
   {
     id: 'b0000000-0000-0000-0000-000000000008',
     supplier_item_name: 'SCISSORS FT 10BE-NB-MD1-NP',
-    nickname: 'Scissors Filter 10s',
+    nickname: 'Scissors',
     hsn: '24022090',
     uom: 'PAC',
     current_purchase_ref_price: 99.70,
@@ -132,7 +132,7 @@ export const DEFAULT_17_PRODUCTS: Product[] = [
   {
     id: 'b0000000-0000-0000-0000-000000000009',
     supplier_item_name: 'FLAKE GOLD CREST 10HL 70',
-    nickname: 'Flake Gold Crest 70',
+    nickname: 'Flake',
     hsn: '24022090',
     uom: 'PAC',
     current_purchase_ref_price: 63.99,
@@ -145,7 +145,7 @@ export const DEFAULT_17_PRODUCTS: Product[] = [
   {
     id: 'b0000000-0000-0000-0000-000000000010',
     supplier_item_name: 'GFT MINI 10BE 70',
-    nickname: 'Gold Flake Mini 70',
+    nickname: 'Mini 70',
     hsn: '24022090',
     uom: 'PAC',
     current_purchase_ref_price: 81.35,
@@ -184,7 +184,7 @@ export const DEFAULT_17_PRODUCTS: Product[] = [
   {
     id: 'b0000000-0000-0000-0000-000000000013',
     supplier_item_name: 'CI Double Burst FS-BDG-ND 20BE',
-    nickname: 'Capstan Double Burst 20',
+    nickname: 'Double Burst 20s',
     hsn: '24022090',
     uom: 'PAC',
     current_purchase_ref_price: 431.56,
@@ -197,7 +197,7 @@ export const DEFAULT_17_PRODUCTS: Product[] = [
   {
     id: 'b0000000-0000-0000-0000-000000000014',
     supplier_item_name: 'AM CLUBNY COOL SLEEKSFTK',
-    nickname: 'American Club Cool Sleeks',
+    nickname: 'American Club',
     hsn: '24022090',
     uom: 'PAC',
     current_purchase_ref_price: 321.43,
@@ -223,7 +223,7 @@ export const DEFAULT_17_PRODUCTS: Product[] = [
   {
     id: 'b0000000-0000-0000-0000-000000000016',
     supplier_item_name: 'WAVEBOSS REFINED TASTE DS',
-    nickname: 'Waveboss Refined Taste',
+    nickname: 'Waveboss',
     hsn: '24022090',
     uom: 'PAC',
     current_purchase_ref_price: 53.00,
@@ -236,7 +236,7 @@ export const DEFAULT_17_PRODUCTS: Product[] = [
   {
     id: 'b0000000-0000-0000-0000-000000000017',
     supplier_item_name: 'GFK MIXPOD MD+NPCT FT 10BE',
-    nickname: 'Gold Flake Mixpod 10s',
+    nickname: 'Mixpod 10s',
     hsn: '24022090',
     uom: 'PAC',
     current_purchase_ref_price: 220.24,
