@@ -132,7 +132,7 @@ export const AppLayout: React.FC = () => {
 
         {/* Desktop & Mobile Slideover Sidebar */}
         <aside
-          className={`no-print fixed md:static inset-y-0 left-0 z-50 w-68 bg-white border-r border-[#ECEEF5] flex flex-col transition-transform duration-300 ease-in-out md:translate-x-0 shadow-xl md:shadow-none ${
+          className={`no-print fixed md:sticky md:top-0 md:h-screen md:max-h-screen inset-y-0 left-0 z-50 w-64 md:w-68 bg-white border-r border-[#ECEEF5] flex flex-col transition-transform duration-300 ease-in-out md:translate-x-0 shadow-xl md:shadow-none shrink-0 ${
             mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
