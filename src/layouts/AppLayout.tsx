@@ -161,21 +161,9 @@ export const AppLayout: React.FC = () => {
             </button>
           </div>
 
-          {/* Primary Action Button */}
-          <div className="p-4 border-b border-[#ECEEF5] space-y-3">
-            <Button
-              variant="primary"
-              className="w-full justify-center py-2.5 text-sm font-semibold rounded-xl shadow-md shadow-[#4B49AC]/25 hover:shadow-lg hover:shadow-[#4B49AC]/35"
-              onClick={() => {
-                navigate('/purchases/import');
-                setMobileMenuOpen(false);
-              }}
-              icon={<PlusCircle className="w-4 h-4" />}
-            >
-              New Purchase Invoice
-            </Button>
-
-            <form onSubmit={handleSearchSubmit} className="md:hidden relative">
+          {/* Mobile Search Form in Drawer */}
+          <div className="md:hidden p-4 border-b border-[#ECEEF5]">
+            <form onSubmit={handleSearchSubmit} className="relative">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#8F93A0]" />
               <input
                 type="search"
