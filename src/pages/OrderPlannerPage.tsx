@@ -1,133 +1,100 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { ShoppingCart, Plus, Trash2, Printer, FileDown, Wallet, ArrowLeft, RefreshCw, Sparkles, Search, Layers } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import {
+  ShoppingCart,
+  Plus,
+  Minus,
+  Trash2,
+  Printer,
+  FileDown,
+  Wallet,
+  ArrowLeft,
+  RotateCcw,
+  Sparkles,
+  Search,
+  CheckCircle2,
+  Package,
+  Building2,
+  Calendar,
+  Layers,
+  Check,
+  Percent
+} from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Select } from '../components/ui/Select';
-import { Input } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
 import { Supplier, Product, PurchaseInvoice } from '../types';
 import { dbService } from '../services/dbService';
 
-interface OrderLineItem {
-  id: string;
+interface OrderPlanRow {
   product_id: string;
-  product?: Product;
+  product: Product;
   quantity: number;
-  estimated_rate: number;
-  rate_source: 'SUPPLIER_LAST' | 'AVG_PRICE' | 'MANUAL_REF' | 'USER_OVERRIDE';
+  purchase_rate: number;
+  rate_source: 'SUPPLIER_LAST' | 'MANUAL_REF' | 'USER_OVERRIDE';
   gst_rate: number;
   taxable_value: number;
-  estimated_gst: number;
+  gst_amount: number;
   total: number;
 }
+
+type FilterTab = 'ALL' | 'ORDERED' | 'ZERO';
 
 export const OrderPlannerPage: React.FC = () => {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [invoices, setInvoices] = useState<PurchaseInvoice[]>([]);
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>('');
-  const [orderItems, setOrderItems] = useState<OrderLineItem[]>([]);
-  
-  // Search Bar Autocomplete state
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const searchRef = useRef<HTMLDivElement>(null);
-
-  const [searchFilter, setSearchFilter] = useState<string>('');
+  const [planRows, setPlanRows] = useState<OrderPlanRow[]>([]);
+  const [search, setSearch] = useState('');
+  const [activeTab, setActiveTab] = useState<FilterTab>('ALL');
   const [isProformaMode, setIsProformaMode] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadData();
-
-    // Close search dropdown on click outside
-    const handleClickOutside = (e: MouseEvent) => {
-      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
-        setIsSearchOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const loadData = async () => {
-    setLoading(true);
-    const sups = await dbService.getSuppliers();
-    const prods = await dbService.getProducts();
-    const invs = await dbService.getInvoices();
-
-    setSuppliers(sups);
-    setProducts(prods);
-    setInvoices(invs);
-
-    if (sups.length > 0) {
-      setSelectedSupplierId(sups[0].id);
+  // Recalculate rate estimates when supplier changes
+  useEffect(() => {
+    if (selectedSupplierId && products.length > 0) {
+      setPlanRows(prev =>
+        prev.map(row => {
+          if (row.rate_source === 'USER_OVERRIDE') return row;
+          const { rate, source, gstRate } = calculateRateEstimate(row.product_id, selectedSupplierId, products, invoices);
+          const divisor = 1 + (gstRate / 100);
+          const total = Number((row.quantity * rate).toFixed(2));
+          const taxable = Number((total / divisor).toFixed(2));
+          return {
+            ...row,
+            purchase_rate: rate,
+            rate_source: source,
+            gst_rate: gstRate,
+            total,
+            taxable_value: taxable,
+            gst_amount: Number((total - taxable).toFixed(2))
+          };
+        })
+      );
     }
+  }, [selectedSupplierId]);
 
-    setOrderItems([]);
-    setLoading(false);
-  };
-
-  const handleClearPlan = () => {
-    setOrderItems([]);
-  };
-
-  const handleAddAllProducts = () => {
-    const allLines: OrderLineItem[] = products.map((prod, idx) => {
-      const { rate, defaultQty, gstRate, source } = calculateRateEstimate(prod.id, selectedSupplierId);
-      const totalCost = Number((defaultQty * rate).toFixed(2));
-      const divisor = 1 + (gstRate / 100);
-      const taxableVal = Number((totalCost / divisor).toFixed(2));
-      const gstVal = Number((totalCost - taxableVal).toFixed(2));
-
-      return {
-        id: `line-${idx}-${Date.now()}`,
-        product_id: prod.id,
-        product: prod,
-        quantity: defaultQty,
-        estimated_rate: Number(rate.toFixed(4)),
-        rate_source: source,
-        gst_rate: gstRate,
-        taxable_value: taxableVal,
-        estimated_gst: gstVal,
-        total: totalCost
-      };
-    });
-    setOrderItems(allLines);
-  };
-
-  const handleLoadLastBill = () => {
-    if (invoices.length > 0 && invoices[0].items) {
-      const initialLines: OrderLineItem[] = invoices[0].items.map((item, idx) => {
-        const prod = products.find(p => p.id === item.product_id || p.supplier_item_name === item.supplier_item_name_snapshot);
-        const ratePerPack = item.quantity > 0 ? (item.total / item.quantity) : item.purchase_rate;
-        return {
-          id: `line-${idx}`,
-          product_id: item.product_id || prod?.id || '',
-          product: prod || item.product,
-          quantity: item.quantity,
-          estimated_rate: Number(ratePerPack.toFixed(4)),
-          rate_source: 'SUPPLIER_LAST',
-          gst_rate: item.gst_rate,
-          taxable_value: item.taxable_value,
-          estimated_gst: item.cgst + item.sgst + item.igst,
-          total: item.total
-        };
-      });
-      setOrderItems(initialLines);
-    }
-  };
-
-  const calculateRateEstimate = (productId: string, supplierId: string) => {
-    const product = products.find(p => p.id === productId);
+  const calculateRateEstimate = (
+    productId: string,
+    supplierId: string,
+    allProducts: Product[],
+    allInvoices: PurchaseInvoice[]
+  ) => {
+    const product = allProducts.find(p => p.id === productId);
     if (!product) return { rate: 0, defaultQty: 10, gstRate: 40, source: 'MANUAL_REF' as const };
 
     let supplierLastRate: number | null = null;
     let lastQty: number | null = null;
     let lastGstRate: number | null = null;
 
-    // Sort invoices descending by date to guarantee finding the most recent invoice first
-    const sortedInvoices = [...invoices].sort((a, b) => new Date(b.invoice_date).getTime() - new Date(a.invoice_date).getTime());
+    const sortedInvoices = [...allInvoices].sort(
+      (a, b) => new Date(b.invoice_date).getTime() - new Date(a.invoice_date).getTime()
+    );
 
     for (const inv of sortedInvoices) {
       if (inv.supplier_id === supplierId && inv.items) {
@@ -144,94 +111,198 @@ export const OrderPlannerPage: React.FC = () => {
     }
 
     if (supplierLastRate !== null) {
-      return { rate: supplierLastRate, defaultQty: lastQty || 10, gstRate: lastGstRate || 40, source: 'SUPPLIER_LAST' as const };
+      return {
+        rate: Number(supplierLastRate.toFixed(2)),
+        defaultQty: lastQty || 0,
+        gstRate: lastGstRate || 40,
+        source: 'SUPPLIER_LAST' as const
+      };
     }
 
-    return { rate: product.current_purchase_ref_price, defaultQty: 10, gstRate: 40, source: 'MANUAL_REF' as const };
-  };
-
-  const handleAddProductByObject = (product: Product) => {
-    const existingIdx = orderItems.findIndex(i => i.product_id === product.id);
-    if (existingIdx >= 0) {
-      handleUpdateItem(orderItems[existingIdx].id, 'quantity', orderItems[existingIdx].quantity + 10);
-      setSearchQuery('');
-      setIsSearchOpen(false);
-      return;
-    }
-
-    const { rate, defaultQty, gstRate, source } = calculateRateEstimate(product.id, selectedSupplierId);
-    const totalCost = Number((defaultQty * rate).toFixed(2));
-    const divisor = 1 + (gstRate / 100);
-    const taxableVal = Number((totalCost / divisor).toFixed(2));
-    const gstVal = Number((totalCost - taxableVal).toFixed(2));
-
-    const newItem: OrderLineItem = {
-      id: `line-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      product_id: product.id,
-      product: product,
-      quantity: defaultQty,
-      estimated_rate: Number(rate.toFixed(4)),
-      rate_source: source,
-      gst_rate: gstRate,
-      taxable_value: taxableVal,
-      estimated_gst: gstVal,
-      total: totalCost
+    return {
+      rate: product.current_purchase_ref_price || 0,
+      defaultQty: 0,
+      gstRate: 40,
+      source: 'MANUAL_REF' as const
     };
-
-    setOrderItems([newItem, ...orderItems]);
-    setSearchQuery('');
-    setIsSearchOpen(false);
   };
 
-  const handleUpdateItem = (id: string, field: keyof OrderLineItem, value: string | number) => {
-    const updated = orderItems.map((row) => {
-      if (row.id !== id) return row;
-      const item = { ...row, [field]: value } as OrderLineItem;
-      if (field === 'estimated_rate') {
-        item.rate_source = 'USER_OVERRIDE';
-      }
-      const qty = Number(item.quantity) || 0;
-      const rate = Number(item.estimated_rate) || 0;
-      const gstRate = Number(item.gst_rate) || 40;
-      const divisor = 1 + (gstRate / 100);
-      item.total = Number((qty * rate).toFixed(2));
-      item.taxable_value = Number((item.total / divisor).toFixed(2));
-      item.estimated_gst = Number((item.total - item.taxable_value).toFixed(2));
-      return item;
-    });
-    setOrderItems(updated);
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [sups, prods, invs] = await Promise.all([
+        dbService.getSuppliers(),
+        dbService.getProducts(),
+        dbService.getInvoices()
+      ]);
+
+      setSuppliers(sups);
+      setProducts(prods);
+      setInvoices(invs);
+
+      const defaultSupplier = sups[0]?.id || '';
+      setSelectedSupplierId(defaultSupplier);
+
+      // Initialize plan rows for all catalog products (sorted A-Z)
+      const rows: OrderPlanRow[] = prods.map(prod => {
+        const { rate, source, gstRate } = calculateRateEstimate(prod.id, defaultSupplier, prods, invs);
+        return {
+          product_id: prod.id,
+          product: prod,
+          quantity: 0,
+          purchase_rate: rate,
+          rate_source: source,
+          gst_rate: gstRate,
+          taxable_value: 0,
+          gst_amount: 0,
+          total: 0
+        };
+      });
+
+      setPlanRows(rows);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleRemoveItem = (id: string) => {
-    setOrderItems(orderItems.filter((item) => item.id !== id));
+  // Update pack quantity for a product row
+  const handleUpdateQuantity = (productId: string, newQty: number) => {
+    const qty = Math.max(0, Math.floor(newQty || 0));
+    setPlanRows(prev =>
+      prev.map(row => {
+        if (row.product_id !== productId) return row;
+        const total = Number((qty * row.purchase_rate).toFixed(2));
+        const divisor = 1 + (row.gst_rate / 100);
+        const taxable = Number((total / divisor).toFixed(2));
+        return {
+          ...row,
+          quantity: qty,
+          total,
+          taxable_value: taxable,
+          gst_amount: Number((total - taxable).toFixed(2))
+        };
+      })
+    );
+  };
+
+  // Update purchase rate
+  const handleUpdateRate = (productId: string, newRate: number) => {
+    const rate = Math.max(0, newRate || 0);
+    setPlanRows(prev =>
+      prev.map(row => {
+        if (row.product_id !== productId) return row;
+        const total = Number((row.quantity * rate).toFixed(2));
+        const divisor = 1 + (row.gst_rate / 100);
+        const taxable = Number((total / divisor).toFixed(2));
+        return {
+          ...row,
+          purchase_rate: rate,
+          rate_source: 'USER_OVERRIDE',
+          total,
+          taxable_value: taxable,
+          gst_amount: Number((total - taxable).toFixed(2))
+        };
+      })
+    );
+  };
+
+  // Quick preset adder (e.g. +10, +50, +100)
+  const handleAddPreset = (productId: string, delta: number) => {
+    const row = planRows.find(r => r.product_id === productId);
+    if (row) {
+      handleUpdateQuantity(productId, row.quantity + delta);
+    }
+  };
+
+  // Quick action: Load quantities from the latest bill
+  const handleLoadLastBillQuantities = () => {
+    if (invoices.length === 0) return;
+    const latest = invoices[0];
+    if (!latest.items) return;
+
+    setPlanRows(prev =>
+      prev.map(row => {
+        const matchingItem = latest.items?.find(
+          it => it.product_id === row.product_id || it.supplier_item_name_snapshot === row.product.supplier_item_name
+        );
+        const qty = matchingItem ? Number(matchingItem.quantity) || 0 : 0;
+        const total = Number((qty * row.purchase_rate).toFixed(2));
+        const divisor = 1 + (row.gst_rate / 100);
+        const taxable = Number((total / divisor).toFixed(2));
+        return {
+          ...row,
+          quantity: qty,
+          total,
+          taxable_value: taxable,
+          gst_amount: Number((total - taxable).toFixed(2))
+        };
+      })
+    );
+  };
+
+  // Quick action: Reset all quantities to 0
+  const handleResetAll = () => {
+    setPlanRows(prev =>
+      prev.map(row => ({
+        ...row,
+        quantity: 0,
+        total: 0,
+        taxable_value: 0,
+        gst_amount: 0
+      }))
+    );
+  };
+
+  // Quick action: Set all items to 10 packs
+  const handleSetAllDefault = () => {
+    setPlanRows(prev =>
+      prev.map(row => {
+        const qty = 10;
+        const total = Number((qty * row.purchase_rate).toFixed(2));
+        const divisor = 1 + (row.gst_rate / 100);
+        const taxable = Number((total / divisor).toFixed(2));
+        return {
+          ...row,
+          quantity: qty,
+          total,
+          taxable_value: taxable,
+          gst_amount: Number((total - taxable).toFixed(2))
+        };
+      })
+    );
   };
 
   const selectedSupplier = suppliers.find(s => s.id === selectedSupplierId);
-  const rawTotalCost = orderItems.reduce((sum, i) => sum + i.total, 0);
-  const totalAgencyLandedCost = Math.round(rawTotalCost);
-  const totalOrderPacks = orderItems.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
-  const roundOffAmount = Number((totalAgencyLandedCost - rawTotalCost).toFixed(2));
-  const totalTaxableSubtotal = orderItems.reduce((sum, i) => sum + i.taxable_value, 0);
-  const totalGstComponent = orderItems.reduce((sum, i) => sum + i.estimated_gst, 0);
 
-  // Filter products matching search bar query
-  const autocompleteSuggestions = products
-    .filter(p =>
-      p.nickname.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.supplier_item_name.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-    .sort((a, b) => {
-      const nameA = (a.nickname || a.supplier_item_name || '').trim().toLowerCase();
-      const nameB = (b.nickname || b.supplier_item_name || '').trim().toLowerCase();
-      return nameA.localeCompare(nameB);
-    });
+  // Filtered rows for display
+  const filteredRows = planRows.filter(row => {
+    // 1. Tab Filter
+    if (activeTab === 'ORDERED' && row.quantity === 0) return false;
+    if (activeTab === 'ZERO' && row.quantity > 0) return false;
 
-  // Auto-generate clean PDF filename upon Save as PDF / Print
+    // 2. Search Filter
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    return (
+      row.product.nickname.toLowerCase().includes(q) ||
+      row.product.supplier_item_name.toLowerCase().includes(q) ||
+      (row.product.hsn && row.product.hsn.toLowerCase().includes(q))
+    );
+  });
+
+  // Active items included in final order (quantity > 0)
+  const orderedItems = planRows.filter(r => r.quantity > 0);
+  const totalPacksOrdered = orderedItems.reduce((sum, r) => sum + r.quantity, 0);
+  const totalTaxable = orderedItems.reduce((sum, r) => sum + r.taxable_value, 0);
+  const totalGst = orderedItems.reduce((sum, r) => sum + r.gst_amount, 0);
+  const rawGrandTotal = orderedItems.reduce((sum, r) => sum + r.total, 0);
+  const grandTotalRounded = Math.round(rawGrandTotal);
+
   const handlePrint = () => {
     const originalTitle = document.title;
-    const supplierCleanName = selectedSupplier?.name ? selectedSupplier.name.replace(/[^a-zA-Z0-9]/g, '_') : 'Ayyappa_Enterprises';
+    const supplierClean = selectedSupplier?.name ? selectedSupplier.name.replace(/[^a-zA-Z0-9]/g, '_') : 'Ayyappa_Enterprises';
     const dateStr = new Date().toISOString().split('T')[0];
-    document.title = `ITC_Wholesale_Order_Estimate_${supplierCleanName}_${dateStr}`;
+    document.title = `Wholesale_Order_Estimate_${supplierClean}_${dateStr}`;
     window.print();
     setTimeout(() => {
       document.title = originalTitle;
@@ -239,43 +310,59 @@ export const OrderPlannerPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto">
+    <div className="space-y-6 max-w-6xl mx-auto pb-16">
       {/* Header Bar */}
       <div className="no-print flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="page-title">
+          <h1 className="page-title flex items-center gap-2.5">
             <ShoppingCart className="w-6 h-6 text-[#4B49AC]" />
             Wholesale Order Planner
           </h1>
           <p className="page-subtitle">
-            Search by personal nickname to calculate exact landed costs before placing orders with distributors.
+            All catalog products are listed below. Simply enter the desired pack quantities to calculate exact landed amounts.
           </p>
         </div>
 
         <div className="flex items-center gap-2.5">
           {isProformaMode ? (
             <>
-              <Button variant="outline" onClick={() => setIsProformaMode(false)} icon={<ArrowLeft className="w-4 h-4" />}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsProformaMode(false)}
+                icon={<ArrowLeft className="w-4 h-4" />}
+              >
                 Back to Edit
               </Button>
-              <Button variant="primary" onClick={handlePrint} icon={<Printer className="w-4 h-4" />}>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handlePrint}
+                icon={<Printer className="w-4 h-4" />}
+              >
                 Save as PDF / Print
               </Button>
             </>
           ) : (
             <>
-              {orderItems.length > 0 && (
-                <Button variant="outline" size="sm" onClick={handleClearPlan} icon={<RefreshCw className="w-4 h-4" />}>
-                  Clear All
+              {orderedItems.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleResetAll}
+                  icon={<RotateCcw className="w-4 h-4" />}
+                >
+                  Reset Quantities
                 </Button>
               )}
               <Button
                 variant="primary"
-                disabled={orderItems.length === 0}
+                size="sm"
+                disabled={orderedItems.length === 0}
                 onClick={() => setIsProformaMode(true)}
                 icon={<FileDown className="w-4 h-4" />}
               >
-                Generate PO Estimate
+                Generate PO Estimate ({orderedItems.length})
               </Button>
             </>
           )}
@@ -283,260 +370,323 @@ export const OrderPlannerPage: React.FC = () => {
       </div>
 
       {!isProformaMode ? (
-        <div className="no-print space-y-6">
-          {/* EASY TOP CONTROL CARD: Vendor + SEARCH BY NICKNAME */}
-          <Card title="Order Setup & Quick Search" className="relative z-30">
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-              
+        <div className="no-print space-y-5">
+          {/* Top Control Strip */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-3.5 items-end">
               {/* Agency Selector */}
-              <div className="md:col-span-4">
-                <Select
-                  label="Distributor Agency *"
-                  value={selectedSupplierId}
-                  onChange={(e) => setSelectedSupplierId(e.target.value)}
-                  options={suppliers.map(s => ({ value: s.id, label: `${s.name} ${s.gstin ? `(${s.gstin})` : ''}` }))}
-                />
+              <div className="md:col-span-5">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-[#6C7383] mb-1.5">
+                  Distributor Agency *
+                </label>
+                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5]">
+                  <Building2 className="w-4 h-4 text-[#4B49AC] shrink-0" />
+                  <select
+                    value={selectedSupplierId}
+                    onChange={(e) => setSelectedSupplierId(e.target.value)}
+                    className="w-full bg-transparent text-xs sm:text-sm font-bold text-[#1F1F2C] focus:outline-none cursor-pointer"
+                  >
+                    {suppliers.map(s => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} {s.gstin ? `(${s.gstin})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
-              {/* SEARCH BAR BY NICKNAME WITH WIDE FLOATING AUTOCOMPLETE */}
-              <div className="md:col-span-5 relative" ref={searchRef}>
-                <label className="text-xs font-semibold uppercase tracking-wider text-[#6C7383] block mb-1.5">
-                  Search by Product Nickname to Add
+              {/* Quick Search */}
+              <div className="md:col-span-4">
+                <label className="block text-xs font-semibold uppercase tracking-wider text-[#6C7383] mb-1.5">
+                  Search Catalog Products
                 </label>
                 <div className="relative">
-                  <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#6C7383]" />
+                  <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8F93A0]" />
                   <input
                     type="text"
-                    placeholder="Type nickname (e.g. Mixpod, Filter, Gold Flake)..."
-                    value={searchQuery}
-                    onFocus={() => setIsSearchOpen(true)}
-                    onChange={(e) => {
-                      setSearchQuery(e.target.value);
-                      setIsSearchOpen(true);
-                    }}
-                    className="w-full pl-10 pr-4 py-2.5 bg-white border border-[#D5DCED] hover:border-[#4B49AC]/50 rounded-xl text-sm text-[#1F1F2C] placeholder-[#6C7383]/60 focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC] font-medium shadow-sm transition-all"
+                    placeholder="Search by nickname, invoice text..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-white border border-[#ECEEF5] text-xs sm:text-sm text-[#1F1F2C] placeholder-[#8F93A0] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC] shadow-xs font-medium"
                   />
                 </div>
-
-                {/* ULTRA-CLEAN UNCLIPPED FLOATING DROPDOWN PANEL (z-50) */}
-                {isSearchOpen && searchQuery.trim().length > 0 && (
-                  <div className="absolute left-0 top-full mt-2 w-full md:w-[480px] bg-white border border-[#ECEEF5] rounded-2xl shadow-2xl z-50 max-h-80 overflow-y-auto divide-y divide-[#ECEEF5]">
-                    {autocompleteSuggestions.length === 0 ? (
-                      <div className="p-4 text-xs text-[#6C7383] text-center font-medium">
-                        No product nickname matches "{searchQuery}"
-                      </div>
-                    ) : (
-                      autocompleteSuggestions.map((prod) => {
-                        const isAdded = orderItems.some(i => i.product_id === prod.id);
-                        return (
-                          <div
-                            key={prod.id}
-                            onClick={() => handleAddProductByObject(prod)}
-                            className="p-3.5 hover:bg-[#F5F7FF] cursor-pointer flex items-center justify-between gap-3 transition-colors group"
-                          >
-                            <div className="min-w-0 flex-1">
-                              <span className="font-bold text-xs text-[#1F1F2C] group-hover:text-[#4B49AC] block truncate">
-                                {prod.nickname}
-                              </span>
-                              <span className="text-[11px] font-mono text-[#6C7383] block truncate mt-0.5">
-                                Invoice Text: "{prod.supplier_item_name}"
-                              </span>
-                            </div>
-
-                            <div className="text-right shrink-0 flex items-center gap-3">
-                              <div className="text-right">
-                                <span className="text-xs font-mono text-[#4B49AC] font-bold block">
-                                  ₹{prod.current_purchase_ref_price.toFixed(2)}
-                                </span>
-                                <span className="text-[10px] text-[#6C7383] font-mono">ref price</span>
-                              </div>
-
-                              {isAdded ? (
-                                <Badge variant="success" size="sm">Added ✓</Badge>
-                              ) : (
-                                <span className="px-3 py-1.5 rounded-lg bg-[#4B49AC] text-white hover:bg-[#3f3e91] font-bold text-xs flex items-center gap-1 transition-all shadow-sm shrink-0">
-                                  <Plus className="w-3.5 h-3.5" /> Add
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                )}
               </div>
 
-              {/* Quick Action Buttons */}
+              {/* Quick Preset Buttons */}
               <div className="md:col-span-3 flex items-center gap-2">
                 <Button
-                  variant="secondary"
+                  variant="outline"
                   size="sm"
+                  onClick={handleLoadLastBillQuantities}
                   className="flex-1 text-xs justify-center"
-                  onClick={handleAddAllProducts}
-                  icon={<Layers className="w-3.5 h-3.5" />}
+                  icon={<Sparkles className="w-3.5 h-3.5 text-[#7978E9]" />}
+                  title="Copy quantities from last confirmed invoice"
                 >
-                  Add All ({products.length})
+                  Last Bill
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
+                  onClick={handleSetAllDefault}
                   className="flex-1 text-xs justify-center"
-                  onClick={handleLoadLastBill}
-                  icon={<Sparkles className="w-3.5 h-3.5" />}
+                  icon={<Layers className="w-3.5 h-3.5" />}
+                  title="Fill all items with 10 packs"
                 >
-                  Last Bill
+                  All 10s
                 </Button>
               </div>
-
             </div>
-          </Card>
 
-          {/* MAIN ORDER ITEMS SHEET */}
-          <Card
-            title={`Planned Order Lines (${orderItems.length} Products)`}
-            className="relative z-10"
-            action={
-              orderItems.length > 0 && (
-                <div className="text-right">
-                  <span className="text-xs text-[#6C7383] mr-2">Estimated Total:</span>
-                  <span className="text-base sm:text-lg font-bold text-[#4B49AC] font-mono">₹{totalAgencyLandedCost.toFixed(2)}</span>
-                </div>
-              )
-            }
-          >
-            {orderItems.length === 0 ? (
-              <div className="py-12 text-center space-y-4">
-                <div className="w-14 h-14 rounded-2xl bg-[#F5F7FF] border border-[#ECEEF5] flex items-center justify-center mx-auto text-[#4B49AC] shadow-sm">
-                  <Search className="w-6 h-6 text-[#4B49AC]" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-[#1F1F2C] tracking-tight">Search by Nickname to Start Your Order</h3>
-                  <p className="text-xs sm:text-sm text-[#6C7383] mt-1 max-w-md mx-auto">
-                    Type any personal nickname in the search bar above or click <strong>Add All {products.length} Products</strong> to plan your order quickly!
-                  </p>
-                </div>
-                <div className="pt-2 flex justify-center gap-3">
-                  <Button variant="primary" size="sm" onClick={handleAddAllProducts} icon={<Layers className="w-4 h-4" />}>
-                    Add All Catalog Products
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={handleLoadLastBill} icon={<Sparkles className="w-4 h-4" />}>
-                    Load Last Bill Items
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {/* Search Filter Inside Current Table */}
-                {orderItems.length > 5 && (
-                  <div className="relative max-w-sm">
-                    <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#6C7383]" />
-                    <input
-                      type="text"
-                      placeholder="Filter current order lines..."
-                      value={searchFilter}
-                      onChange={(e) => setSearchFilter(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 bg-white border border-[#D5DCED] rounded-xl text-xs text-[#1F1F2C] placeholder-[#6C7383]/60 focus:outline-none focus:border-[#4B49AC]"
-                    />
-                  </div>
-                )}
-
-                {/* Streamlined Table Rows */}
-                <div className="divide-y divide-[#ECEEF5] border border-[#ECEEF5] rounded-2xl overflow-hidden bg-white shadow-skydash">
-                  {orderItems
-                    .filter(item =>
-                      !searchFilter ||
-                      item.product?.nickname.toLowerCase().includes(searchFilter.toLowerCase()) ||
-                      item.product?.supplier_item_name.toLowerCase().includes(searchFilter.toLowerCase())
-                    )
-                    .map((item, idx) => (
-                      <div key={item.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-[#F8F9FE] transition-colors">
-                        {/* Product Info */}
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2.5">
-                            <span className="font-mono text-xs text-[#6C7383] px-2 py-0.5 rounded bg-[#F5F7FF] font-medium">#{idx + 1}</span>
-                            <span className="font-bold text-[#1F1F2C] text-sm">{item.product?.nickname}</span>
-                          </div>
-                          <span className="text-xs font-mono text-[#6C7383] block mt-0.5">
-                            Invoice Text: "{item.product?.supplier_item_name}"
-                          </span>
-                        </div>
-
-                        {/* Inline Controls */}
-                        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
-                          <div className="w-full sm:w-24">
-                            <label className="text-[10px] font-bold text-[#6C7383] uppercase block mb-1">Pack Qty</label>
-                            <input
-                              type="number"
-                              value={item.quantity}
-                              onChange={(e) => handleUpdateItem(item.id, 'quantity', parseFloat(e.target.value) || 0)}
-                              className="w-full px-2.5 py-1.5 bg-white border border-[#D5DCED] rounded-lg text-xs font-mono font-bold text-[#1F1F2C] text-right focus:outline-none focus:border-[#4B49AC] min-h-[38px]"
-                            />
-                          </div>
-
-                          <div className="w-full sm:w-28">
-                            <label className="text-[10px] font-bold text-[#6C7383] uppercase block mb-1">Rate / Pack (₹)</label>
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={item.estimated_rate}
-                              onChange={(e) => handleUpdateItem(item.id, 'estimated_rate', parseFloat(e.target.value) || 0)}
-                              className="w-full px-2.5 py-1.5 bg-white border border-[#D5DCED] rounded-lg text-xs font-mono text-[#1F1F2C] font-semibold text-right focus:outline-none focus:border-[#4B49AC] min-h-[38px]"
-                            />
-                          </div>
-
-                          <div className="w-full sm:w-28 text-left sm:text-right">
-                            <label className="text-[10px] font-bold text-[#6C7383] uppercase block mb-1">Total (₹)</label>
-                            <span className="font-mono font-bold text-xs sm:text-sm text-[#4B49AC] block py-1.5 truncate">
-                              ₹{item.total.toFixed(2)}
-                            </span>
-                          </div>
-
-                          <div className="flex items-end justify-end sm:justify-start">
-                            <button
-                              onClick={() => handleRemoveItem(item.id)}
-                              className="p-2 text-[#6C7383] hover:text-[#F3797E] rounded-lg hover:bg-[#F3797E]/10 transition-colors min-h-[38px] min-w-[38px] flex items-center justify-center"
-                              title="Remove Line"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-
-                {/* Final Total Cash Needed Card */}
-                <div className="p-5 bg-gradient-to-r from-[#4B49AC] to-[#7978E9] text-white rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-skydash-primary">
-                  <div className="flex items-center gap-3.5">
-                    <div className="p-3 rounded-xl bg-white/20 text-white backdrop-blur-sm shadow-md shrink-0">
-                      <Wallet className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-white uppercase tracking-wide">
-                        Exact Amount to Have Ready for Agency
-                      </h4>
-                      <p className="text-xs text-white/80 mt-0.5">
-                        Total Items: {orderItems.length} Products • Total Quantity: {totalOrderPacks} Packs
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="text-right">
-                    <span className="text-2xl sm:text-3xl font-bold font-mono text-white tracking-tight">
-                      ₹{totalAgencyLandedCost.toFixed(2)}
+            {/* Filter Tabs Strip */}
+            <div className="flex items-center justify-between flex-wrap gap-2 pt-2 border-t border-[#ECEEF5]">
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+                {(
+                  [
+                    { id: 'ALL', label: 'All Catalog Products', count: planRows.length },
+                    { id: 'ORDERED', label: 'In Current Order', count: orderedItems.length },
+                    { id: 'ZERO', label: 'Unordered (0 Packs)', count: planRows.length - orderedItems.length }
+                  ] as const
+                ).map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
+                      activeTab === tab.id
+                        ? 'bg-[#4B49AC] text-white shadow-sm shadow-[#4B49AC]/20'
+                        : 'bg-[#F5F7FF] text-[#6C7383] hover:text-[#4B49AC] hover:bg-[#EEF2FF]'
+                    }`}
+                  >
+                    <span>{tab.label}</span>
+                    <span
+                      className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                        activeTab === tab.id ? 'bg-white/20 text-white' : 'bg-[#ECEEF5] text-[#6C7383]'
+                      }`}
+                    >
+                      {tab.count}
                     </span>
-                  </div>
-                </div>
+                  </button>
+                ))}
               </div>
-            )}
-          </Card>
+
+              <div className="text-xs text-[#6C7383] font-mono">
+                Showing <strong className="text-[#1F1F2C]">{filteredRows.length}</strong> of {planRows.length} products
+              </div>
+            </div>
+          </div>
+
+          {/* Product Order Table (Matches Products Page Look & Feel) */}
+          <div className="rounded-2xl border border-[#ECEEF5] bg-white shadow-skydash overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-[#F5F7FF] text-[11px] font-bold text-[#6C7383] uppercase tracking-wider border-b border-[#ECEEF5]">
+                  <tr>
+                    <th className="px-4 py-3.5 text-center w-12">#</th>
+                    <th className="px-4 py-3.5">Product Alias / Nickname</th>
+                    <th className="px-4 py-3.5 text-right w-36">Purchase Ref Rate</th>
+                    <th className="px-4 py-3.5 text-center w-64">Order Packs (Quantity)</th>
+                    <th className="px-4 py-3.5 text-right w-36">Line Total (₹)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#ECEEF5]">
+                  {loading ? (
+                    <tr>
+                      <td colSpan={5} className="py-12 text-center text-xs text-[#6C7383]">
+                        Loading products catalog...
+                      </td>
+                    </tr>
+                  ) : filteredRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-12 text-center text-xs text-[#6C7383]">
+                        No products match your search/filter.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredRows.map((row, idx) => {
+                      const isSelected = row.quantity > 0;
+                      return (
+                        <tr
+                          key={row.product_id}
+                          className={`transition-colors ${
+                            isSelected ? 'bg-[#F5F7FF]/60 hover:bg-[#EEF2FF]' : 'hover:bg-[#F8F9FE]'
+                          }`}
+                        >
+                          {/* Row Index */}
+                          <td className="px-4 py-3 text-center font-mono text-[#8F93A0] font-semibold">
+                            {idx + 1}
+                          </td>
+
+                          {/* Product Alias & Subtitle */}
+                          <td className="px-4 py-3">
+                            <div className="space-y-0.5">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-[#1F1F2C] text-sm hover:text-[#4B49AC] transition-colors">
+                                  {row.product.nickname}
+                                </span>
+                                {isSelected && (
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                    {row.quantity} Packs
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[11px] font-mono text-[#6C7383] block">
+                                Invoice Text: "{row.product.supplier_item_name}"
+                              </span>
+                            </div>
+                          </td>
+
+                          {/* Purchase Rate (₹) */}
+                          <td className="px-4 py-3 text-right">
+                            <div className="space-y-0.5">
+                              <span className="font-mono font-bold text-sm text-[#4B49AC]">
+                                ₹{row.purchase_rate.toFixed(2)}
+                              </span>
+                              <span className="text-[10px] font-mono text-[#8F93A0] block">
+                                {row.rate_source === 'SUPPLIER_LAST' ? 'Last Bill' : 'Ref Rate'}
+                              </span>
+                            </div>
+                          </td>
+
+                          {/* Quantity (Packs) Controls */}
+                          <td className="px-4 py-3">
+                            <div className="flex items-center justify-center gap-1.5">
+                              {/* Minus 10 Button */}
+                              <button
+                                type="button"
+                                onClick={() => handleAddPreset(row.product_id, -10)}
+                                disabled={row.quantity <= 0}
+                                className="w-7 h-7 rounded-lg bg-[#F5F7FF] text-[#6C7383] hover:bg-[#EEF2FF] hover:text-[#4B49AC] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center font-bold text-xs border border-[#ECEEF5] transition-all"
+                                title="Decrease by 10"
+                              >
+                                -10
+                              </button>
+
+                              {/* Minus 1 Button */}
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateQuantity(row.product_id, row.quantity - 1)}
+                                disabled={row.quantity <= 0}
+                                className="w-7 h-7 rounded-lg bg-[#F5F7FF] text-[#6C7383] hover:bg-[#EEF2FF] hover:text-[#4B49AC] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center border border-[#ECEEF5] transition-all"
+                                title="Decrease by 1"
+                              >
+                                <Minus className="w-3.5 h-3.5" />
+                              </button>
+
+                              {/* Numeric Input */}
+                              <input
+                                type="number"
+                                min="0"
+                                value={row.quantity === 0 ? '' : row.quantity}
+                                placeholder="0"
+                                onChange={(e) => handleUpdateQuantity(row.product_id, parseInt(e.target.value) || 0)}
+                                onFocus={(e) => e.target.select()}
+                                className={`w-20 px-2 py-1.5 rounded-lg border text-center font-mono font-bold text-sm focus:outline-none transition-all ${
+                                  isSelected
+                                    ? 'bg-white border-[#4B49AC] text-[#4B49AC] ring-2 ring-[#4B49AC]/20 shadow-xs'
+                                    : 'bg-white border-[#ECEEF5] text-[#1F1F2C] hover:border-[#D5DCED]'
+                                }`}
+                              />
+
+                              {/* Plus 1 Button */}
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateQuantity(row.product_id, row.quantity + 1)}
+                                className="w-7 h-7 rounded-lg bg-[#F5F7FF] text-[#6C7383] hover:bg-[#EEF2FF] hover:text-[#4B49AC] flex items-center justify-center border border-[#ECEEF5] transition-all"
+                                title="Increase by 1"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                              </button>
+
+                              {/* Plus 10 Button */}
+                              <button
+                                type="button"
+                                onClick={() => handleAddPreset(row.product_id, 10)}
+                                className="px-2 h-7 rounded-lg bg-[#F5F7FF] text-[#4B49AC] hover:bg-[#4B49AC] hover:text-white font-bold text-xs border border-[#ECEEF5] transition-all"
+                                title="Add 10 Packs"
+                              >
+                                +10
+                              </button>
+
+                              {/* Plus 50 Button */}
+                              <button
+                                type="button"
+                                onClick={() => handleAddPreset(row.product_id, 50)}
+                                className="px-2 h-7 rounded-lg bg-[#F5F7FF] text-[#6C7383] hover:bg-[#7978E9] hover:text-white font-bold text-xs border border-[#ECEEF5] transition-all hidden sm:inline-flex items-center"
+                                title="Add 50 Packs"
+                              >
+                                +50
+                              </button>
+                            </div>
+                          </td>
+
+                          {/* Line Total */}
+                          <td className="px-4 py-3 text-right">
+                            {isSelected ? (
+                              <span className="font-mono font-bold text-sm text-[#1F1F2C] block">
+                                ₹{row.total.toFixed(2)}
+                              </span>
+                            ) : (
+                              <span className="font-mono text-xs text-[#8F93A0] italic block">
+                                ₹0.00
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Sticky / Live Order Summary Card */}
+          <div className="p-5 rounded-2xl bg-gradient-to-r from-[#4B49AC] via-[#5C59BE] to-[#7978E9] text-white shadow-skydash-primary flex flex-col md:flex-row md:items-center justify-between gap-5">
+            <div className="flex items-center gap-4">
+              <div className="p-3.5 rounded-2xl bg-white/20 text-white backdrop-blur-md shrink-0 shadow-sm">
+                <Wallet className="w-7 h-7" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-extrabold text-white tracking-wide uppercase">
+                    Order Landed Estimate
+                  </h3>
+                  <span className="px-2.5 py-0.5 rounded-full bg-white/25 text-white text-xs font-mono font-bold">
+                    {orderedItems.length} Products
+                  </span>
+                </div>
+                <p className="text-xs text-white/80 font-medium">
+                  Total Volume: <strong>{totalPacksOrdered} Packs</strong> • Taxable: ₹{totalTaxable.toFixed(2)} • GST (40%): ₹{totalGst.toFixed(2)}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 shrink-0">
+              <div className="text-left sm:text-right">
+                <span className="text-[11px] uppercase font-bold text-white/80 tracking-wider block">
+                  Total Amount Needed
+                </span>
+                <span className="text-2xl sm:text-3xl font-black font-mono text-white tracking-tight">
+                  ₹{grandTotalRounded.toFixed(2)}
+                </span>
+              </div>
+
+              <Button
+                variant="outline"
+                size="lg"
+                disabled={orderedItems.length === 0}
+                onClick={() => setIsProformaMode(true)}
+                className="bg-white text-[#4B49AC] hover:bg-[#F5F7FF] font-extrabold border-transparent shadow-md"
+                icon={<FileDown className="w-4 h-4 text-[#4B49AC]" />}
+              >
+                Generate PO Sheet
+              </Button>
+            </div>
+          </div>
         </div>
       ) : (
-        /* ULTRA-CLEAN CORPORATE PDF PRINTABLE DOCUMENT VIEW */
+        /* ULTRA-CLEAN CORPORATE PRINTABLE DOCUMENT VIEW */
         <div className="printable-container">
           <div className="printable-document max-w-4xl mx-auto bg-white text-black rounded-none p-6 sm:p-8 space-y-6 shadow-none border border-black">
-            
             {/* Header / Brand Title */}
             <div className="flex justify-between items-center border-b-2 border-black pb-5">
               <div className="flex items-center gap-3">
@@ -555,7 +705,7 @@ export const OrderPlannerPage: React.FC = () => {
 
               <div className="text-right">
                 <span className="px-3 py-1 bg-black text-white rounded-none font-mono text-xs font-bold uppercase">
-                  ORDER ESTIMATE SHEET
+                  WHOLESALE ORDER ESTIMATE
                 </span>
                 <p className="text-xs font-mono text-zinc-700 mt-1">Ref #: EST-{Date.now().toString().slice(-6)}</p>
                 <p className="text-xs font-mono text-zinc-700">Date: {new Date().toLocaleDateString('en-IN')}</p>
@@ -582,7 +732,9 @@ export const OrderPlannerPage: React.FC = () => {
                 </span>
                 <h2 className="text-sm font-bold text-black">BERRY QUEQ (RAMACHANDRAN)</h2>
                 <p className="text-zinc-700 mt-0.5">Veppampattu, Chennai, Tamil Nadu</p>
-                <p className="font-mono text-zinc-800 mt-0.5">Payment Terms: <strong>{selectedSupplier?.payment_terms || 'CREDIT / BANK'}</strong></p>
+                <p className="font-mono text-zinc-800 mt-0.5">
+                  Payment Terms: <strong>{selectedSupplier?.payment_terms || 'CREDIT / CASH'}</strong>
+                </p>
               </div>
             </div>
 
@@ -592,25 +744,25 @@ export const OrderPlannerPage: React.FC = () => {
                 <thead>
                   <tr className="bg-zinc-100 border-b-2 border-black text-black uppercase text-[10px] font-bold">
                     <th className="py-2.5 px-3">#</th>
-                    <th className="py-2.5 px-3">Product Description & Invoice Name</th>
+                    <th className="py-2.5 px-3">Product Description & Invoice Alias</th>
                     <th className="py-2.5 px-3 text-right">Pack Qty</th>
-                    <th className="py-2.5 px-3 text-right">Net Landed Rate / Pack (₹)</th>
+                    <th className="py-2.5 px-3 text-right">Rate / Pack (₹)</th>
                     <th className="py-2.5 px-3 text-right">Line Total (₹)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-200">
-                  {orderItems.map((item, idx) => (
-                    <tr key={item.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-zinc-50'}>
+                  {orderedItems.map((item, idx) => (
+                    <tr key={item.product_id} className={idx % 2 === 0 ? 'bg-white' : 'bg-zinc-50'}>
                       <td className="py-2.5 px-3 font-mono text-zinc-600">{idx + 1}</td>
                       <td className="py-2.5 px-3">
-                        <span className="font-bold text-black block">{item.product?.nickname}</span>
-                        <span className="text-[11px] font-mono text-zinc-600">"{item.product?.supplier_item_name}"</span>
+                        <span className="font-bold text-black block">{item.product.nickname}</span>
+                        <span className="text-[11px] font-mono text-zinc-600">"{item.product.supplier_item_name}"</span>
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono font-semibold text-black">
                         {item.quantity} Packs
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono text-black">
-                        ₹{item.estimated_rate.toFixed(2)}
+                        ₹{item.purchase_rate.toFixed(2)}
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono font-bold text-black">
                         ₹{item.total.toFixed(2)}
@@ -626,22 +778,30 @@ export const OrderPlannerPage: React.FC = () => {
               <div className="p-3 bg-zinc-50 border border-zinc-300 rounded-none text-xs max-w-sm">
                 <span className="font-bold text-black block mb-1">Order Notes & Payment Preparation</span>
                 <p className="text-[11px] text-zinc-700 leading-relaxed">
-                  Prices derived from agency billing history. Have exact total ready in bank/cash prior to order placement.
+                  Prices derived from agency billing history and reference catalogs. Have exact cash / cheque ready prior to order placement.
                 </p>
               </div>
 
               <div className="w-full sm:w-72 space-y-2 text-xs">
                 <div className="flex justify-between text-zinc-700">
-                  <span>Total Items:</span>
-                  <span className="font-mono text-black">{orderItems.length} Products</span>
+                  <span>Selected Products:</span>
+                  <span className="font-mono text-black">{orderedItems.length} SKUs</span>
                 </div>
                 <div className="flex justify-between text-zinc-700">
-                  <span>Total Quantity:</span>
-                  <span className="font-mono text-black">{totalOrderPacks} Packs</span>
+                  <span>Total Packs Volume:</span>
+                  <span className="font-mono text-black">{totalPacksOrdered} Packs</span>
+                </div>
+                <div className="flex justify-between text-zinc-700">
+                  <span>Taxable Subtotal:</span>
+                  <span className="font-mono text-black">₹{totalTaxable.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-zinc-700">
+                  <span>GST Component (40%):</span>
+                  <span className="font-mono text-black">₹{totalGst.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-sm font-black text-black pt-2 border-t-2 border-black">
                   <span>TOTAL AMOUNT NEEDED:</span>
-                  <span className="font-mono text-black text-base">₹{totalAgencyLandedCost.toFixed(2)}</span>
+                  <span className="font-mono text-black text-base">₹{grandTotalRounded.toFixed(2)}</span>
                 </div>
               </div>
             </div>
@@ -649,7 +809,7 @@ export const OrderPlannerPage: React.FC = () => {
             {/* Footer Signature */}
             <div className="pt-8 flex justify-between items-end text-[11px] text-zinc-600 border-t border-zinc-300">
               <div>
-                <p>System Generated Document</p>
+                <p>System Generated Order Estimate</p>
                 <p className="font-mono text-[10px]">Timestamp: {new Date().toISOString()}</p>
               </div>
               <div className="text-right">
@@ -657,7 +817,6 @@ export const OrderPlannerPage: React.FC = () => {
                 <p className="font-bold text-black">Authorized Signature</p>
               </div>
             </div>
-
           </div>
         </div>
       )}
