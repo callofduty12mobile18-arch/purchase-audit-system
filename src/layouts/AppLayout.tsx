@@ -248,10 +248,6 @@ export const AppLayout: React.FC = () => {
             <div className="w-8 h-8 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5] flex items-center justify-center text-[#6C7383] hover:text-[#4B49AC] cursor-pointer transition-colors">
               <Bell className="w-4 h-4" />
             </div>
-            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-[#4B49AC]/10 text-[#4B49AC] border border-[#4B49AC]/20 shadow-xs">
-              <span className="w-2 h-2 rounded-full bg-[#4B49AC] animate-pulse" />
-              Live System
-            </span>
           </div>
         </header>
 
