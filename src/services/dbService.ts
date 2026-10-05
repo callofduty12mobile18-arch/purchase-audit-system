@@ -601,6 +601,8 @@ export const dbService = {
 
   // --- INVOICES & PURCHASES ---
   getInvoices: async (): Promise<PurchaseInvoice[]> => {
+    const localInvoices = getLocalData<PurchaseInvoice[]>(LOCAL_STORAGE_KEY_INVOICES, []);
+
     try {
       const { data, error } = await supabase
         .from('purchase_invoices')
@@ -608,7 +610,13 @@ export const dbService = {
         .order('invoice_date', { ascending: false });
 
       if (!error && data !== null) {
-        const remoteInvoices = (data as PurchaseInvoice[]).sort(
+        const remoteInvoices = (data as PurchaseInvoice[]).map(inv => {
+          const localMatch = localInvoices.find(l => l.id === inv.id);
+          return {
+            ...inv,
+            invoice_name: inv.invoice_name || localMatch?.invoice_name || 'RAMACHANDRAN'
+          };
+        }).sort(
           (a, b) => new Date(b.invoice_date || b.created_at || 0).getTime() - new Date(a.invoice_date || a.created_at || 0).getTime()
         );
         // Authoritative remote state overwrites local cache cleanly
@@ -635,8 +643,12 @@ export const dbService = {
 
       if (!error) {
         if (data) {
-          const freshInvoice = data as PurchaseInvoice;
           const localInvoices = getLocalData<PurchaseInvoice[]>(LOCAL_STORAGE_KEY_INVOICES, []);
+          const localMatch = localInvoices.find(i => i.id === id);
+          const freshInvoice: PurchaseInvoice = {
+            ...(data as PurchaseInvoice),
+            invoice_name: (data as any).invoice_name || localMatch?.invoice_name || 'RAMACHANDRAN'
+          };
           const updated = [freshInvoice, ...localInvoices.filter(i => i.id !== id)];
           setLocalData(LOCAL_STORAGE_KEY_INVOICES, updated);
           return freshInvoice;
@@ -755,12 +767,14 @@ export const dbService = {
       ? extractedData.payment_status
       : 'PAID';
 
+    const effectiveInvoiceName = extractedData.invoice_name?.trim() || 'RAMACHANDRAN';
+
     const newInvoice: PurchaseInvoice = {
       id: invoiceId,
       supplier_id: supplier.id,
       supplier: supplier,
       invoice_number: invoiceNumber,
-      invoice_name: extractedData.invoice_name?.trim() || undefined,
+      invoice_name: effectiveInvoiceName,
       invoice_date: extractedData.invoice_date || getTodayIST(),
       payment_mode: safePaymentMode,
       payment_status: safePaymentStatus,
@@ -793,6 +807,7 @@ export const dbService = {
           id: invoiceId,
           supplier_id: supplier.id,
           invoice_number: invoiceNumber,
+          invoice_name: effectiveInvoiceName,
           invoice_date: extractedData.invoice_date,
           payment_mode: safePaymentMode,
           payment_status: safePaymentStatus,
@@ -811,7 +826,30 @@ export const dbService = {
         });
 
       if (invErr) {
-        console.error('Supabase purchase_invoices upsert error:', invErr);
+        // Fallback retry if invoice_name column is not present in remote schema
+        console.warn('Supabase purchase_invoices upsert note:', invErr.message);
+        await supabase
+          .from('purchase_invoices')
+          .upsert({
+            id: invoiceId,
+            supplier_id: supplier.id,
+            invoice_number: invoiceNumber,
+            invoice_date: extractedData.invoice_date,
+            payment_mode: safePaymentMode,
+            payment_status: safePaymentStatus,
+            subtotal: extractedData.subtotal,
+            taxable_amount: extractedData.taxable_amount,
+            cgst: extractedData.cgst,
+            sgst: extractedData.sgst,
+            igst: extractedData.igst,
+            total_tax: extractedData.total_tax,
+            round_off: extractedData.round_off,
+            grand_total: extractedData.grand_total,
+            verification_status: 'VERIFIED',
+            ocr_status: 'MANUAL',
+            created_at: now,
+            updated_at: now
+          });
       } else {
         const { error: itemsErr } = await supabase
           .from('purchase_items')

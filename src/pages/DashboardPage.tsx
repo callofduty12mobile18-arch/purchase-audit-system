@@ -139,13 +139,18 @@ export const DashboardPage: React.FC = () => {
     {
       header: 'Invoice Number',
       cell: (row: PurchaseInvoice) => (
-        <span
-          onClick={() => setSelectedInvoice(row)}
-          className="font-mono text-[#4B49AC] font-bold hover:underline cursor-pointer flex items-center gap-1.5"
-        >
-          <Receipt className="w-3.5 h-3.5 text-[#7DA0FA]" />
-          {row.invoice_number}
-        </span>
+        <div className="space-y-1">
+          <span
+            onClick={() => setSelectedInvoice(row)}
+            className="font-mono text-[#4B49AC] font-bold hover:underline cursor-pointer flex items-center gap-1.5"
+          >
+            <Receipt className="w-3.5 h-3.5 text-[#7DA0FA]" />
+            {row.invoice_number}
+          </span>
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-[#F0F3FF] text-[#4B49AC] border border-[#D5DCED]" title="Memo Name">
+            🏷️ {row.invoice_name || 'RAMACHANDRAN'}
+          </span>
+        </div>
       )
     },
     {
@@ -354,19 +359,17 @@ export const DashboardPage: React.FC = () => {
                     <Receipt className="w-5 h-5" />
                   </div>
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-mono text-base font-extrabold text-[#1F1F2C]">
                         {selectedInvoice.invoice_number}
                       </span>
                       <Badge variant={selectedInvoice.payment_status === 'PAID' ? 'success' : 'warning'}>
                         {selectedInvoice.payment_status}
                       </Badge>
-                    </div>
-                    {selectedInvoice.invoice_name && (
-                      <span className="text-xs font-semibold text-[#4B49AC] block mt-0.5">
-                        🏷️ {selectedInvoice.invoice_name}
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold bg-[#F0F3FF] text-[#4B49AC] border border-[#D5DCED]">
+                        🏷️ {selectedInvoice.invoice_name || 'RAMACHANDRAN'}
                       </span>
-                    )}
+                    </div>
                   </div>
                 </div>
 

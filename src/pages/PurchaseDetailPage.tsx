@@ -137,11 +137,14 @@ export const PurchaseDetailPage: React.FC = () => {
               <Receipt className="w-6 h-6" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-xl font-bold font-mono text-[#1F1F2C]">{invoice.invoice_number}</h1>
                 <Badge variant={invoice.payment_status === 'PAID' ? 'success' : 'warning'}>
                   {invoice.payment_status}
                 </Badge>
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-bold bg-[#F0F3FF] text-[#4B49AC] border border-[#D5DCED]">
+                  🏷️ {invoice.invoice_name || 'RAMACHANDRAN'}
+                </span>
               </div>
               <p className="text-xs text-[#6C7383] mt-0.5">
                 Recorded on {new Date(invoice.created_at).toLocaleDateString()} at {new Date(invoice.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
