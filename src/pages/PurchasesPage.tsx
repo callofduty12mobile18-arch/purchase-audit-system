@@ -195,6 +195,7 @@ export const PurchasesPage: React.FC = () => {
           columns={columns}
           data={paginatedInvoices}
           keyExtractor={(row) => row.id}
+          onRowClick={(row) => navigate(`/purchases/${row.id}`)}
           isLoading={loading}
           emptyText="No invoices matched your filter criteria."
         />

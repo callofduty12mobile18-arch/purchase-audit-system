@@ -365,7 +365,7 @@ export const OrderPlannerPage: React.FC = () => {
                 <Button
                   variant="secondary"
                   size="sm"
-                  className="w-full text-xs"
+                  className="flex-1 text-xs justify-center"
                   onClick={handleAddAllProducts}
                   icon={<Layers className="w-3.5 h-3.5" />}
                 >
@@ -374,7 +374,7 @@ export const OrderPlannerPage: React.FC = () => {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="w-full text-xs"
+                  className="flex-1 text-xs justify-center"
                   onClick={handleLoadLastBill}
                   icon={<Sparkles className="w-3.5 h-3.5" />}
                 >

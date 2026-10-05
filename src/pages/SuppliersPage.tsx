@@ -197,6 +197,7 @@ export const SuppliersPage: React.FC = () => {
         columns={columns}
         data={filteredSuppliers}
         keyExtractor={(row) => row.id}
+        onRowClick={(row) => navigate(`/suppliers/${row.id}`)}
         isLoading={loading}
         emptyText="No suppliers match your search query."
       />

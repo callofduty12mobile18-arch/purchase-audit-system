@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { TrendingUp, Search, ArrowRight, History } from 'lucide-react';
 import { Input } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
@@ -7,6 +8,7 @@ import { PriceHistory } from '../types';
 import { dbService } from '../services/dbService';
 
 export const PriceHistoryPage: React.FC = () => {
+  const navigate = useNavigate();
   const [history, setHistory] = useState<PriceHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -104,6 +106,9 @@ export const PriceHistoryPage: React.FC = () => {
         columns={columns}
         data={filteredHistory}
         keyExtractor={(row) => row.id}
+        onRowClick={(row) => {
+          if (row.product_id) navigate(`/products/${row.product_id}`);
+        }}
         isLoading={loading}
         emptyText="No price adjustments logged yet."
       />
