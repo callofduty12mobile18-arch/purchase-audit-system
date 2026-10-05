@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
-  FileUp,
+  PlusCircle,
   Receipt,
   Package,
   TrendingUp,
@@ -167,9 +167,9 @@ export const DashboardPage: React.FC = () => {
           <Button
             variant="primary"
             onClick={() => navigate('/purchases/import')}
-            icon={<FileUp className="w-4 h-4" />}
+            icon={<PlusCircle className="w-4 h-4" />}
           >
-            Scan / Upload Bill
+            New Purchase Invoice
           </Button>
         </div>
       </div>
@@ -230,7 +230,7 @@ export const DashboardPage: React.FC = () => {
               data={recentInvoices}
               keyExtractor={(row) => row.id}
               isLoading={loading}
-              emptyText="No invoices processed yet. Upload your first bill above."
+              emptyText="No invoices recorded yet. Click '+ New Purchase Invoice' to enter your first bill."
             />
           </Card>
         </div>

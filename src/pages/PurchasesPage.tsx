@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Receipt, FileUp, Search, Eye } from 'lucide-react';
+import { Receipt, PlusCircle, Search, Eye } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
@@ -129,7 +129,7 @@ export const PurchasesPage: React.FC = () => {
         <Button
           variant="primary"
           onClick={() => navigate('/purchases/import')}
-          icon={<FileUp className="w-4 h-4" />}
+          icon={<PlusCircle className="w-4 h-4" />}
         >
           New Purchase Invoice
         </Button>

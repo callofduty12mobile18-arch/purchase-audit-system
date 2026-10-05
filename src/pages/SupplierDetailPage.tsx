@@ -158,7 +158,7 @@ export const SupplierDetailPage: React.FC = () => {
           data={invoices}
           keyExtractor={(row) => row.id}
           isLoading={loading}
-          emptyText="No invoices uploaded for this supplier yet."
+          emptyText="No invoices recorded for this supplier yet."
         />
       </div>
     </div>

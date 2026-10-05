@@ -3,7 +3,6 @@ import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   Receipt,
-  FileUp,
   Building2,
   Package,
   TrendingUp,

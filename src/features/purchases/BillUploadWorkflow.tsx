@@ -2,10 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FileText,
-  Upload,
-  RotateCw,
-  ZoomIn,
-  ZoomOut,
   AlertTriangle,
   CheckCircle2,
   Trash2,
@@ -13,19 +9,14 @@ import {
   ShieldAlert,
   ArrowLeft,
   Building2,
-  Calendar,
   DollarSign,
   Package,
-  Layers,
   Sparkles,
-  Eye,
-  EyeOff
+  Receipt
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
-import { Input } from '../../components/ui/Input';
-import { Select } from '../../components/ui/Select';
-import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
+import { Badge } from '../../components/ui/Badge';
 import { InvoiceFormData, InvoiceFormItem, PurchaseInvoice, Supplier, Product } from '../../types';
 import { createBlankInvoice, createBlankInvoiceItem } from '../../services/invoiceService';
 import { dbService } from '../../services/dbService';
@@ -35,27 +26,14 @@ export const BillUploadWorkflow: React.FC = () => {
   const [formData, setFormData] = useState<InvoiceFormData>(createBlankInvoice());
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [showDocumentPanel, setShowDocumentPanel] = useState<boolean>(false);
-  const [rotation, setRotation] = useState(0);
-  const [zoom, setZoom] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [existingDuplicate, setExistingDuplicate] = useState<PurchaseInvoice | null>(null);
   const [loadingInitial, setLoadingInitial] = useState(true);
 
-  const isPdf = selectedFile?.type === 'application/pdf' || selectedFile?.name.toLowerCase().endsWith('.pdf');
-
   useEffect(() => {
     loadMetadata();
   }, []);
-
-  useEffect(() => {
-    return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-    };
-  }, [previewUrl]);
 
   const loadMetadata = async () => {
     try {
@@ -71,29 +49,6 @@ export const BillUploadWorkflow: React.FC = () => {
     } finally {
       setLoadingInitial(false);
     }
-  };
-
-  // File Handling for Optional Bill Attachment Preview
-  const handleFileSelect = (file: File) => {
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setSelectedFile(file);
-    const url = URL.createObjectURL(file);
-    setPreviewUrl(url);
-    setShowDocumentPanel(true);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFileSelect(e.dataTransfer.files[0]);
-    }
-  };
-
-  const handleRemoveAttachment = () => {
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setSelectedFile(null);
-    setPreviewUrl(null);
-    setShowDocumentPanel(false);
   };
 
   // Mathematical Recalculations
@@ -158,7 +113,7 @@ export const BillUploadWorkflow: React.FC = () => {
       item.item_name = String(value);
       item.supplier_item_name = String(value);
       
-      // Check if matches an existing product in catalogue
+      // Auto-suggest product info if matched
       const matchedProd = products.find(p =>
         p.supplier_item_name.toLowerCase() === String(value).toLowerCase() ||
         p.nickname.toLowerCase() === String(value).toLowerCase()
@@ -215,7 +170,7 @@ export const BillUploadWorkflow: React.FC = () => {
       }
     }
 
-    // Warnings & Validation Check
+    // Validation checks
     const warnings: string[] = [];
     if (!item.supplier_item_name?.trim()) warnings.push('Item description is required');
     if (!item.pack_qty || item.pack_qty <= 0) warnings.push('Pack quantity is required');
@@ -291,7 +246,7 @@ export const BillUploadWorkflow: React.FC = () => {
       await executeSave();
     } catch (err: any) {
       console.error('Save error:', err);
-      alert(err.message || 'Failed to confirm and save purchase invoice');
+      alert(err.message || 'Failed to save purchase invoice');
       setIsSubmitting(false);
     }
   };
@@ -300,10 +255,7 @@ export const BillUploadWorkflow: React.FC = () => {
     setIsSubmitting(true);
     setShowDuplicateModal(false);
     try {
-      const saved = await dbService.confirmAndSaveInvoice(
-        formData,
-        selectedFile?.name || undefined
-      );
+      const saved = await dbService.confirmAndSaveInvoice(formData);
       navigate(`/purchases/${saved.id}`);
     } catch (err: any) {
       alert(err.message || 'Error saving invoice to database');
@@ -313,7 +265,7 @@ export const BillUploadWorkflow: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-16">
+    <div className="space-y-6 max-w-6xl mx-auto pb-16">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -327,428 +279,334 @@ export const BillUploadWorkflow: React.FC = () => {
             Back to Invoices Ledger
           </Button>
           <h1 className="page-title flex items-center gap-2.5">
-            <FileText className="w-6 h-6 text-[#4B49AC]" />
+            <Receipt className="w-6 h-6 text-[#4B49AC]" />
             New Purchase Invoice Entry
           </h1>
           <p className="page-subtitle">
-            Enter wholesale purchase bills, auto-calculate GST line items, and update inventory reference prices.
+            Record supplier purchase bills, auto-calculate GST line items, and maintain inventory reference prices.
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-3">
           <Button
             variant="outline"
-            size="sm"
-            onClick={() => setShowDocumentPanel(!showDocumentPanel)}
-            icon={showDocumentPanel ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            onClick={() => navigate('/purchases')}
           >
-            {showDocumentPanel ? 'Hide Bill Preview' : 'Show Bill Preview'}
+            Cancel
           </Button>
           <Button
             variant="primary"
             onClick={handleInitiateConfirm}
             isLoading={isSubmitting}
             icon={<CheckCircle2 className="w-4 h-4" />}
+            className="shadow-md shadow-[#4B49AC]/25"
           >
             Save & Confirm Invoice
           </Button>
         </div>
       </div>
 
-      {/* Main Container: Split screen if document preview is open, or full-width form */}
-      <div className={`grid grid-cols-1 ${showDocumentPanel ? 'lg:grid-cols-12' : ''} gap-6`}>
+      {/* Main Invoice Form */}
+      <div className="space-y-6">
         
-        {/* LEFT COLUMN: Optional Document Attachment & Viewer */}
-        {showDocumentPanel && (
-          <div className="lg:col-span-5 space-y-4">
-            <div className="p-4 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash">
-              <div className="flex items-center justify-between pb-3 border-b border-[#ECEEF5] mb-3">
-                <div className="flex items-center gap-2">
-                  <Upload className="w-4 h-4 text-[#4B49AC]" />
-                  <span className="text-xs font-bold text-[#1F1F2C] uppercase tracking-wider">Bill Document Attachment</span>
-                </div>
-                {selectedFile && (
-                  <button
-                    onClick={handleRemoveAttachment}
-                    className="text-xs text-rose-500 hover:text-rose-700 font-semibold"
-                  >
-                    Remove
-                  </button>
-                )}
-              </div>
-
-              {!selectedFile ? (
-                <div
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={handleDrop}
-                  className="p-6 border-2 border-dashed border-[#ECEEF5] hover:border-[#4B49AC] rounded-xl text-center cursor-pointer transition-colors bg-[#F5F7FF]"
-                  onClick={() => document.getElementById('bill-file-input')?.click()}
-                >
-                  <input
-                    id="bill-file-input"
-                    type="file"
-                    accept="image/*,application/pdf"
-                    className="hidden"
-                    onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
-                  />
-                  <Upload className="w-8 h-8 text-[#7DA0FA] mx-auto mb-2" />
-                  <p className="text-xs font-semibold text-[#1F1F2C]">Click to browse or drop bill image / PDF</p>
-                  <p className="text-[11px] text-[#6C7383] mt-1">Useful to reference paper invoice while entering line items</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between text-xs text-[#6C7383] bg-[#F5F7FF] p-2 rounded-lg">
-                    <span className="truncate max-w-[200px] font-mono font-medium text-[#1F1F2C]">{selectedFile.name}</span>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() => setRotation((r) => (r + 90) % 360)}
-                        className="p-1 rounded hover:bg-white text-[#4B49AC]"
-                        title="Rotate 90°"
-                      >
-                        <RotateCw className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => setZoom((z) => Math.min(z + 0.25, 2.5))}
-                        className="p-1 rounded hover:bg-white text-[#4B49AC]"
-                        title="Zoom In"
-                      >
-                        <ZoomIn className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => setZoom((z) => Math.max(z - 0.25, 0.5))}
-                        className="p-1 rounded hover:bg-white text-[#4B49AC]"
-                        title="Zoom Out"
-                      >
-                        <ZoomOut className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="h-[560px] bg-zinc-900 rounded-xl overflow-auto flex items-center justify-center p-3 relative border border-zinc-800">
-                    {previewUrl && (
-                      isPdf ? (
-                        <iframe
-                          src={`${previewUrl}#toolbar=0`}
-                          className="w-full h-full rounded border-0 bg-white"
-                          title="PDF Preview"
-                        />
-                      ) : (
-                        <div
-                          style={{
-                            transform: `rotate(${rotation}deg) scale(${zoom})`,
-                            transition: 'transform 0.2s ease',
-                          }}
-                          className="flex items-center justify-center"
-                        >
-                          <img
-                            src={previewUrl}
-                            alt="Invoice Attachment"
-                            className="max-h-[500px] max-w-full object-contain rounded shadow-lg"
-                          />
-                        </div>
-                      )
-                    )}
-                  </div>
-                </div>
-              )}
+        {/* Header Metadata Card */}
+        <div className="p-5 sm:p-6 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[#ECEEF5]">
+            <div className="flex items-center gap-2">
+              <Building2 className="w-4.5 h-4.5 text-[#4B49AC]" />
+              <h2 className="text-sm font-bold text-[#1F1F2C] uppercase tracking-wider">Invoice Header Information</h2>
             </div>
-          </div>
-        )}
-
-        {/* RIGHT COLUMN: Invoice Header & Line Items Editor */}
-        <div className={`${showDocumentPanel ? 'lg:col-span-7' : 'w-full'} space-y-6`}>
-          
-          {/* Header Metadata Card */}
-          <div className="p-5 sm:p-6 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-[#ECEEF5]">
-              <div className="flex items-center gap-2">
-                <Building2 className="w-4.5 h-4.5 text-[#4B49AC]" />
-                <h2 className="text-sm font-bold text-[#1F1F2C] uppercase tracking-wider">Invoice Header Information</h2>
-              </div>
-              <Badge variant="purple">Manual Bill Entry</Badge>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-[#1F1F2C] mb-1">
-                  Supplier Name <span className="text-rose-500">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    list="suppliers-datalist"
-                    type="text"
-                    required
-                    placeholder="e.g. ITC LIMITED"
-                    value={formData.supplier_name}
-                    onChange={(e) => handleSupplierSelect(e.target.value)}
-                    className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#ECEEF5] text-xs text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC]"
-                  />
-                  <datalist id="suppliers-datalist">
-                    {suppliers.map((s) => (
-                      <option key={s.id} value={s.name} />
-                    ))}
-                  </datalist>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-[#1F1F2C] mb-1">Supplier GSTIN</label>
-                <input
-                  type="text"
-                  placeholder="33AAAAA0000A1Z5"
-                  value={formData.supplier_gstin || ''}
-                  onChange={(e) => handleHeaderChange('supplier_gstin', e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#ECEEF5] text-xs font-mono text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-[#1F1F2C] mb-1">
-                  Invoice Number <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. INV-2026-081"
-                  value={formData.invoice_number}
-                  onChange={(e) => handleHeaderChange('invoice_number', e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#ECEEF5] text-xs font-mono font-bold text-[#4B49AC] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-[#1F1F2C] mb-1">
-                  Invoice Date <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  required
-                  value={formData.invoice_date}
-                  onChange={(e) => handleHeaderChange('invoice_date', e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#ECEEF5] text-xs font-mono text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-[#1F1F2C] mb-1">Payment Mode</label>
-                <select
-                  value={formData.payment_mode}
-                  onChange={(e) => handleHeaderChange('payment_mode', e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#ECEEF5] text-xs text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC]"
-                >
-                  <option value="BANK_TRANSFER">Bank Transfer (NEFT/RTGS)</option>
-                  <option value="UPI">UPI</option>
-                  <option value="CASH">Cash</option>
-                  <option value="CREDIT">Credit (Accounts Payable)</option>
-                  <option value="CHEQUE">Cheque</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-[#1F1F2C] mb-1">Payment Status</label>
-                <select
-                  value={formData.payment_status}
-                  onChange={(e) => handleHeaderChange('payment_status', e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#ECEEF5] text-xs text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC]"
-                >
-                  <option value="PAID">Paid</option>
-                  <option value="UNPAID">Unpaid</option>
-                  <option value="PARTIALLY_PAID">Partially Paid</option>
-                </select>
-              </div>
-            </div>
+            <Badge variant="purple">Bill Details</Badge>
           </div>
 
-          {/* Line Items Table Card */}
-          <div className="p-5 sm:p-6 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[#ECEEF5]">
-              <div>
-                <h3 className="text-sm font-bold text-[#1F1F2C] uppercase tracking-wider flex items-center gap-2">
-                  <Package className="w-4 h-4 text-[#4B49AC]" />
-                  Line Items Entry ({formData.items.length})
-                </h3>
-                <p className="text-[11px] text-[#6C7383]">
-                  Rate per pack is automatically derived from <code>invoice_amount / pack_qty</code>.
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleAddItem}
-                icon={<Plus className="w-3.5 h-3.5" />}
-              >
-                Add Line Item
-              </Button>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse min-w-[700px]">
-                <thead>
-                  <tr className="bg-[#F5F7FF] text-[#6C7383] uppercase text-[10px] font-bold border-b border-[#ECEEF5]">
-                    <th className="py-2.5 px-3 w-8">#</th>
-                    <th className="py-2.5 px-3 min-w-[200px]">Item Description</th>
-                    <th className="py-2.5 px-3 w-24">HSN</th>
-                    <th className="py-2.5 px-3 w-20 text-right">Packs</th>
-                    <th className="py-2.5 px-3 w-24 text-right">MRP (₹)</th>
-                    <th className="py-2.5 px-3 w-28 text-right">Bill Total (₹)</th>
-                    <th className="py-2.5 px-3 w-24 text-right">Each Pack Rate</th>
-                    <th className="py-2.5 px-3 w-10 text-center"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#ECEEF5]">
-                  {formData.items.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-[#F8F9FE] transition-colors">
-                      <td className="py-2 px-3 font-mono text-[#6C7383] text-center font-bold">
-                        {idx + 1}
-                      </td>
-                      <td className="py-2 px-3">
-                        <input
-                          type="text"
-                          placeholder="e.g. CI Ice Burst 10M"
-                          value={item.supplier_item_name || item.item_name || ''}
-                          onChange={(e) => handleItemChange(idx, 'supplier_item_name', e.target.value)}
-                          className="w-full px-2.5 py-1.5 rounded-lg bg-[#F5F7FF] border border-[#ECEEF5] text-xs font-medium text-[#1F1F2C] focus:outline-none focus:ring-1 focus:ring-[#4B49AC]"
-                        />
-                      </td>
-                      <td className="py-2 px-3">
-                        <input
-                          type="text"
-                          placeholder="24022090"
-                          value={item.hsn || ''}
-                          onChange={(e) => handleItemChange(idx, 'hsn', e.target.value)}
-                          className="w-full px-2.5 py-1.5 rounded-lg bg-[#F5F7FF] border border-[#ECEEF5] text-xs font-mono text-[#6C7383] focus:outline-none focus:ring-1 focus:ring-[#4B49AC]"
-                        />
-                      </td>
-                      <td className="py-2 px-3 text-right">
-                        <input
-                          type="number"
-                          min="1"
-                          step="1"
-                          value={item.pack_qty || ''}
-                          onChange={(e) => handleItemChange(idx, 'pack_qty', e.target.value)}
-                          className="w-full px-2.5 py-1.5 text-right rounded-lg bg-[#F5F7FF] border border-[#ECEEF5] text-xs font-mono font-semibold text-[#1F1F2C] focus:outline-none focus:ring-1 focus:ring-[#4B49AC]"
-                        />
-                      </td>
-                      <td className="py-2 px-3 text-right">
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          placeholder="0.00"
-                          value={item.mrp_rsp || ''}
-                          onChange={(e) => handleItemChange(idx, 'mrp_rsp', e.target.value)}
-                          className="w-full px-2.5 py-1.5 text-right rounded-lg bg-[#F5F7FF] border border-[#ECEEF5] text-xs font-mono text-[#1F1F2C] focus:outline-none focus:ring-1 focus:ring-[#4B49AC]"
-                        />
-                      </td>
-                      <td className="py-2 px-3 text-right">
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          placeholder="0.00"
-                          value={item.invoice_amount || item.total || ''}
-                          onChange={(e) => handleItemChange(idx, 'invoice_amount', e.target.value)}
-                          className="w-full px-2.5 py-1.5 text-right rounded-lg bg-[#F5F7FF] border border-[#ECEEF5] text-xs font-mono font-bold text-[#4B49AC] focus:outline-none focus:ring-1 focus:ring-[#4B49AC]"
-                        />
-                      </td>
-                      <td className="py-2 px-3 text-right font-mono font-bold text-[#1F1F2C]">
-                        ₹{item.each_pack_rate?.toFixed(2) || '0.00'}
-                      </td>
-                      <td className="py-2 px-3 text-center">
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveItem(idx)}
-                          disabled={formData.items.length <= 1}
-                          className="p-1 text-[#8F93A0] hover:text-rose-600 disabled:opacity-30 transition-colors"
-                          title="Delete line item"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
-                    </tr>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-[#1F1F2C] mb-1">
+                Supplier Name <span className="text-rose-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  list="suppliers-datalist"
+                  type="text"
+                  required
+                  placeholder="e.g. ITC LIMITED"
+                  value={formData.supplier_name}
+                  onChange={(e) => handleSupplierSelect(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#ECEEF5] text-xs text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC]"
+                />
+                <datalist id="suppliers-datalist">
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={s.name} />
                   ))}
-                </tbody>
-              </table>
+                </datalist>
+              </div>
             </div>
 
+            <div>
+              <label className="block text-xs font-semibold text-[#1F1F2C] mb-1">Supplier GSTIN</label>
+              <input
+                type="text"
+                placeholder="33AAAAA0000A1Z5"
+                value={formData.supplier_gstin || ''}
+                onChange={(e) => handleHeaderChange('supplier_gstin', e.target.value)}
+                className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#ECEEF5] text-xs font-mono text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-[#1F1F2C] mb-1">
+                Invoice Number <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. INV-2026-081"
+                value={formData.invoice_number}
+                onChange={(e) => handleHeaderChange('invoice_number', e.target.value)}
+                className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#ECEEF5] text-xs font-mono font-bold text-[#4B49AC] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-[#1F1F2C] mb-1">
+                Invoice Date <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="date"
+                required
+                value={formData.invoice_date}
+                onChange={(e) => handleHeaderChange('invoice_date', e.target.value)}
+                className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#ECEEF5] text-xs font-mono text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-[#1F1F2C] mb-1">Payment Mode</label>
+              <select
+                value={formData.payment_mode}
+                onChange={(e) => handleHeaderChange('payment_mode', e.target.value)}
+                className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#ECEEF5] text-xs text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC]"
+              >
+                <option value="BANK_TRANSFER">Bank Transfer (NEFT/RTGS)</option>
+                <option value="UPI">UPI</option>
+                <option value="CASH">Cash</option>
+                <option value="CREDIT">Credit (Accounts Payable)</option>
+                <option value="CHEQUE">Cheque</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-[#1F1F2C] mb-1">Payment Status</label>
+              <select
+                value={formData.payment_status}
+                onChange={(e) => handleHeaderChange('payment_status', e.target.value)}
+                className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#ECEEF5] text-xs text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC]"
+              >
+                <option value="PAID">Paid</option>
+                <option value="UNPAID">Unpaid</option>
+                <option value="PARTIALLY_PAID">Partially Paid</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Line Items Table Card */}
+        <div className="p-5 sm:p-6 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[#ECEEF5]">
+            <div>
+              <h3 className="text-sm font-bold text-[#1F1F2C] uppercase tracking-wider flex items-center gap-2">
+                <Package className="w-4 h-4 text-[#4B49AC]" />
+                Line Items ({formData.items.length})
+              </h3>
+              <p className="text-[11px] text-[#6C7383]">
+                Unit price per pack is auto-calculated from <code>Bill Total / Packs</code>.
+              </p>
+            </div>
             <Button
               variant="outline"
               size="sm"
               onClick={handleAddItem}
               icon={<Plus className="w-3.5 h-3.5" />}
-              className="w-full justify-center py-2 text-xs"
             >
-              Add Another Line Item
+              Add Line Item
             </Button>
           </div>
 
-          {/* Financial Totals & Balance Summary */}
-          <div className="p-5 sm:p-6 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash space-y-4">
-            <h3 className="text-sm font-bold text-[#1F1F2C] uppercase tracking-wider pb-3 border-b border-[#ECEEF5] flex items-center gap-2">
-              <DollarSign className="w-4 h-4 text-[#4B49AC]" />
-              Tax & Grand Total Summary
-            </h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse min-w-[700px]">
+              <thead>
+                <tr className="bg-[#F5F7FF] text-[#6C7383] uppercase text-[10px] font-bold border-b border-[#ECEEF5]">
+                  <th className="py-2.5 px-3 w-8">#</th>
+                  <th className="py-2.5 px-3 min-w-[220px]">Item Description</th>
+                  <th className="py-2.5 px-3 w-24">HSN</th>
+                  <th className="py-2.5 px-3 w-20 text-right">Packs</th>
+                  <th className="py-2.5 px-3 w-24 text-right">MRP (₹)</th>
+                  <th className="py-2.5 px-3 w-28 text-right">Bill Total (₹)</th>
+                  <th className="py-2.5 px-3 w-28 text-right">Each Pack Rate</th>
+                  <th className="py-2.5 px-3 w-10 text-center"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#ECEEF5]">
+                {formData.items.map((item, idx) => (
+                  <tr key={idx} className="hover:bg-[#F8F9FE] transition-colors">
+                    <td className="py-2 px-3 font-mono text-[#6C7383] text-center font-bold">
+                      {idx + 1}
+                    </td>
+                    <td className="py-2 px-3">
+                      <input
+                        list={`products-datalist-${idx}`}
+                        type="text"
+                        placeholder="e.g. CI Ice Burst 10M"
+                        value={item.supplier_item_name || item.item_name || ''}
+                        onChange={(e) => handleItemChange(idx, 'supplier_item_name', e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded-lg bg-[#F5F7FF] border border-[#ECEEF5] text-xs font-medium text-[#1F1F2C] focus:outline-none focus:ring-1 focus:ring-[#4B49AC]"
+                      />
+                      <datalist id={`products-datalist-${idx}`}>
+                        {products.map((p) => (
+                          <option key={p.id} value={p.supplier_item_name}>
+                            {p.nickname}
+                          </option>
+                        ))}
+                      </datalist>
+                    </td>
+                    <td className="py-2 px-3">
+                      <input
+                        type="text"
+                        placeholder="24022090"
+                        value={item.hsn || ''}
+                        onChange={(e) => handleItemChange(idx, 'hsn', e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded-lg bg-[#F5F7FF] border border-[#ECEEF5] text-xs font-mono text-[#6C7383] focus:outline-none focus:ring-1 focus:ring-[#4B49AC]"
+                      />
+                    </td>
+                    <td className="py-2 px-3 text-right">
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={item.pack_qty || ''}
+                        onChange={(e) => handleItemChange(idx, 'pack_qty', e.target.value)}
+                        className="w-full px-2.5 py-1.5 text-right rounded-lg bg-[#F5F7FF] border border-[#ECEEF5] text-xs font-mono font-semibold text-[#1F1F2C] focus:outline-none focus:ring-1 focus:ring-[#4B49AC]"
+                      />
+                    </td>
+                    <td className="py-2 px-3 text-right">
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={item.mrp_rsp || ''}
+                        onChange={(e) => handleItemChange(idx, 'mrp_rsp', e.target.value)}
+                        className="w-full px-2.5 py-1.5 text-right rounded-lg bg-[#F5F7FF] border border-[#ECEEF5] text-xs font-mono text-[#1F1F2C] focus:outline-none focus:ring-1 focus:ring-[#4B49AC]"
+                      />
+                    </td>
+                    <td className="py-2 px-3 text-right">
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={item.invoice_amount || item.total || ''}
+                        onChange={(e) => handleItemChange(idx, 'invoice_amount', e.target.value)}
+                        className="w-full px-2.5 py-1.5 text-right rounded-lg bg-[#F5F7FF] border border-[#ECEEF5] text-xs font-mono font-bold text-[#4B49AC] focus:outline-none focus:ring-1 focus:ring-[#4B49AC]"
+                      />
+                    </td>
+                    <td className="py-2 px-3 text-right font-mono font-bold text-[#1F1F2C]">
+                      ₹{item.each_pack_rate?.toFixed(2) || '0.00'}
+                    </td>
+                    <td className="py-2 px-3 text-center">
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveItem(idx)}
+                        disabled={formData.items.length <= 1}
+                        className="p-1 text-[#8F93A0] hover:text-rose-600 disabled:opacity-30 transition-colors"
+                        title="Delete line item"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-xs">
-              <div className="p-3.5 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5]">
-                <span className="text-[#6C7383] block text-[11px] font-semibold">Taxable Subtotal</span>
-                <span className="font-mono text-base font-bold text-[#1F1F2C] mt-1 block">
-                  ₹{formData.subtotal.toFixed(2)}
-                </span>
-              </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleAddItem}
+            icon={<Plus className="w-3.5 h-3.5" />}
+            className="w-full justify-center py-2 text-xs"
+          >
+            Add Another Line Item
+          </Button>
+        </div>
 
-              <div className="p-3.5 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5]">
-                <span className="text-[#6C7383] block text-[11px] font-semibold">Total GST (CGST+SGST)</span>
-                <span className="font-mono text-base font-bold text-[#7DA0FA] mt-1 block">
-                  ₹{formData.total_tax.toFixed(2)}
-                </span>
-              </div>
+        {/* Financial Totals & Balance Summary */}
+        <div className="p-5 sm:p-6 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash space-y-4">
+          <h3 className="text-sm font-bold text-[#1F1F2C] uppercase tracking-wider pb-3 border-b border-[#ECEEF5] flex items-center gap-2">
+            <DollarSign className="w-4 h-4 text-[#4B49AC]" />
+            Tax & Grand Total Summary
+          </h3>
 
-              <div className="p-3.5 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5]">
-                <label className="text-[#6C7383] block text-[11px] font-semibold mb-1">Round Off (₹)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formData.round_off}
-                  onChange={(e) => handleHeaderChange('round_off', e.target.value)}
-                  className="w-full px-2.5 py-1 rounded bg-white border border-[#ECEEF5] font-mono text-xs font-semibold text-[#1F1F2C]"
-                />
-              </div>
-
-              <div className="p-3.5 rounded-xl bg-[#4B49AC]/10 border border-[#4B49AC]/30">
-                <span className="text-[#4B49AC] block text-[11px] font-bold uppercase tracking-wider">Grand Total</span>
-                <span className="font-mono text-lg font-bold text-[#4B49AC] mt-1 block">
-                  ₹{formData.grand_total.toFixed(2)}
-                </span>
-              </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+            <div className="p-3.5 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5]">
+              <span className="text-[#6C7383] block text-[11px] font-semibold">Taxable Subtotal</span>
+              <span className="font-mono text-base font-bold text-[#1F1F2C] mt-1 block">
+                ₹{formData.subtotal.toFixed(2)}
+              </span>
             </div>
 
-            {isTotalMismatch && (
-              <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2.5 text-xs text-amber-800">
-                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                <div>
-                  <strong>Calculated Total Discrepancy:</strong> Sum of (Subtotal + GST + Round Off) = ₹{calculatedGrandTotal.toFixed(2)}, which differs from Grand Total ₹{formData.grand_total.toFixed(2)}.
-                </div>
-              </div>
-            )}
-
-            <div className="pt-2 flex justify-end gap-3">
-              <Button
-                variant="outline"
-                onClick={() => navigate('/purchases')}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                onClick={handleInitiateConfirm}
-                isLoading={isSubmitting}
-                icon={<CheckCircle2 className="w-4 h-4" />}
-                className="px-6 shadow-md shadow-[#4B49AC]/25"
-              >
-                Save & Confirm Purchase Invoice
-              </Button>
+            <div className="p-3.5 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5]">
+              <span className="text-[#6C7383] block text-[11px] font-semibold">Total GST (CGST+SGST)</span>
+              <span className="font-mono text-base font-bold text-[#7DA0FA] mt-1 block">
+                ₹{formData.total_tax.toFixed(2)}
+              </span>
             </div>
+
+            <div className="p-3.5 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5]">
+              <label className="text-[#6C7383] block text-[11px] font-semibold mb-1">Round Off (₹)</label>
+              <input
+                type="number"
+                step="0.01"
+                value={formData.round_off}
+                onChange={(e) => handleHeaderChange('round_off', e.target.value)}
+                className="w-full px-2.5 py-1 rounded bg-white border border-[#ECEEF5] font-mono text-xs font-semibold text-[#1F1F2C]"
+              />
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-[#4B49AC]/10 border border-[#4B49AC]/30">
+              <span className="text-[#4B49AC] block text-[11px] font-bold uppercase tracking-wider">Grand Total</span>
+              <span className="font-mono text-lg font-bold text-[#4B49AC] mt-1 block">
+                ₹{formData.grand_total.toFixed(2)}
+              </span>
+            </div>
+          </div>
+
+          {isTotalMismatch && (
+            <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2.5 text-xs text-amber-800">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <strong>Calculated Total Discrepancy:</strong> Sum of (Subtotal + GST + Round Off) = ₹{calculatedGrandTotal.toFixed(2)}, which differs from Grand Total ₹{formData.grand_total.toFixed(2)}.
+              </div>
+            </div>
+          )}
+
+          <div className="pt-2 flex justify-end gap-3">
+            <Button
+              variant="outline"
+              onClick={() => navigate('/purchases')}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleInitiateConfirm}
+              isLoading={isSubmitting}
+              icon={<CheckCircle2 className="w-4 h-4" />}
+              className="px-6 shadow-md shadow-[#4B49AC]/25"
+            >
+              Save & Confirm Purchase Invoice
+            </Button>
           </div>
         </div>
       </div>
