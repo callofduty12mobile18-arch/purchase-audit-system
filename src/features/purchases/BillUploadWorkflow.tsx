@@ -23,6 +23,13 @@ import { createBlankInvoice, createBlankInvoiceItem } from '../../services/invoi
 import { dbService } from '../../services/dbService';
 import { useToast } from '../../context/ToastContext';
 
+export const MEMO_NAME_OPTIONS = [
+  'RAMACHANDRAN',
+  'ASHWIN KARTHIK',
+  'BERRY QUEQ',
+  'SUBIKSHA STORE'
+] as const;
+
 export const BillUploadWorkflow: React.FC = () => {
   const navigate = useNavigate();
   const { success: toastSuccess, error: toastError, warning: toastWarning } = useToast();
@@ -55,6 +62,7 @@ export const BillUploadWorkflow: React.FC = () => {
         ...prev,
         supplier_name: 'AYYAPPA ENTERPRISES',
         supplier_gstin: '33AABFA2949R1Z5',
+        invoice_name: prev.invoice_name || 'RAMACHANDRAN',
         invoice_number: prev.invoice_number || `INV-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`,
         payment_mode: prev.payment_mode === 'CHEQUE' ? 'CHEQUE' : 'CASH',
         payment_status: prev.payment_status === 'CHEQUE' ? 'CHEQUE' : 'PAID',
@@ -459,18 +467,22 @@ export const BillUploadWorkflow: React.FC = () => {
               </div>
             </div>
 
-            {/* Custom Invoice / Memo Name */}
+            {/* Memo Name Dropdown */}
             <div>
               <label className="block text-xs font-semibold text-[#1F1F2C] mb-1">
-                Invoice / Memo Name
+                Memo Name
               </label>
-              <input
-                type="text"
-                placeholder="e.g. Weekly ITC Stock, Bill #1024"
-                value={formData.invoice_name || ''}
+              <select
+                value={formData.invoice_name || 'RAMACHANDRAN'}
                 onChange={(e) => handleHeaderChange('invoice_name', e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#ECEEF5] text-xs sm:text-sm text-[#1F1F2C] placeholder-[#8F93A0] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC] shadow-xs"
-              />
+                className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#ECEEF5] text-xs sm:text-sm font-bold text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC] shadow-xs"
+              >
+                {MEMO_NAME_OPTIONS.map(opt => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Invoice Date */}
@@ -979,7 +991,7 @@ export const BillUploadWorkflow: React.FC = () => {
               </div>
               {savedInvoice.invoice_name && (
                 <div className="flex justify-between pb-1.5 border-b border-[#ECEEF5]">
-                  <span className="text-[#6C7383]">Invoice Name / Memo:</span>
+                  <span className="text-[#6C7383]">Memo Name:</span>
                   <span className="font-bold text-[#4B49AC]">{savedInvoice.invoice_name}</span>
                 </div>
               )}
