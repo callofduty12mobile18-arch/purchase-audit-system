@@ -10,6 +10,17 @@ import {
   InvoiceFormData
 } from '../types';
 
+export function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 export const DEFAULT_SUPPLIERS: Supplier[] = [
   {
     id: 'a0000000-0000-0000-0000-000000000001',
@@ -349,7 +360,8 @@ export const dbService = {
 
   saveSupplier: async (supplier: Partial<Supplier>): Promise<Supplier> => {
     const now = new Date().toISOString();
-    const id = supplier.id || `sup-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const isExistingUUID = supplier.id && supplier.id.length === 36 && supplier.id.includes('-');
+    const id = isExistingUUID ? supplier.id! : generateUUID();
     const newRecord: Supplier = {
       id,
       name: supplier.name || 'Vendor',
@@ -377,18 +389,17 @@ export const dbService = {
     setLocalData(LOCAL_STORAGE_KEY_SUPPLIERS, updatedList);
 
     // Sync to Supabase in background
-    supabase
-      .from('suppliers')
-      .upsert({
-        ...newRecord,
-        updated_at: now
-      })
-      .then(
-        ({ error }) => {
-          if (error) console.warn('Supabase supplier upsert note:', error.message);
-        },
-        () => {}
-      );
+    try {
+      const { error } = await supabase
+        .from('suppliers')
+        .upsert({
+          ...newRecord,
+          updated_at: now
+        });
+      if (error) console.warn('Supabase supplier upsert note:', error.message);
+    } catch (e) {
+      console.warn('Supabase supplier exception:', e);
+    }
 
     await dbService.logAudit(
       supplier.id ? 'SUPPLIER_UPDATED' : 'SUPPLIER_CREATED',
@@ -461,17 +472,19 @@ export const dbService = {
 
   saveProduct: async (product: Partial<Product>, priceChangeReason?: string): Promise<Product> => {
     const now = new Date().toISOString();
-    const id = product.id || `prod-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-    let oldPrice: number | undefined;
-
     const currentProds = await dbService.getProducts();
-    const existing = currentProds.find(p => p.id === id || p.supplier_item_name.toLowerCase() === (product.supplier_item_name || '').toLowerCase());
+    const existing = currentProds.find(p =>
+      (product.id && p.id === product.id) ||
+      p.supplier_item_name.toLowerCase() === (product.supplier_item_name || '').toLowerCase()
+    );
+    const id = existing?.id || (product.id && product.id.length === 36 && product.id.includes('-') ? product.id : generateUUID());
+    let oldPrice: number | undefined;
     if (existing) {
       oldPrice = existing.current_purchase_ref_price;
     }
 
     const savedProd: Product = {
-      id: existing ? existing.id : id,
+      id,
       supplier_item_name: product.supplier_item_name || existing?.supplier_item_name || 'Item',
       nickname: product.nickname || existing?.nickname || product.supplier_item_name || 'Item',
       sku: product.sku || existing?.sku,
@@ -535,9 +548,9 @@ export const dbService = {
     try {
       const { data, error } = await supabase
         .from('purchase_invoices')
-        .select('*, supplier:suppliers(*), items:purchase_items(*)')
+        .select('*, supplier:suppliers(*), items:purchase_items(*, product:products(*))')
         .order('invoice_date', { ascending: false });
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         setLocalData(LOCAL_STORAGE_KEY_INVOICES, data);
         return data as PurchaseInvoice[];
       }
@@ -563,7 +576,7 @@ export const dbService = {
     return dup || null;
   },
 
-  confirmAndSaveInvoice: async (extractedData: InvoiceFormData, documentPath?: string): Promise<PurchaseInvoice> => {
+  confirmAndSaveInvoice: async (extractedData: InvoiceFormData, _documentPath?: string): Promise<PurchaseInvoice> => {
     const suppliers = await dbService.getSuppliers();
     let supplier = suppliers.find(
       s => s.name.trim().toLowerCase() === extractedData.supplier_name.trim().toLowerCase()
@@ -577,7 +590,7 @@ export const dbService = {
     }
 
     const now = new Date().toISOString();
-    const invoiceId = `inv-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const invoiceId = generateUUID();
 
     // 1. Process and Insert Line Items & Auto-map Products
     const itemsToInsert: PurchaseItem[] = [];
@@ -598,7 +611,7 @@ export const dbService = {
         is_active: true
       }, `Invoice #${extractedData.invoice_number}`);
 
-      const itemId = `item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+      const itemId = generateUUID();
       itemsToInsert.push({
         id: itemId,
         purchase_invoice_id: invoiceId,
@@ -621,14 +634,22 @@ export const dbService = {
 
     const invoiceNumber = extractedData.invoice_number?.trim() || `INV-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
 
+    const validPaymentModes = ['CASH', 'UPI', 'BANK_TRANSFER', 'CREDIT', 'CHEQUE', 'OTHER'];
+    const safePaymentMode = (extractedData.payment_mode && validPaymentModes.includes(extractedData.payment_mode))
+      ? (extractedData.payment_mode as any)
+      : 'CASH';
+    const safePaymentStatus = (extractedData.payment_status === 'UNPAID' || extractedData.payment_status === 'PARTIALLY_PAID')
+      ? extractedData.payment_status
+      : 'PAID';
+
     const newInvoice: PurchaseInvoice = {
       id: invoiceId,
       supplier_id: supplier.id,
       supplier: supplier,
       invoice_number: invoiceNumber,
       invoice_date: extractedData.invoice_date,
-      payment_mode: extractedData.payment_mode || 'CASH',
-      payment_status: extractedData.payment_status || 'PAID',
+      payment_mode: safePaymentMode,
+      payment_status: safePaymentStatus,
       cheque_date: extractedData.cheque_date,
       subtotal: extractedData.subtotal,
       taxable_amount: extractedData.taxable_amount,
@@ -651,32 +672,37 @@ export const dbService = {
     setLocalData(LOCAL_STORAGE_KEY_INVOICES, updatedInvoices);
 
     // Sync to Supabase
-    supabase
-      .from('purchase_invoices')
-      .insert({
-        id: invoiceId,
-        supplier_id: supplier.id,
-        invoice_number: extractedData.invoice_number,
-        invoice_date: extractedData.invoice_date,
-        payment_mode: extractedData.payment_mode || 'BANK_TRANSFER',
-        payment_status: extractedData.payment_status || 'PAID',
-        subtotal: extractedData.subtotal,
-        taxable_amount: extractedData.taxable_amount,
-        cgst: extractedData.cgst,
-        sgst: extractedData.sgst,
-        igst: extractedData.igst,
-        total_tax: extractedData.total_tax,
-        round_off: extractedData.round_off,
-        grand_total: extractedData.grand_total,
-        verification_status: 'VERIFIED',
-        ocr_status: 'MANUAL',
-        created_at: now,
-        updated_at: now
-      })
-      .then(async ({ error: invErr }) => {
-        if (!invErr) {
-          await supabase.from('purchase_items').insert(
-            itemsToInsert.map(i => ({
+    try {
+      const { error: invErr } = await supabase
+        .from('purchase_invoices')
+        .insert({
+          id: invoiceId,
+          supplier_id: supplier.id,
+          invoice_number: invoiceNumber,
+          invoice_date: extractedData.invoice_date,
+          payment_mode: safePaymentMode,
+          payment_status: safePaymentStatus,
+          subtotal: extractedData.subtotal,
+          taxable_amount: extractedData.taxable_amount,
+          cgst: extractedData.cgst,
+          sgst: extractedData.sgst,
+          igst: extractedData.igst,
+          total_tax: extractedData.total_tax,
+          round_off: extractedData.round_off,
+          grand_total: extractedData.grand_total,
+          verification_status: 'VERIFIED',
+          ocr_status: 'MANUAL',
+          created_at: now,
+          updated_at: now
+        });
+
+      if (invErr) {
+        console.error('Supabase purchase_invoices insert error:', invErr);
+      } else {
+        const { error: itemsErr } = await supabase
+          .from('purchase_items')
+          .insert(
+            itemsToInsert.map((i, idx) => ({
               id: i.id,
               purchase_invoice_id: invoiceId,
               product_id: i.product_id,
@@ -691,13 +717,17 @@ export const dbService = {
               sgst: i.sgst,
               igst: i.igst,
               total: i.total,
+              line_number: idx + 1,
               created_at: now
             }))
           );
+        if (itemsErr) {
+          console.error('Supabase purchase_items insert error:', itemsErr);
         }
-      },
-      () => {}
-    );
+      }
+    } catch (err) {
+      console.error('Supabase sync exception:', err);
+    }
 
     // Audit Log
     await dbService.logAudit(
@@ -731,7 +761,7 @@ export const dbService = {
 
   addPriceHistory: async (entry: Omit<PriceHistory, 'id' | 'changed_at'>): Promise<PriceHistory> => {
     const now = new Date().toISOString();
-    const id = `ph-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const id = generateUUID();
     const newEntry: PriceHistory = {
       id,
       ...entry,
@@ -741,13 +771,16 @@ export const dbService = {
     const currentHistory = await dbService.getPriceHistory();
     setLocalData(LOCAL_STORAGE_KEY_PRICE_HISTORY, [newEntry, ...currentHistory]);
 
-    supabase
-      .from('price_history')
-      .insert({
-        ...newEntry,
-        changed_at: now
-      })
-      .then(() => {}, () => {});
+    try {
+      await supabase
+        .from('price_history')
+        .insert({
+          ...newEntry,
+          changed_at: now
+        });
+    } catch (e) {
+      console.warn('Price history sync note:', e);
+    }
 
     return newEntry;
   },
@@ -778,8 +811,10 @@ export const dbService = {
     reason?: string
   ): Promise<void> => {
     const now = new Date().toISOString();
+    const id = generateUUID();
+    const validEntityId = (entityId && entityId.length === 36 && entityId.includes('-')) ? entityId : undefined;
     const newLog: AuditLog = {
-      id: `audit-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      id,
       action,
       entity_type: entityType,
       entity_id: entityId,
@@ -792,17 +827,21 @@ export const dbService = {
     const currentLogs = await dbService.getAuditLogs();
     setLocalData(LOCAL_STORAGE_KEY_AUDIT, [newLog, ...currentLogs]);
 
-    supabase
-      .from('audit_logs')
-      .insert({
-        action,
-        entity_type: entityType,
-        entity_id: entityId,
-        old_value: oldValue,
-        new_value: newValue,
-        reason,
-        timestamp: now
-      })
-      .then(() => {}, () => {});
+    try {
+      await supabase
+        .from('audit_logs')
+        .insert({
+          id,
+          action,
+          entity_type: entityType,
+          entity_id: validEntityId,
+          old_value: oldValue,
+          new_value: newValue,
+          reason,
+          timestamp: now
+        });
+    } catch (e) {
+      console.warn('Audit log sync note:', e);
+    }
   }
 };
