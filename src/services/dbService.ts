@@ -593,7 +593,6 @@ export const dbService = {
 
   // --- INVOICES & PURCHASES ---
   getInvoices: async (): Promise<PurchaseInvoice[]> => {
-    const localInvoices = getLocalData<PurchaseInvoice[]>(LOCAL_STORAGE_KEY_INVOICES, []);
     try {
       const { data, error } = await supabase
         .from('purchase_invoices')
@@ -601,27 +600,13 @@ export const dbService = {
         .order('invoice_date', { ascending: false });
 
       if (!error && data) {
-        // Merge Supabase data with any locally saved invoices by ID
-        const mergedMap = new Map<string, PurchaseInvoice>();
-        (data as PurchaseInvoice[]).forEach(inv => {
-          if (inv && inv.id) mergedMap.set(inv.id, inv);
-        });
-        localInvoices.forEach(inv => {
-          if (inv && inv.id && !mergedMap.has(inv.id)) {
-            mergedMap.set(inv.id, inv);
-          }
-        });
-
-        const merged = Array.from(mergedMap.values()).sort(
-          (a, b) => new Date(b.invoice_date || b.created_at).getTime() - new Date(a.invoice_date || a.created_at).getTime()
-        );
-        setLocalData(LOCAL_STORAGE_KEY_INVOICES, merged);
-        return merged;
+        setLocalData(LOCAL_STORAGE_KEY_INVOICES, data);
+        return data as PurchaseInvoice[];
       }
     } catch (e) {
       console.warn('Supabase invoices fetch note:', e);
     }
-    return localInvoices;
+    return getLocalData<PurchaseInvoice[]>(LOCAL_STORAGE_KEY_INVOICES, []);
   },
 
   getInvoiceById: async (id: string): Promise<PurchaseInvoice | null> => {
@@ -857,42 +842,35 @@ export const dbService = {
   },
 
   deleteInvoice: async (id: string): Promise<boolean> => {
-    // 1. Find invoice to extract metadata for audit logging
+    // 1. Fetch current invoices to obtain the target invoice number
     const invoices = await dbService.getInvoices();
     const targetInvoice = invoices.find(inv => inv.id === id);
 
-    // 2. Remove from local storage cache
+    // 2. Remove from local storage cache immediately
     const updatedInvoices = invoices.filter(inv => inv.id !== id);
     setLocalData(LOCAL_STORAGE_KEY_INVOICES, updatedInvoices);
 
-    // 3. Delete from Supabase remote database
+    // 3. Remove any audit logs associated with this specific invoice from local storage cache
+    const currentAudit = getLocalData<AuditLog[]>(LOCAL_STORAGE_KEY_AUDIT, []);
+    const updatedAudit = currentAudit.filter(
+      a => a.entity_id !== id && (!targetInvoice?.invoice_number || !a.reason?.includes(targetInvoice.invoice_number))
+    );
+    setLocalData(LOCAL_STORAGE_KEY_AUDIT, updatedAudit);
+
+    // 4. Delete from Supabase remote database
     try {
       await supabase.from('purchase_items').delete().eq('purchase_invoice_id', id);
       await supabase.from('purchase_invoice_documents').delete().eq('purchase_invoice_id', id);
+      await supabase.from('audit_logs').delete().eq('entity_id', id);
+      if (targetInvoice?.invoice_number) {
+        await supabase.from('audit_logs').delete().ilike('reason', `%${targetInvoice.invoice_number}%`);
+      }
       const { error } = await supabase.from('purchase_invoices').delete().eq('id', id);
       if (error) {
         console.warn('Supabase delete invoice note:', error.message);
       }
     } catch (e) {
       console.warn('Supabase delete invoice exception:', e);
-    }
-
-    // 4. Log Audit event for permanent invoice deletion
-    if (targetInvoice) {
-      await dbService.logAudit(
-        'INVOICE_DELETED',
-        'purchase_invoices',
-        id,
-        {
-          invoice_number: targetInvoice.invoice_number,
-          supplier_name: targetInvoice.supplier?.name,
-          grand_total: targetInvoice.grand_total,
-          item_count: targetInvoice.items?.length || 0,
-          invoice_date: targetInvoice.invoice_date
-        },
-        null,
-        `Deleted purchase invoice #${targetInvoice.invoice_number} (₹${targetInvoice.grand_total.toFixed(2)})`
-      );
     }
 
     return true;
@@ -943,57 +921,53 @@ export const dbService = {
 
   // --- AUDIT LOGS ---
   getAuditLogs: async (): Promise<AuditLog[]> => {
-    const local = getLocalData<AuditLog[]>(LOCAL_STORAGE_KEY_AUDIT, []);
     try {
-      const { data, error } = await supabase
-        .from('audit_logs')
-        .select('*')
-        .order('timestamp', { ascending: false });
+      const [logsRes, invsRes] = await Promise.all([
+        supabase.from('audit_logs').select('*').order('timestamp', { ascending: false }),
+        supabase.from('purchase_invoices').select('id, invoice_number')
+      ]);
 
-      if (!error && data) {
-        const map = new Map<string, AuditLog>();
-        data.forEach(item => map.set(item.id, item as AuditLog));
-        const unsynced: AuditLog[] = [];
-        local.forEach(item => {
-          if (!map.has(item.id)) {
-            map.set(item.id, item);
-            unsynced.push(item);
-          }
-        });
+      if (!logsRes.error && logsRes.data) {
+        let allLogs = logsRes.data as AuditLog[];
 
-        // Sync local-only records to remote in background
-        if (unsynced.length > 0) {
-          (async () => {
-            try {
-              await supabase
-                .from('audit_logs')
-                .upsert(
-                  unsynced.map(u => ({
-                    id: u.id,
-                    action: u.action,
-                    entity_type: u.entity_type,
-                    entity_id: (u.entity_id && u.entity_id.length === 36 && u.entity_id.includes('-')) ? u.entity_id : null,
-                    old_value: u.old_value,
-                    new_value: u.new_value,
-                    reason: u.reason,
-                    timestamp: u.timestamp
-                  }))
-                );
-            } catch (err) {
-              console.warn('Audit logs background sync note:', err);
+        // If invoices table is accessible, automatically prune orphan audit logs for deleted invoices
+        if (!invsRes.error && invsRes.data) {
+          const activeInvoiceIds = new Set(invsRes.data.map(i => i.id));
+          const activeInvoiceNumbers = new Set(invsRes.data.map(i => (i.invoice_number || '').trim().toLowerCase()));
+
+          const orphanLogIds: string[] = [];
+          allLogs = allLogs.filter(l => {
+            const isInvoiceLog = l.entity_type === 'purchase_invoices' || l.action === 'INVOICE_CONFIRMED';
+            if (isInvoiceLog) {
+              const matchesId = l.entity_id && activeInvoiceIds.has(l.entity_id);
+              const matchesNumber = l.reason && Array.from(activeInvoiceNumbers).some(num => num && l.reason?.toLowerCase().includes(num));
+              if (!matchesId && !matchesNumber && activeInvoiceIds.size > 0) {
+                orphanLogIds.push(l.id);
+                return false;
+              }
             }
-          })();
+            return true;
+          });
+
+          // Delete orphan logs from Supabase in background
+          if (orphanLogIds.length > 0) {
+            (async () => {
+              try {
+                await supabase.from('audit_logs').delete().in('id', orphanLogIds);
+              } catch (err) {
+                console.warn('Orphan audit log cleanup note:', err);
+              }
+            })();
+          }
         }
 
-        const merged = Array.from(map.values()).sort(
-          (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-        );
-        setLocalData(LOCAL_STORAGE_KEY_AUDIT, merged);
-        return merged;
+        setLocalData(LOCAL_STORAGE_KEY_AUDIT, allLogs);
+        return allLogs;
       }
-    } catch {
-      // Fallback
+    } catch (e) {
+      console.warn('Supabase audit logs fetch error:', e);
     }
+    const local = getLocalData<AuditLog[]>(LOCAL_STORAGE_KEY_AUDIT, []);
     return local.sort(
       (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     );
