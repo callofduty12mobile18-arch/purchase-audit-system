@@ -53,14 +53,24 @@ export function Table<T>({
         {data.map((row, rowIndex) => (
           <div
             key={keyExtractor(row)}
-            className="rounded-2xl border border-[#ECEEF5] bg-white p-4 space-y-3 shadow-skydash"
+            className="rounded-2xl border border-[#ECEEF5] bg-white p-4 space-y-2.5 shadow-skydash"
           >
-            {columns.map((col, idx) => (
-              <div key={idx} className="flex flex-col gap-1 min-w-0">
-                <span className="text-[10px] uppercase tracking-wider text-[#6C7383] font-bold">{col.header}</span>
-                <div className="text-sm text-[#1F1F2C] break-words [&>*]:whitespace-normal">{renderCell(col, row, rowIndex)}</div>
-              </div>
-            ))}
+            {columns.map((col, idx) => {
+              const cellContent = renderCell(col, row, rowIndex);
+              return (
+                <div
+                  key={idx}
+                  className="flex items-center justify-between gap-3 min-w-0 border-b border-[#ECEEF5]/60 last:border-0 pb-2 last:pb-0"
+                >
+                  <span className="text-[10px] sm:text-[11px] uppercase tracking-wider text-[#6C7383] font-bold shrink-0">
+                    {col.header}
+                  </span>
+                  <div className="text-xs sm:text-sm text-[#1F1F2C] text-right break-words font-medium min-w-0">
+                    {cellContent}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         ))}
       </div>

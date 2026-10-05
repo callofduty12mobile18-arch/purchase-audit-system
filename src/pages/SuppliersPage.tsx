@@ -222,7 +222,7 @@ export const SuppliersPage: React.FC = () => {
             onChange={(e) => setEditingSupplier({ ...editingSupplier, gstin: e.target.value })}
             error={gstinError || undefined}
           />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Phone Number"
               value={editingSupplier.phone || ''}

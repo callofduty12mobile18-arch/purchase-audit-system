@@ -35,7 +35,7 @@ export const StatCard: React.FC<StatCardProps> = ({
   return (
     <div
       className={clsx(
-        'group relative overflow-hidden p-6 rounded-2xl border transition-all duration-300 hover:-translate-y-1',
+        'group relative overflow-hidden p-4 sm:p-5 lg:p-6 rounded-2xl border transition-all duration-300 hover:-translate-y-1',
         colorStyles[color],
         className
       )}
@@ -43,7 +43,7 @@ export const StatCard: React.FC<StatCardProps> = ({
       <div className="flex items-center justify-between gap-2">
         <span
           className={clsx(
-            'text-xs font-semibold uppercase tracking-wider',
+            'text-[11px] sm:text-xs font-semibold uppercase tracking-wider truncate',
             isColored ? 'text-white/80' : 'text-[#6C7383]'
           )}
         >
@@ -51,7 +51,7 @@ export const StatCard: React.FC<StatCardProps> = ({
         </span>
         <div
           className={clsx(
-            'p-2.5 rounded-xl transition-all duration-300 shadow-sm',
+            'p-2 sm:p-2.5 rounded-xl transition-all duration-300 shadow-sm shrink-0',
             isColored
               ? 'bg-white/15 text-white group-hover:bg-white group-hover:text-[#4B49AC]'
               : 'bg-[#F5F7FF] text-[#4B49AC] border border-[#ECEEF5] group-hover:bg-[#4B49AC] group-hover:text-white'
@@ -61,10 +61,10 @@ export const StatCard: React.FC<StatCardProps> = ({
         </div>
       </div>
 
-      <div className="mt-4">
+      <div className="mt-3 sm:mt-4">
         <div
           className={clsx(
-            'text-2xl sm:text-3xl font-bold tracking-tight font-mono',
+            'text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight font-mono truncate',
             isColored ? 'text-white' : 'text-[#1F1F2C]'
           )}
         >

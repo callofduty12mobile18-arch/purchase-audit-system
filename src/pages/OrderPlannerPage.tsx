@@ -456,42 +456,44 @@ export const OrderPlannerPage: React.FC = () => {
                         </div>
 
                         {/* Inline Controls */}
-                        <div className="flex flex-wrap sm:flex-nowrap items-center gap-3">
-                          <div className="w-28">
+                        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
+                          <div className="w-full sm:w-24">
                             <label className="text-[10px] font-bold text-[#6C7383] uppercase block mb-1">Pack Qty</label>
                             <input
                               type="number"
                               value={item.quantity}
                               onChange={(e) => handleUpdateItem(item.id, 'quantity', parseFloat(e.target.value) || 0)}
-                              className="w-full px-3 py-1.5 bg-white border border-[#D5DCED] rounded-lg text-xs font-mono font-bold text-[#1F1F2C] text-right focus:outline-none focus:border-[#4B49AC] min-h-[38px]"
+                              className="w-full px-2.5 py-1.5 bg-white border border-[#D5DCED] rounded-lg text-xs font-mono font-bold text-[#1F1F2C] text-right focus:outline-none focus:border-[#4B49AC] min-h-[38px]"
                             />
                           </div>
 
-                          <div className="w-32">
+                          <div className="w-full sm:w-28">
                             <label className="text-[10px] font-bold text-[#6C7383] uppercase block mb-1">Rate / Pack (₹)</label>
                             <input
                               type="number"
                               step="0.01"
                               value={item.estimated_rate}
                               onChange={(e) => handleUpdateItem(item.id, 'estimated_rate', parseFloat(e.target.value) || 0)}
-                              className="w-full px-3 py-1.5 bg-white border border-[#D5DCED] rounded-lg text-xs font-mono text-[#1F1F2C] font-semibold text-right focus:outline-none focus:border-[#4B49AC] min-h-[38px]"
+                              className="w-full px-2.5 py-1.5 bg-white border border-[#D5DCED] rounded-lg text-xs font-mono text-[#1F1F2C] font-semibold text-right focus:outline-none focus:border-[#4B49AC] min-h-[38px]"
                             />
                           </div>
 
-                          <div className="w-32 text-right">
+                          <div className="w-full sm:w-28 text-left sm:text-right">
                             <label className="text-[10px] font-bold text-[#6C7383] uppercase block mb-1">Total (₹)</label>
-                            <span className="font-mono font-bold text-sm text-[#4B49AC] block py-1.5">
+                            <span className="font-mono font-bold text-xs sm:text-sm text-[#4B49AC] block py-1.5 truncate">
                               ₹{item.total.toFixed(2)}
                             </span>
                           </div>
 
-                          <button
-                            onClick={() => handleRemoveItem(item.id)}
-                            className="p-2 text-[#6C7383] hover:text-[#F3797E] rounded-lg hover:bg-[#F3797E]/10 transition-colors mt-2 sm:mt-0 min-h-[44px] min-w-[44px] flex items-center justify-center"
-                            title="Remove Line"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <div className="flex items-end justify-end sm:justify-start">
+                            <button
+                              onClick={() => handleRemoveItem(item.id)}
+                              className="p-2 text-[#6C7383] hover:text-[#F3797E] rounded-lg hover:bg-[#F3797E]/10 transition-colors min-h-[38px] min-w-[38px] flex items-center justify-center"
+                              title="Remove Line"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ))}

@@ -11,7 +11,6 @@ import {
   Building2,
   DollarSign,
   Package,
-  Sparkles,
   Receipt
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
@@ -265,21 +264,21 @@ export const BillUploadWorkflow: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto pb-16">
+    <div className="space-y-5 sm:space-y-6 max-w-6xl mx-auto pb-16">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
         <div>
           <Button
             variant="ghost"
             size="sm"
             onClick={() => navigate('/purchases')}
             icon={<ArrowLeft className="w-4 h-4" />}
-            className="mb-2 text-[#6C7383] hover:text-[#4B49AC]"
+            className="mb-1 text-[#6C7383] hover:text-[#4B49AC] -ml-2"
           >
             Back to Invoices Ledger
           </Button>
           <h1 className="page-title flex items-center gap-2.5">
-            <Receipt className="w-6 h-6 text-[#4B49AC]" />
+            <Receipt className="w-5.5 h-5.5 text-[#4B49AC]" />
             New Purchase Invoice Entry
           </h1>
           <p className="page-subtitle">
@@ -287,10 +286,11 @@ export const BillUploadWorkflow: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5 self-stretch sm:self-auto">
           <Button
             variant="outline"
             onClick={() => navigate('/purchases')}
+            className="flex-1 sm:flex-none justify-center"
           >
             Cancel
           </Button>
@@ -299,27 +299,27 @@ export const BillUploadWorkflow: React.FC = () => {
             onClick={handleInitiateConfirm}
             isLoading={isSubmitting}
             icon={<CheckCircle2 className="w-4 h-4" />}
-            className="shadow-md shadow-[#4B49AC]/25"
+            className="flex-1 sm:flex-none justify-center shadow-md shadow-[#4B49AC]/25"
           >
-            Save & Confirm Invoice
+            Save & Confirm
           </Button>
         </div>
       </div>
 
       {/* Main Invoice Form */}
-      <div className="space-y-6">
+      <div className="space-y-5 sm:space-y-6">
         
         {/* Header Metadata Card */}
-        <div className="p-5 sm:p-6 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash space-y-4">
+        <div className="p-4 sm:p-5 md:p-6 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-[#ECEEF5]">
             <div className="flex items-center gap-2">
               <Building2 className="w-4.5 h-4.5 text-[#4B49AC]" />
-              <h2 className="text-sm font-bold text-[#1F1F2C] uppercase tracking-wider">Invoice Header Information</h2>
+              <h2 className="text-xs sm:text-sm font-bold text-[#1F1F2C] uppercase tracking-wider">Invoice Header Information</h2>
             </div>
             <Badge variant="purple">Bill Details</Badge>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
             <div>
               <label className="block text-xs font-semibold text-[#1F1F2C] mb-1">
                 Supplier Name <span className="text-rose-500">*</span>
@@ -332,7 +332,7 @@ export const BillUploadWorkflow: React.FC = () => {
                   placeholder="e.g. ITC LIMITED"
                   value={formData.supplier_name}
                   onChange={(e) => handleSupplierSelect(e.target.value)}
-                  className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#ECEEF5] text-xs text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC]"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#ECEEF5] text-xs sm:text-sm text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC] shadow-xs"
                 />
                 <datalist id="suppliers-datalist">
                   {suppliers.map((s) => (
@@ -349,7 +349,7 @@ export const BillUploadWorkflow: React.FC = () => {
                 placeholder="33AAAAA0000A1Z5"
                 value={formData.supplier_gstin || ''}
                 onChange={(e) => handleHeaderChange('supplier_gstin', e.target.value)}
-                className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#ECEEF5] text-xs font-mono text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC]"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#ECEEF5] text-xs sm:text-sm font-mono text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC] shadow-xs"
               />
             </div>
 
@@ -363,7 +363,7 @@ export const BillUploadWorkflow: React.FC = () => {
                 placeholder="e.g. INV-2026-081"
                 value={formData.invoice_number}
                 onChange={(e) => handleHeaderChange('invoice_number', e.target.value)}
-                className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#ECEEF5] text-xs font-mono font-bold text-[#4B49AC] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC]"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#ECEEF5] text-xs sm:text-sm font-mono font-bold text-[#4B49AC] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC] shadow-xs"
               />
             </div>
 
@@ -376,7 +376,7 @@ export const BillUploadWorkflow: React.FC = () => {
                 required
                 value={formData.invoice_date}
                 onChange={(e) => handleHeaderChange('invoice_date', e.target.value)}
-                className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#ECEEF5] text-xs font-mono text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC]"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#ECEEF5] text-xs sm:text-sm font-mono text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC] shadow-xs"
               />
             </div>
 
@@ -385,7 +385,7 @@ export const BillUploadWorkflow: React.FC = () => {
               <select
                 value={formData.payment_mode}
                 onChange={(e) => handleHeaderChange('payment_mode', e.target.value)}
-                className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#ECEEF5] text-xs text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC]"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#ECEEF5] text-xs sm:text-sm text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC] shadow-xs"
               >
                 <option value="BANK_TRANSFER">Bank Transfer (NEFT/RTGS)</option>
                 <option value="UPI">UPI</option>
@@ -400,7 +400,7 @@ export const BillUploadWorkflow: React.FC = () => {
               <select
                 value={formData.payment_status}
                 onChange={(e) => handleHeaderChange('payment_status', e.target.value)}
-                className="w-full px-3.5 py-2 rounded-xl bg-white border border-[#ECEEF5] text-xs text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC]"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#ECEEF5] text-xs sm:text-sm text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC] shadow-xs"
               >
                 <option value="PAID">Paid</option>
                 <option value="UNPAID">Unpaid</option>
@@ -410,16 +410,16 @@ export const BillUploadWorkflow: React.FC = () => {
           </div>
         </div>
 
-        {/* Line Items Table Card */}
-        <div className="p-5 sm:p-6 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[#ECEEF5]">
+        {/* Line Items Card */}
+        <div className="p-4 sm:p-5 md:p-6 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 border-b border-[#ECEEF5]">
             <div>
-              <h3 className="text-sm font-bold text-[#1F1F2C] uppercase tracking-wider flex items-center gap-2">
+              <h3 className="text-xs sm:text-sm font-bold text-[#1F1F2C] uppercase tracking-wider flex items-center gap-2">
                 <Package className="w-4 h-4 text-[#4B49AC]" />
                 Line Items ({formData.items.length})
               </h3>
-              <p className="text-[11px] text-[#6C7383]">
-                Unit price per pack is auto-calculated from <code>Bill Total / Packs</code>.
+              <p className="text-[11px] text-[#6C7383] mt-0.5">
+                Rate per pack is automatically derived: <code>Bill Total ÷ Packs</code>.
               </p>
             </div>
             <Button
@@ -427,12 +427,102 @@ export const BillUploadWorkflow: React.FC = () => {
               size="sm"
               onClick={handleAddItem}
               icon={<Plus className="w-3.5 h-3.5" />}
+              className="self-start sm:self-auto"
             >
               Add Line Item
             </Button>
           </div>
 
-          <div className="overflow-x-auto">
+          {/* MOBILE CARDS VIEW (< 768px) */}
+          <div className="md:hidden space-y-3.5">
+            {formData.items.map((item, idx) => (
+              <div key={idx} className="p-4 rounded-xl bg-[#F8F9FE] border border-[#ECEEF5] space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-full bg-[#4B49AC] text-white font-mono font-bold text-xs flex items-center justify-center">
+                      {idx + 1}
+                    </span>
+                    <span className="text-xs font-bold text-[#1F1F2C]">Item #{idx + 1}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveItem(idx)}
+                    disabled={formData.items.length <= 1}
+                    className="p-1.5 text-[#8F93A0] hover:text-rose-600 disabled:opacity-30 rounded-lg hover:bg-rose-50"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-[#1F1F2C] mb-1">Item Description *</label>
+                  <input
+                    list={`mobile-products-${idx}`}
+                    type="text"
+                    placeholder="e.g. CI Ice Burst 10M"
+                    value={item.supplier_item_name || item.item_name || ''}
+                    onChange={(e) => handleItemChange(idx, 'supplier_item_name', e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg bg-white border border-[#ECEEF5] text-xs font-medium text-[#1F1F2C] focus:outline-none focus:ring-1 focus:ring-[#4B49AC]"
+                  />
+                  <datalist id={`mobile-products-${idx}`}>
+                    {products.map((p) => (
+                      <option key={p.id} value={p.supplier_item_name}>{p.nickname}</option>
+                    ))}
+                  </datalist>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-[10px] font-semibold text-[#6C7383] uppercase mb-1">Pack Qty *</label>
+                    <input
+                      type="number"
+                      min="1"
+                      placeholder="1"
+                      value={item.pack_qty || ''}
+                      onChange={(e) => handleItemChange(idx, 'pack_qty', e.target.value)}
+                      className="w-full px-2.5 py-1.5 text-right rounded-lg bg-white border border-[#ECEEF5] text-xs font-mono font-bold text-[#1F1F2C] focus:outline-none focus:ring-1 focus:ring-[#4B49AC]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-semibold text-[#6C7383] uppercase mb-1">MRP (₹)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={item.mrp_rsp || ''}
+                      onChange={(e) => handleItemChange(idx, 'mrp_rsp', e.target.value)}
+                      className="w-full px-2.5 py-1.5 text-right rounded-lg bg-white border border-[#ECEEF5] text-xs font-mono text-[#1F1F2C] focus:outline-none focus:ring-1 focus:ring-[#4B49AC]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-semibold text-[#6C7383] uppercase mb-1">Bill Amount (₹) *</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={item.invoice_amount || item.total || ''}
+                      onChange={(e) => handleItemChange(idx, 'invoice_amount', e.target.value)}
+                      className="w-full px-2.5 py-1.5 text-right rounded-lg bg-white border border-[#ECEEF5] text-xs font-mono font-bold text-[#4B49AC] focus:outline-none focus:ring-1 focus:ring-[#4B49AC]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-semibold text-[#6C7383] uppercase mb-1">Each Pack Rate</label>
+                    <div className="px-2.5 py-1.5 bg-white border border-[#ECEEF5] rounded-lg text-right font-mono font-bold text-xs text-[#1F1F2C]">
+                      ₹{item.each_pack_rate?.toFixed(2) || '0.00'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* DESKTOP / TABLET TABLE VIEW (>= 768px) */}
+          <div className="hidden md:block overflow-x-auto rounded-xl border border-[#ECEEF5]">
             <table className="w-full text-left text-xs border-collapse min-w-[700px]">
               <thead>
                 <tr className="bg-[#F5F7FF] text-[#6C7383] uppercase text-[10px] font-bold border-b border-[#ECEEF5]">
@@ -454,14 +544,14 @@ export const BillUploadWorkflow: React.FC = () => {
                     </td>
                     <td className="py-2 px-3">
                       <input
-                        list={`products-datalist-${idx}`}
+                        list={`desktop-products-${idx}`}
                         type="text"
                         placeholder="e.g. CI Ice Burst 10M"
                         value={item.supplier_item_name || item.item_name || ''}
                         onChange={(e) => handleItemChange(idx, 'supplier_item_name', e.target.value)}
                         className="w-full px-2.5 py-1.5 rounded-lg bg-[#F5F7FF] border border-[#ECEEF5] text-xs font-medium text-[#1F1F2C] focus:outline-none focus:ring-1 focus:ring-[#4B49AC]"
                       />
-                      <datalist id={`products-datalist-${idx}`}>
+                      <datalist id={`desktop-products-${idx}`}>
                         {products.map((p) => (
                           <option key={p.id} value={p.supplier_item_name}>
                             {p.nickname}
@@ -542,23 +632,23 @@ export const BillUploadWorkflow: React.FC = () => {
         </div>
 
         {/* Financial Totals & Balance Summary */}
-        <div className="p-5 sm:p-6 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash space-y-4">
-          <h3 className="text-sm font-bold text-[#1F1F2C] uppercase tracking-wider pb-3 border-b border-[#ECEEF5] flex items-center gap-2">
+        <div className="p-4 sm:p-5 md:p-6 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash space-y-4">
+          <h3 className="text-xs sm:text-sm font-bold text-[#1F1F2C] uppercase tracking-wider pb-3 border-b border-[#ECEEF5] flex items-center gap-2">
             <DollarSign className="w-4 h-4 text-[#4B49AC]" />
             Tax & Grand Total Summary
           </h3>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 text-xs">
             <div className="p-3.5 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5]">
               <span className="text-[#6C7383] block text-[11px] font-semibold">Taxable Subtotal</span>
-              <span className="font-mono text-base font-bold text-[#1F1F2C] mt-1 block">
+              <span className="font-mono text-sm sm:text-base font-bold text-[#1F1F2C] mt-1 block truncate">
                 ₹{formData.subtotal.toFixed(2)}
               </span>
             </div>
 
             <div className="p-3.5 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5]">
-              <span className="text-[#6C7383] block text-[11px] font-semibold">Total GST (CGST+SGST)</span>
-              <span className="font-mono text-base font-bold text-[#7DA0FA] mt-1 block">
+              <span className="text-[#6C7383] block text-[11px] font-semibold">GST Tax</span>
+              <span className="font-mono text-sm sm:text-base font-bold text-[#7DA0FA] mt-1 block truncate">
                 ₹{formData.total_tax.toFixed(2)}
               </span>
             </div>
@@ -574,9 +664,9 @@ export const BillUploadWorkflow: React.FC = () => {
               />
             </div>
 
-            <div className="p-3.5 rounded-xl bg-[#4B49AC]/10 border border-[#4B49AC]/30">
+            <div className="p-3.5 rounded-xl bg-[#4B49AC]/10 border border-[#4B49AC]/30 col-span-2 sm:col-span-1">
               <span className="text-[#4B49AC] block text-[11px] font-bold uppercase tracking-wider">Grand Total</span>
-              <span className="font-mono text-lg font-bold text-[#4B49AC] mt-1 block">
+              <span className="font-mono text-base sm:text-lg font-bold text-[#4B49AC] mt-1 block truncate">
                 ₹{formData.grand_total.toFixed(2)}
               </span>
             </div>
@@ -591,10 +681,11 @@ export const BillUploadWorkflow: React.FC = () => {
             </div>
           )}
 
-          <div className="pt-2 flex justify-end gap-3">
+          <div className="pt-2 flex flex-col sm:flex-row justify-end gap-2.5 sm:gap-3">
             <Button
               variant="outline"
               onClick={() => navigate('/purchases')}
+              className="w-full sm:w-auto justify-center"
             >
               Cancel
             </Button>
@@ -603,7 +694,7 @@ export const BillUploadWorkflow: React.FC = () => {
               onClick={handleInitiateConfirm}
               isLoading={isSubmitting}
               icon={<CheckCircle2 className="w-4 h-4" />}
-              className="px-6 shadow-md shadow-[#4B49AC]/25"
+              className="w-full sm:w-auto justify-center px-6 shadow-md shadow-[#4B49AC]/25"
             >
               Save & Confirm Purchase Invoice
             </Button>
@@ -637,8 +728,8 @@ export const BillUploadWorkflow: React.FC = () => {
             </div>
           )}
 
-          <div className="flex justify-end gap-3 pt-3">
-            <Button variant="outline" size="sm" onClick={() => setShowDuplicateModal(false)}>
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 pt-3">
+            <Button variant="outline" size="sm" onClick={() => setShowDuplicateModal(false)} className="w-full sm:w-auto justify-center">
               Cancel & Review
             </Button>
             <Button
@@ -646,6 +737,7 @@ export const BillUploadWorkflow: React.FC = () => {
               size="sm"
               onClick={executeSave}
               isLoading={isSubmitting}
+              className="w-full sm:w-auto justify-center"
             >
               Proceed & Save Anyway
             </Button>

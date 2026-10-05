@@ -226,7 +226,7 @@ export const ProductsPage: React.FC = () => {
             helperText="Exact string written on purchase bills (e.g. 'GFK RED NBUNDLE')"
           />
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="HSN Code"
               value={editingProduct.hsn || ''}
@@ -239,7 +239,7 @@ export const ProductsPage: React.FC = () => {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Current Purchase Ref Price (₹)"
               type="number"
@@ -276,7 +276,7 @@ export const ProductsPage: React.FC = () => {
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="SKU"
               value={editingProduct.sku || ''}

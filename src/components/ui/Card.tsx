@@ -17,7 +17,7 @@ export const Card: React.FC<CardProps> = ({
   action,
 }) => {
   return (
-    <div className={clsx('bg-white border border-[#ECEEF5] shadow-skydash rounded-2xl p-6 transition-all duration-200', className)}>
+    <div className={clsx('bg-white border border-[#ECEEF5] shadow-skydash rounded-2xl p-4 sm:p-5 md:p-6 transition-all duration-200', className)}>
       {(title || action) && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-5 border-b border-[#ECEEF5]">
           <div className="min-w-0">
