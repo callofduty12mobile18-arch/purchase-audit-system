@@ -109,7 +109,7 @@ const ToastContainer: React.FC<{
   return (
     <div
       aria-live="polite"
-      className="no-print fixed bottom-5 right-5 z-50 flex flex-col gap-2.5 max-w-sm w-full pointer-events-none px-4 sm:px-0"
+      className="no-print fixed top-4 sm:top-auto sm:bottom-6 right-4 sm:right-6 left-4 sm:left-auto z-[99999] flex flex-col gap-2.5 max-w-md sm:max-w-sm w-auto pointer-events-none"
     >
       {toasts.map((toast) => {
         let borderClass = 'border-[#ECEEF5]';
@@ -117,23 +117,23 @@ const ToastContainer: React.FC<{
         let icon = <Info className="w-5 h-5 text-[#4B49AC]" />;
 
         if (toast.type === 'success') {
-          borderClass = 'border-emerald-200';
-          bgClass = 'bg-emerald-50/95';
+          borderClass = 'border-emerald-300 shadow-emerald-500/10';
+          bgClass = 'bg-white/95 text-emerald-950';
           icon = <CheckCircle2 className="w-5 h-5 text-emerald-600" />;
         } else if (toast.type === 'error') {
-          borderClass = 'border-rose-200';
-          bgClass = 'bg-rose-50/95';
+          borderClass = 'border-rose-300 shadow-rose-500/10';
+          bgClass = 'bg-white/95 text-rose-950';
           icon = <XCircle className="w-5 h-5 text-rose-600" />;
         } else if (toast.type === 'warning') {
-          borderClass = 'border-amber-200';
-          bgClass = 'bg-amber-50/95';
+          borderClass = 'border-amber-300 shadow-amber-500/10';
+          bgClass = 'bg-white/95 text-amber-950';
           icon = <AlertTriangle className="w-5 h-5 text-amber-600" />;
         }
 
         return (
           <div
             key={toast.id}
-            className={`pointer-events-auto flex items-start gap-3 p-4 rounded-2xl border shadow-xl backdrop-blur-md ${bgClass} ${borderClass} animate-in slide-in-from-bottom-5 duration-200`}
+            className={`pointer-events-auto flex items-start gap-3 p-4 rounded-2xl border shadow-2xl backdrop-blur-xl ${bgClass} ${borderClass} animate-in slide-in-from-top-4 sm:slide-in-from-bottom-5 duration-200`}
           >
             <div className="shrink-0 mt-0.5">{icon}</div>
             <div className="flex-1 min-w-0">
