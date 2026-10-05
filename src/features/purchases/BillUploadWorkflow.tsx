@@ -11,7 +11,8 @@ import {
   Building2,
   DollarSign,
   Package,
-  Receipt
+  Receipt,
+  Calendar
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
@@ -43,6 +44,16 @@ export const BillUploadWorkflow: React.FC = () => {
       ]);
       setSuppliers(fetchedSuppliers);
       setProducts(fetchedProducts);
+
+      setFormData(prev => ({
+        ...prev,
+        supplier_name: 'AYYAPPA ENTERPRISES',
+        supplier_gstin: '33AABFA2949R1Z5',
+        invoice_number: prev.invoice_number || `INV-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`,
+        payment_mode: prev.payment_mode === 'CHEQUE' ? 'CHEQUE' : 'CASH',
+        payment_status: prev.payment_status === 'CHEQUE' ? 'CHEQUE' : 'PAID',
+        cheque_date: prev.cheque_date || prev.invoice_date || new Date().toISOString().slice(0, 10)
+      }));
     } catch (err) {
       console.error('Failed to load suppliers/products:', err);
     } finally {
@@ -206,33 +217,34 @@ export const BillUploadWorkflow: React.FC = () => {
   const calculatedGrandTotal = formData.subtotal + formData.total_tax + formData.round_off;
   const isTotalMismatch = Math.abs(calculatedGrandTotal - formData.grand_total) > 0.05;
 
-  // Duplicate Inspection & Confirmation
+  // Confirmation & Save
   const handleInitiateConfirm = async () => {
-    if (!formData.supplier_name.trim()) {
-      alert('Please enter or select a supplier name.');
-      return;
-    }
-    if (!formData.invoice_number.trim()) {
-      alert('Please enter an invoice number.');
-      return;
-    }
     if (formData.items.length === 0) {
       alert('Please enter at least one line item.');
       return;
     }
 
+    const finalInvoiceNumber = formData.invoice_number?.trim() || `INV-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const submissionData: InvoiceFormData = {
+      ...formData,
+      supplier_name: 'AYYAPPA ENTERPRISES',
+      supplier_gstin: '33AABFA2949R1Z5',
+      invoice_number: finalInvoiceNumber,
+    };
+
     setIsSubmitting(true);
 
     try {
       const matchedSupplier = suppliers.find(
-        s => s.name.trim().toLowerCase() === formData.supplier_name.trim().toLowerCase()
+        s => s.name.trim().toLowerCase() === 'ayyappa enterprises'
       );
 
       if (matchedSupplier) {
         const duplicate = await dbService.checkDuplicateInvoice(
           matchedSupplier.id,
-          formData.invoice_number,
-          formData.invoice_date
+          finalInvoiceNumber,
+          submissionData.invoice_date
         );
         if (duplicate) {
           setExistingDuplicate(duplicate);
@@ -242,7 +254,7 @@ export const BillUploadWorkflow: React.FC = () => {
         }
       }
 
-      await executeSave();
+      await executeSave(submissionData);
     } catch (err: any) {
       console.error('Save error:', err);
       alert(err.message || 'Failed to save purchase invoice');
@@ -250,11 +262,11 @@ export const BillUploadWorkflow: React.FC = () => {
     }
   };
 
-  const executeSave = async () => {
+  const executeSave = async (overrideData?: InvoiceFormData) => {
     setIsSubmitting(true);
     setShowDuplicateModal(false);
     try {
-      const saved = await dbService.confirmAndSaveInvoice(formData);
+      const saved = await dbService.confirmAndSaveInvoice(overrideData || formData);
       navigate(`/purchases/${saved.id}`);
     } catch (err: any) {
       alert(err.message || 'Error saving invoice to database');
@@ -316,57 +328,35 @@ export const BillUploadWorkflow: React.FC = () => {
               <Building2 className="w-4.5 h-4.5 text-[#4B49AC]" />
               <h2 className="text-xs sm:text-sm font-bold text-[#1F1F2C] uppercase tracking-wider">Invoice Header Information</h2>
             </div>
-            <Badge variant="purple">Bill Details</Badge>
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Verified Supplier</span>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
+            {/* Static Supplier Name */}
             <div>
-              <label className="block text-xs font-semibold text-[#1F1F2C] mb-1">
-                Supplier Name <span className="text-rose-500">*</span>
+              <label className="block text-xs font-semibold text-[#6C7383] uppercase tracking-wider mb-1">
+                Supplier Name
               </label>
-              <div className="relative">
-                <input
-                  list="suppliers-datalist"
-                  type="text"
-                  required
-                  placeholder="e.g. ITC LIMITED"
-                  value={formData.supplier_name}
-                  onChange={(e) => handleSupplierSelect(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#ECEEF5] text-xs sm:text-sm text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC] shadow-xs"
-                />
-                <datalist id="suppliers-datalist">
-                  {suppliers.map((s) => (
-                    <option key={s.id} value={s.name} />
-                  ))}
-                </datalist>
+              <div className="w-full px-3.5 py-2.5 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5] text-xs sm:text-sm font-bold text-[#1F1F2C] flex items-center justify-between">
+                <span>AYYAPPA ENTERPRISES</span>
+                <span className="text-[10px] uppercase font-bold text-[#4B49AC] bg-white px-2 py-0.5 rounded-md border border-[#ECEEF5]">Static</span>
               </div>
             </div>
 
+            {/* Static Supplier GSTIN */}
             <div>
-              <label className="block text-xs font-semibold text-[#1F1F2C] mb-1">Supplier GSTIN</label>
-              <input
-                type="text"
-                placeholder="33AAAAA0000A1Z5"
-                value={formData.supplier_gstin || ''}
-                onChange={(e) => handleHeaderChange('supplier_gstin', e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#ECEEF5] text-xs sm:text-sm font-mono text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC] shadow-xs"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-[#1F1F2C] mb-1">
-                Invoice Number <span className="text-rose-500">*</span>
+              <label className="block text-xs font-semibold text-[#6C7383] uppercase tracking-wider mb-1">
+                Supplier GSTIN
               </label>
-              <input
-                type="text"
-                required
-                placeholder="e.g. INV-2026-081"
-                value={formData.invoice_number}
-                onChange={(e) => handleHeaderChange('invoice_number', e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#ECEEF5] text-xs sm:text-sm font-mono font-bold text-[#4B49AC] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC] shadow-xs"
-              />
+              <div className="w-full px-3.5 py-2.5 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5] text-xs sm:text-sm font-mono font-bold text-[#4B49AC]">
+                33AABFA2949R1Z5
+              </div>
             </div>
 
+            {/* Invoice Date */}
             <div>
               <label className="block text-xs font-semibold text-[#1F1F2C] mb-1">
                 Invoice Date <span className="text-rose-500">*</span>
@@ -380,33 +370,63 @@ export const BillUploadWorkflow: React.FC = () => {
               />
             </div>
 
+            {/* Payment Mode (Cash & Cheque only) */}
             <div>
               <label className="block text-xs font-semibold text-[#1F1F2C] mb-1">Payment Mode</label>
               <select
-                value={formData.payment_mode}
-                onChange={(e) => handleHeaderChange('payment_mode', e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#ECEEF5] text-xs sm:text-sm text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC] shadow-xs"
+                value={formData.payment_mode === 'CHEQUE' ? 'CHEQUE' : 'CASH'}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  handleHeaderChange('payment_mode', val);
+                  if (val === 'CHEQUE' && formData.payment_status !== 'CHEQUE') {
+                    handleHeaderChange('payment_status', 'CHEQUE');
+                  }
+                }}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#ECEEF5] text-xs sm:text-sm font-semibold text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC] shadow-xs"
               >
-                <option value="BANK_TRANSFER">Bank Transfer (NEFT/RTGS)</option>
-                <option value="UPI">UPI</option>
                 <option value="CASH">Cash</option>
-                <option value="CREDIT">Credit (Accounts Payable)</option>
                 <option value="CHEQUE">Cheque</option>
               </select>
             </div>
 
+            {/* Payment Status (Paid & Cheque only) */}
             <div>
               <label className="block text-xs font-semibold text-[#1F1F2C] mb-1">Payment Status</label>
               <select
-                value={formData.payment_status}
-                onChange={(e) => handleHeaderChange('payment_status', e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#ECEEF5] text-xs sm:text-sm text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC] shadow-xs"
+                value={formData.payment_status === 'CHEQUE' ? 'CHEQUE' : 'PAID'}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  handleHeaderChange('payment_status', val);
+                  if (val === 'CHEQUE' && formData.payment_mode !== 'CHEQUE') {
+                    handleHeaderChange('payment_mode', 'CHEQUE');
+                  }
+                }}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#ECEEF5] text-xs sm:text-sm font-semibold text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC] shadow-xs"
               >
                 <option value="PAID">Paid</option>
-                <option value="UNPAID">Unpaid</option>
-                <option value="PARTIALLY_PAID">Partially Paid</option>
+                <option value="CHEQUE">Cheque</option>
               </select>
             </div>
+
+            {/* Cheque Date Calendar Picker if Cheque is selected */}
+            {(formData.payment_status === 'CHEQUE' || formData.payment_mode === 'CHEQUE') && (
+              <div className="sm:col-span-2 lg:col-span-3 p-3.5 rounded-xl bg-[#F5F7FF] border-2 border-[#7978E9]/40 space-y-1.5 animate-in fade-in duration-200">
+                <label className="block text-xs font-bold text-[#4B49AC] flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4 text-[#7978E9]" />
+                  Cheque Clearance Date (Date Amount Will Pass) <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={formData.cheque_date || formData.invoice_date}
+                  onChange={(e) => handleHeaderChange('cheque_date', e.target.value)}
+                  className="w-full sm:w-64 px-3.5 py-2 rounded-xl bg-white border border-[#7978E9]/50 text-xs sm:text-sm font-mono text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/30 focus:border-[#4B49AC] shadow-sm"
+                />
+                <p className="text-[11px] text-[#6C7383]">
+                  Scheduled clearance date for the bank to process and pass this cheque amount.
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -735,7 +755,7 @@ export const BillUploadWorkflow: React.FC = () => {
             <Button
               variant="danger"
               size="sm"
-              onClick={executeSave}
+              onClick={() => executeSave()}
               isLoading={isSubmitting}
               className="w-full sm:w-auto justify-center"
             >

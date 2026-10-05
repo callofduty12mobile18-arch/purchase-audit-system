@@ -568,14 +568,17 @@ export const dbService = {
       });
     }
 
+    const invoiceNumber = extractedData.invoice_number?.trim() || `INV-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
+
     const newInvoice: PurchaseInvoice = {
       id: invoiceId,
       supplier_id: supplier.id,
       supplier: supplier,
-      invoice_number: extractedData.invoice_number,
+      invoice_number: invoiceNumber,
       invoice_date: extractedData.invoice_date,
-      payment_mode: extractedData.payment_mode || 'BANK_TRANSFER',
+      payment_mode: extractedData.payment_mode || 'CASH',
       payment_status: extractedData.payment_status || 'PAID',
+      cheque_date: extractedData.cheque_date,
       subtotal: extractedData.subtotal,
       taxable_amount: extractedData.taxable_amount,
       cgst: extractedData.cgst,

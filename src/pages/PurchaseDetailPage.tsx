@@ -217,8 +217,10 @@ export const PurchaseDetailPage: React.FC = () => {
                 BILLED TO (PURCHASER)
               </span>
               <h2 className="text-sm font-bold text-black">BERRY QUEQ (RAMACHANDRAN)</h2>
-              <p className="text-zinc-700 mt-0.5">Veppampattu, Chennai, Tamil Nadu</p>
               <p className="font-mono text-zinc-800 mt-0.5">Payment Status: <strong>{invoice?.payment_status} ({invoice?.payment_mode})</strong></p>
+              {invoice?.cheque_date && (
+                <p className="font-mono text-zinc-800 mt-0.5">Cheque Clearance Date: <strong>{invoice.cheque_date}</strong></p>
+              )}
             </div>
           </div>
 

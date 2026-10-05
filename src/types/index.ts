@@ -1,7 +1,7 @@
 // Core Data Types for Purchase Audit & Order Planning System
 
-export type PaymentMode = 'CASH' | 'UPI' | 'BANK_TRANSFER' | 'CREDIT' | 'CHEQUE' | 'OTHER';
-export type PaymentStatus = 'UNPAID' | 'PARTIALLY_PAID' | 'PAID';
+export type PaymentMode = 'CASH' | 'CHEQUE' | 'UPI' | 'BANK_TRANSFER' | 'CREDIT' | 'OTHER';
+export type PaymentStatus = 'PAID' | 'CHEQUE' | 'UNPAID' | 'PARTIALLY_PAID';
 export type VerificationStatus = 'DRAFT' | 'PENDING_VERIFICATION' | 'VERIFIED' | 'REJECTED';
 export type OcrStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'MANUAL';
 export type PriceType = 'PURCHASE_REF' | 'SELLING';
@@ -92,6 +92,7 @@ export interface PurchaseInvoice {
   invoice_date: string;
   payment_mode: PaymentMode;
   payment_status: PaymentStatus;
+  cheque_date?: string;
   subtotal: number;
   taxable_amount: number;
   cgst: number;
@@ -194,6 +195,7 @@ export interface InvoiceFormData {
   invoice_date: string;
   payment_mode: PaymentMode;
   payment_status: PaymentStatus;
+  cheque_date?: string;
   items: InvoiceFormItem[];
   total_items?: number;
   total_packs?: number;

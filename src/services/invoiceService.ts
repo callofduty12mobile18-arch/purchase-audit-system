@@ -24,12 +24,13 @@ export const createBlankInvoiceItem = (): InvoiceFormItem => ({
 });
 
 export const createBlankInvoice = (): InvoiceFormData => ({
-  supplier_name: '',
-  supplier_gstin: '',
-  invoice_number: '',
+  supplier_name: 'AYYAPPA ENTERPRISES',
+  supplier_gstin: '33AABFA2949R1Z5',
+  invoice_number: `INV-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`,
   invoice_date: new Date().toISOString().slice(0, 10),
-  payment_mode: 'CREDIT',
+  payment_mode: 'CASH',
   payment_status: 'PAID',
+  cheque_date: new Date().toISOString().slice(0, 10),
   subtotal: 0,
   taxable_amount: 0,
   cgst: 0,
