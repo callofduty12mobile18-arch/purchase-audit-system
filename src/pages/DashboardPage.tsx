@@ -5,6 +5,10 @@ import {
   PlusCircle,
   Receipt,
   Package,
+  Building2,
+  Calendar,
+  Printer,
+  Trash2
 } from 'lucide-react';
 import { StatCard } from '../components/ui/StatCard';
 import { Card } from '../components/ui/Card';
@@ -15,22 +19,42 @@ import { Badge } from '../components/ui/Badge';
 import { StatCardSkeleton } from '../components/ui/LoadingSkeleton';
 import { ErrorState } from '../components/ui/ErrorState';
 import { Modal } from '../components/ui/Modal';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { PurchaseInvoice, Product, PurchaseItem } from '../types';
 import { dbService } from '../services/dbService';
-import { Building2, Calendar, Printer } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
+  const { success: toastSuccess, error: toastError } = useToast();
   const [invoices, setInvoices] = useState<PurchaseInvoice[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [dateFilter, setDateFilter] = useState('ALL');
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [selectedInvoice, setSelectedInvoice] = useState<PurchaseInvoice | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     loadDashboardData();
   }, []);
+
+  const handleDeleteInvoice = async () => {
+    if (!selectedInvoice) return;
+    setIsDeleting(true);
+    try {
+      await dbService.deleteInvoice(selectedInvoice.id);
+      toastSuccess('Invoice Deleted', `Invoice #${selectedInvoice.invoice_number} has been deleted.`);
+      setSelectedInvoice(null);
+      setShowDeleteConfirm(false);
+      loadDashboardData();
+    } catch (err: any) {
+      toastError('Delete Failed', err.message || 'Could not delete invoice.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const loadDashboardData = async () => {
     setLoading(true);
@@ -266,14 +290,22 @@ export const DashboardPage: React.FC = () => {
           subtitle={`Recorded Bill Details • ${selectedInvoice.invoice_date}`}
           size="xl"
           footer={
-            <div className="w-full flex items-center justify-between gap-3">
+            <div className="w-full flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
               <div className="text-xs text-[#6C7383] font-mono">
                 Invoice Total:{' '}
                 <strong className="text-base text-[#4B49AC] font-bold">
                   ₹{selectedInvoice.grand_total.toFixed(2)}
                 </strong>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center justify-end gap-2 flex-wrap">
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  icon={<Trash2 className="w-3.5 h-3.5" />}
+                >
+                  Delete
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
@@ -425,6 +457,19 @@ export const DashboardPage: React.FC = () => {
             </div>
           </div>
         </Modal>
+      )}
+
+      {showDeleteConfirm && selectedInvoice && (
+        <ConfirmDialog
+          isOpen={showDeleteConfirm}
+          onClose={() => setShowDeleteConfirm(false)}
+          onConfirm={handleDeleteInvoice}
+          title="Delete Purchase Invoice"
+          message={`Are you sure you want to delete Invoice #${selectedInvoice.invoice_number}? This will permanently delete this bill and all its associated item entries from the database.`}
+          confirmText="Yes, Delete Invoice"
+          variant="danger"
+          isLoading={isDeleting}
+        />
       )}
     </div>
   );

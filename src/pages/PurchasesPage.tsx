@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Receipt, PlusCircle, Search, Building2, Calendar, Package, DollarSign, Printer, X, Tag } from 'lucide-react';
+import { Receipt, PlusCircle, Search, Building2, Calendar, Package, DollarSign, Printer, X, Tag, Trash2 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
 import { Table } from '../components/ui/Table';
 import { Modal } from '../components/ui/Modal';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { Pagination } from '../components/ui/Pagination';
 import { ShimmerBar } from '../components/ui/LoadingSkeleton';
 import { PurchaseInvoice, PurchaseItem } from '../types';
@@ -14,18 +15,36 @@ import { useToast } from '../context/ToastContext';
 
 export const PurchasesPage: React.FC = () => {
   const navigate = useNavigate();
-  const { error: toastError } = useToast();
+  const { success: toastSuccess, error: toastError } = useToast();
   const [invoices, setInvoices] = useState<PurchaseInvoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [selectedInvoice, setSelectedInvoice] = useState<PurchaseInvoice | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
   useEffect(() => {
     loadInvoices();
   }, []);
+
+  const handleDeleteInvoice = async () => {
+    if (!selectedInvoice) return;
+    setIsDeleting(true);
+    try {
+      await dbService.deleteInvoice(selectedInvoice.id);
+      toastSuccess('Invoice Deleted', `Invoice #${selectedInvoice.invoice_number} has been deleted.`);
+      setSelectedInvoice(null);
+      setShowDeleteConfirm(false);
+      loadInvoices();
+    } catch (err: any) {
+      toastError('Delete Failed', err.message || 'Could not delete invoice.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const loadInvoices = async () => {
     setLoading(true);
@@ -228,14 +247,22 @@ export const PurchasesPage: React.FC = () => {
           subtitle={`Recorded Bill Details • ${selectedInvoice.invoice_date}`}
           size="xl"
           footer={
-            <div className="w-full flex items-center justify-between gap-3">
+            <div className="w-full flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
               <div className="text-xs text-[#6C7383] font-mono">
                 Invoice Total:{' '}
                 <strong className="text-base text-[#4B49AC] font-bold">
                   ₹{selectedInvoice.grand_total.toFixed(2)}
                 </strong>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center justify-end gap-2 flex-wrap">
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  icon={<Trash2 className="w-3.5 h-3.5" />}
+                >
+                  Delete
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
@@ -388,6 +415,19 @@ export const PurchasesPage: React.FC = () => {
             </div>
           </div>
         </Modal>
+      )}
+
+      {showDeleteConfirm && selectedInvoice && (
+        <ConfirmDialog
+          isOpen={showDeleteConfirm}
+          onClose={() => setShowDeleteConfirm(false)}
+          onConfirm={handleDeleteInvoice}
+          title="Delete Purchase Invoice"
+          message={`Are you sure you want to delete Invoice #${selectedInvoice.invoice_number}? This will permanently delete this bill and all its associated item entries from the database.`}
+          confirmText="Yes, Delete Invoice"
+          variant="danger"
+          isLoading={isDeleting}
+        />
       )}
     </div>
   );

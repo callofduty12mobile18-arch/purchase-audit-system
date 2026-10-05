@@ -847,6 +847,48 @@ export const dbService = {
     return newInvoice;
   },
 
+  deleteInvoice: async (id: string): Promise<boolean> => {
+    // 1. Find invoice to extract metadata for audit logging
+    const invoices = await dbService.getInvoices();
+    const targetInvoice = invoices.find(inv => inv.id === id);
+
+    // 2. Remove from local storage cache
+    const updatedInvoices = invoices.filter(inv => inv.id !== id);
+    setLocalData(LOCAL_STORAGE_KEY_INVOICES, updatedInvoices);
+
+    // 3. Delete from Supabase remote database
+    try {
+      await supabase.from('purchase_items').delete().eq('purchase_invoice_id', id);
+      await supabase.from('purchase_invoice_documents').delete().eq('purchase_invoice_id', id);
+      const { error } = await supabase.from('purchase_invoices').delete().eq('id', id);
+      if (error) {
+        console.warn('Supabase delete invoice note:', error.message);
+      }
+    } catch (e) {
+      console.warn('Supabase delete invoice exception:', e);
+    }
+
+    // 4. Log Audit event for permanent invoice deletion
+    if (targetInvoice) {
+      await dbService.logAudit(
+        'INVOICE_DELETED',
+        'purchase_invoices',
+        id,
+        {
+          invoice_number: targetInvoice.invoice_number,
+          supplier_name: targetInvoice.supplier?.name,
+          grand_total: targetInvoice.grand_total,
+          item_count: targetInvoice.items?.length || 0,
+          invoice_date: targetInvoice.invoice_date
+        },
+        null,
+        `Deleted purchase invoice #${targetInvoice.invoice_number} (₹${targetInvoice.grand_total.toFixed(2)})`
+      );
+    }
+
+    return true;
+  },
+
   // --- PRICE HISTORY ---
   getPriceHistory: async (): Promise<PriceHistory[]> => {
     try {
