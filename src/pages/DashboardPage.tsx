@@ -180,8 +180,8 @@ export const DashboardPage: React.FC = () => {
           color="blue"
           title="Total Purchase Value"
           value={`₹${totalPurchaseValue.toFixed(2)}`}
-          subtitle={`${visibleInvoices.length} verified bills`}
-          change={visibleInvoices.length > 0 ? `${visibleInvoices.length} Bills` : undefined}
+          subtitle="Total procurement spend"
+          change={visibleInvoices.length > 0 ? `${visibleInvoices.length} Invoices` : undefined}
           changeType="positive"
           icon={<Receipt className="w-5 h-5" />}
         />
