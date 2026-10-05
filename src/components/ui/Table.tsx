@@ -13,6 +13,7 @@ interface TableProps<T> {
   keyExtractor: (row: T) => string;
   isLoading?: boolean;
   emptyText?: string;
+  onRowClick?: (row: T) => void;
 }
 
 export function Table<T>({
@@ -21,6 +22,7 @@ export function Table<T>({
   keyExtractor,
   isLoading = false,
   emptyText = 'No records found',
+  onRowClick,
 }: TableProps<T>) {
   const renderCell = (col: Column<T>, row: T, rowIndex: number) => {
     if (col.cell) return col.cell(row, rowIndex);
@@ -53,7 +55,10 @@ export function Table<T>({
         {data.map((row, rowIndex) => (
           <div
             key={keyExtractor(row)}
-            className="rounded-2xl border border-[#ECEEF5] bg-white p-4 space-y-2.5 shadow-skydash"
+            onClick={() => onRowClick?.(row)}
+            className={`rounded-2xl border border-[#ECEEF5] bg-white p-4 space-y-2.5 shadow-skydash ${
+              onRowClick ? 'cursor-pointer hover:border-[#4B49AC] hover:shadow-md transition-all active:scale-[0.99]' : ''
+            }`}
           >
             {columns.map((col, idx) => {
               const cellContent = renderCell(col, row, rowIndex);
@@ -90,7 +95,10 @@ export function Table<T>({
             {data.map((row, rowIndex) => (
               <tr
                 key={keyExtractor(row)}
-                className="hover:bg-[#F8F9FE] transition-colors group"
+                onClick={() => onRowClick?.(row)}
+                className={`transition-colors group ${
+                  onRowClick ? 'cursor-pointer hover:bg-[#F0F3FF]' : 'hover:bg-[#F8F9FE]'
+                }`}
               >
                 {columns.map((col, idx) => (
                   <td key={idx} className={`px-5 py-4 whitespace-nowrap ${col.className || ''}`}>
