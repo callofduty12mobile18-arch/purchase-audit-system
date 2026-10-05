@@ -311,7 +311,7 @@ export const AuditLogPage: React.FC = () => {
       </div>
 
       {/* KPI Stats Strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="p-4 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash space-y-1">
           <div className="flex items-center justify-between">
             <span className="text-xs text-[#6C7383] font-semibold">Total Audit Events</span>
@@ -332,13 +332,6 @@ export const AuditLogPage: React.FC = () => {
             <Package className="w-4 h-4 text-[#7978E9]" />
           </div>
           <p className="text-xl font-extrabold text-[#7978E9]">{productCount}</p>
-        </div>
-        <div className="p-4 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash space-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-[#6C7383] font-semibold">Supplier Records</span>
-            <Building2 className="w-4 h-4 text-amber-600" />
-          </div>
-          <p className="text-xl font-extrabold text-amber-600">{supplierCount}</p>
         </div>
       </div>
 
