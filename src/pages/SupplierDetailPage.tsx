@@ -55,28 +55,40 @@ export const SupplierDetailPage: React.FC = () => {
       cell: (row: PurchaseInvoice) => <span className="text-[#1F1F2C] font-mono">{row.invoice_date}</span>
     },
     {
-      header: 'Items',
-      cell: (row: PurchaseInvoice) => <span className="text-[#6C7383]">{row.items?.length || 0} items</span>
+      header: 'Items & Packs',
+      cell: (row: PurchaseInvoice) => {
+        const totalPacks = row.items?.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0) || 0;
+        return (
+          <div className="space-y-0.5">
+            <span className="px-2.5 py-0.5 rounded-full bg-[#F5F7FF] border border-[#D5DCED] text-[#4B49AC] font-mono text-xs font-semibold inline-block">
+              {row.items?.length || 0} items
+            </span>
+            {totalPacks > 0 && (
+              <span className="text-[11px] font-mono text-[#6C7383] block">
+                {totalPacks} packs
+              </span>
+            )}
+          </div>
+        );
+      }
     },
     {
-      header: 'Taxable (₹)',
-      cell: (row: PurchaseInvoice) => <span className="font-mono text-[#6C7383]">₹{row.taxable_amount.toFixed(2)}</span>
-    },
-    {
-      header: 'Total Tax (₹)',
-      cell: (row: PurchaseInvoice) => <span className="font-mono text-[#6C7383]">₹{row.total_tax.toFixed(2)}</span>
-    },
-    {
-      header: 'Grand Total (₹)',
-      cell: (row: PurchaseInvoice) => <span className="font-mono font-bold text-[#1F1F2C]">₹{row.grand_total.toFixed(2)}</span>
-    },
-    {
-      header: 'Status',
+      header: 'Payment Mode',
       cell: (row: PurchaseInvoice) => (
-        <Badge variant={row.verification_status === 'VERIFIED' ? 'success' : 'warning'}>
-          {row.verification_status}
+        <span className="font-mono text-xs text-[#1F1F2C] font-medium">{row.payment_mode}</span>
+      )
+    },
+    {
+      header: 'Payment Status',
+      cell: (row: PurchaseInvoice) => (
+        <Badge variant={row.payment_status === 'PAID' ? 'success' : 'warning'}>
+          {row.payment_status}
         </Badge>
       )
+    },
+    {
+      header: 'Invoice Total (₹)',
+      cell: (row: PurchaseInvoice) => <span className="font-mono font-bold text-[#4B49AC]">₹{row.grand_total.toFixed(2)}</span>
     }
   ];
 

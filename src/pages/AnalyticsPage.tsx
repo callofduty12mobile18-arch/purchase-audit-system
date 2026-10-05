@@ -180,9 +180,9 @@ export const AnalyticsPage: React.FC = () => {
         <div>
           <h1 className="page-title flex items-center gap-2.5">
             <ChartIcon className="w-6 h-6 text-[#4B49AC]" />
-            Spending & Tax Analytics
+            Spending & Purchase Analytics
           </h1>
-          <p className="page-subtitle">Audit spend velocity, tax breakdown, and product rates</p>
+          <p className="page-subtitle">Procurement spend velocity and product purchase rates</p>
         </div>
 
         <div className="w-full sm:w-60">
@@ -205,14 +205,14 @@ export const AnalyticsPage: React.FC = () => {
           color="blue"
           title="Total Purchase Spend"
           value={`₹${totalSpend.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-          subtitle="All verified invoices"
+          subtitle="All recorded invoices"
           icon={<TrendingUp className="w-5 h-5" />}
         />
         <StatCard
           color="purple"
           title="Processed Invoices"
           value={invoiceCount}
-          subtitle="Immutable audit entries"
+          subtitle="Total recorded invoices"
           icon={<ChartIcon className="w-5 h-5" />}
         />
       </div>
@@ -221,7 +221,7 @@ export const AnalyticsPage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Monthly Trend Area Chart */}
         <div className="lg:col-span-8">
-          <Card title="Monthly Purchase Velocity" subtitle="Subtotal vs Tax paid across billing cycles">
+          <Card title="Monthly Purchase Velocity" subtitle="Purchase spend trend across billing cycles">
             <div className="h-72 w-full pt-4">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={monthlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -229,10 +229,6 @@ export const AnalyticsPage: React.FC = () => {
                     <linearGradient id="totalColor" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#4B49AC" stopOpacity={0.4}/>
                       <stop offset="95%" stopColor="#4B49AC" stopOpacity={0}/>
-                    </linearGradient>
-                    <linearGradient id="taxColor" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#7DA0FA" stopOpacity={0.4}/>
-                      <stop offset="95%" stopColor="#7DA0FA" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
                   <XAxis dataKey="month" stroke="#6C7383" fontSize={12} tickLine={false} axisLine={{ stroke: '#ECEEF5' }} />
@@ -248,7 +244,6 @@ export const AnalyticsPage: React.FC = () => {
                   />
                   <Legend wrapperStyle={{ paddingTop: '10px', fontSize: '12px' }} />
                   <Area type="monotone" dataKey="total" name="Total Spend (₹)" stroke="#4B49AC" strokeWidth={2.5} fillOpacity={1} fill="url(#totalColor)" />
-                  <Area type="monotone" dataKey="tax" name="GST Tax (₹)" stroke="#7DA0FA" strokeWidth={2} fillOpacity={1} fill="url(#taxColor)" />
                 </AreaChart>
               </ResponsiveContainer>
             </div>

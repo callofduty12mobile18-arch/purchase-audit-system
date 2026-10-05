@@ -66,33 +66,41 @@ export const PurchasesPage: React.FC = () => {
       cell: (row: PurchaseInvoice) => <span className="font-mono text-[#6C7383] text-xs">{row.invoice_date}</span>
     },
     {
-      header: 'Items',
+      header: 'Items & Packs',
+      cell: (row: PurchaseInvoice) => {
+        const totalPacks = row.items?.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0) || 0;
+        return (
+          <div className="space-y-0.5">
+            <span className="px-2.5 py-0.5 rounded-full bg-[#F5F7FF] border border-[#D5DCED] text-[#4B49AC] font-mono text-xs font-semibold inline-block">
+              {row.items?.length || 0} items
+            </span>
+            {totalPacks > 0 && (
+              <span className="text-[11px] font-mono text-[#6C7383] block">
+                {totalPacks} packs
+              </span>
+            )}
+          </div>
+        );
+      }
+    },
+    {
+      header: 'Payment Mode',
       cell: (row: PurchaseInvoice) => (
-        <span className="px-2.5 py-0.5 rounded-full bg-[#F5F7FF] border border-[#D5DCED] text-[#4B49AC] font-mono text-xs font-semibold">
-          {row.items?.length || 0} items
-        </span>
+        <span className="font-mono text-xs text-[#1F1F2C] font-medium">{row.payment_mode}</span>
       )
     },
     {
-      header: 'Taxable Amount',
-      cell: (row: PurchaseInvoice) => <span className="font-mono text-[#1F1F2C]">₹{row.taxable_amount.toFixed(2)}</span>
+      header: 'Payment Status',
+      cell: (row: PurchaseInvoice) => (
+        <Badge variant={row.payment_status === 'PAID' ? 'success' : 'warning'}>
+          {row.payment_status}
+        </Badge>
+      )
     },
     {
-      header: 'GST Tax',
-      cell: (row: PurchaseInvoice) => <span className="font-mono text-[#1F1F2C] font-semibold">₹{row.total_tax.toFixed(2)}</span>
-    },
-    {
-      header: 'Grand Total',
+      header: 'Invoice Total',
       cell: (row: PurchaseInvoice) => (
         <span className="font-mono font-bold text-[#4B49AC] text-sm">₹{row.grand_total.toFixed(2)}</span>
-      )
-    },
-    {
-      header: 'Status',
-      cell: (row: PurchaseInvoice) => (
-        <Badge variant={row.verification_status === 'VERIFIED' ? 'success' : 'warning'}>
-          {row.verification_status}
-        </Badge>
       )
     },
     {
@@ -104,14 +112,17 @@ export const PurchasesPage: React.FC = () => {
           onClick={() => navigate(`/purchases/${row.id}`)}
           icon={<Eye className="w-3.5 h-3.5" />}
         >
-          Inspect
+          View
         </Button>
       )
     }
   ];
 
   const totalSpend = filteredInvoices.reduce((sum, i) => sum + i.grand_total, 0);
-  const totalTax = filteredInvoices.reduce((sum, i) => sum + i.total_tax, 0);
+  const totalPacksPurchased = filteredInvoices.reduce(
+    (sum, inv) => sum + (inv.items?.reduce((s, it) => s + (Number(it.quantity) || 0), 0) || 0),
+    0
+  );
 
   return (
     <div className="space-y-6">
@@ -123,7 +134,7 @@ export const PurchasesPage: React.FC = () => {
             Purchase Invoices Ledger
           </h1>
           <p className="page-subtitle">
-            Audited purchase invoices, attached bill documents, and itemized GST tax breakdowns.
+            Manage purchase bills, track supplier history, and view order totals.
           </p>
         </div>
         <Button
@@ -136,9 +147,9 @@ export const PurchasesPage: React.FC = () => {
       </div>
 
       {/* Summary Stats Strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 sm:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-4">
         <div className="p-5 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash">
-          <span className="text-[11px] font-bold text-[#6C7383] uppercase tracking-wider block">Filtered Invoices</span>
+          <span className="text-[11px] font-bold text-[#6C7383] uppercase tracking-wider block">Total Invoices</span>
           <span className="text-xl sm:text-2xl font-bold font-mono text-[#1F1F2C] mt-1 block">{filteredInvoices.length}</span>
         </div>
         <div className="p-5 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash">
@@ -146,14 +157,9 @@ export const PurchasesPage: React.FC = () => {
           <span className="text-xl sm:text-2xl font-bold font-mono text-[#4B49AC] mt-1 block">₹{totalSpend.toFixed(2)}</span>
         </div>
         <div className="p-5 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash">
-          <span className="text-[11px] font-bold text-[#6C7383] uppercase tracking-wider block">Total GST Input Tax</span>
-          <span className="text-xl sm:text-2xl font-bold font-mono text-[#7DA0FA] mt-1 block">₹{totalTax.toFixed(2)}</span>
-        </div>
-        <div className="p-5 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash">
-          <span className="text-[11px] font-bold text-[#6C7383] uppercase tracking-wider block">Audit State</span>
-          <span className="text-sm font-bold text-emerald-600 mt-2 block flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            100% Immutable
+          <span className="text-[11px] font-bold text-[#6C7383] uppercase tracking-wider block">Total Packs Purchased</span>
+          <span className="text-xl sm:text-2xl font-bold font-mono text-[#7978E9] mt-1 block">
+            {totalPacksPurchased}
           </span>
         </div>
       </div>
@@ -169,22 +175,6 @@ export const PurchasesPage: React.FC = () => {
               setCurrentPage(1);
             }}
             icon={<Search className="w-4 h-4" />}
-          />
-        </div>
-        <div className="w-full sm:w-64">
-          <Select
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setCurrentPage(1);
-            }}
-            options={[
-              { value: '', label: 'All Verification Statuses' },
-              { value: 'VERIFIED', label: 'Verified Only' },
-              { value: 'DRAFT', label: 'Drafts Only' },
-              { value: 'PENDING_VERIFICATION', label: 'Pending Verification' },
-              { value: 'REJECTED', label: 'Rejected' },
-            ]}
           />
         </div>
       </div>

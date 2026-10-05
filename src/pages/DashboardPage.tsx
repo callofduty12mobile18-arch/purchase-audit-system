@@ -124,10 +124,10 @@ export const DashboardPage: React.FC = () => {
       )
     },
     {
-      header: 'Status',
+      header: 'Payment Status',
       cell: (row: PurchaseInvoice) => (
-        <Badge variant={row.verification_status === 'VERIFIED' ? 'success' : 'warning'}>
-          {row.verification_status}
+        <Badge variant={row.payment_status === 'PAID' ? 'success' : 'warning'}>
+          {row.payment_status}
         </Badge>
       )
     }
@@ -143,7 +143,7 @@ export const DashboardPage: React.FC = () => {
             Executive Audit Dashboard
           </h1>
           <p className="page-subtitle">
-            Real-time procurement metrics, verified invoice tax breakdown & active price monitoring.
+            Real-time procurement metrics, purchase invoice tracking & active price monitoring.
           </p>
         </div>
 

@@ -209,6 +209,7 @@ export const OrderPlannerPage: React.FC = () => {
   const selectedSupplier = suppliers.find(s => s.id === selectedSupplierId);
   const rawTotalCost = orderItems.reduce((sum, i) => sum + i.total, 0);
   const totalAgencyLandedCost = Math.round(rawTotalCost);
+  const totalOrderPacks = orderItems.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
   const roundOffAmount = Number((totalAgencyLandedCost - rawTotalCost).toFixed(2));
   const totalTaxableSubtotal = orderItems.reduce((sum, i) => sum + i.taxable_value, 0);
   const totalGstComponent = orderItems.reduce((sum, i) => sum + i.estimated_gst, 0);
@@ -510,7 +511,7 @@ export const OrderPlannerPage: React.FC = () => {
                         Exact Amount to Have Ready for Agency
                       </h4>
                       <p className="text-xs text-white/80 mt-0.5">
-                        Taxable: ₹{totalTaxableSubtotal.toFixed(2)} • GST (40%): ₹{totalGstComponent.toFixed(2)} • Round Off: {roundOffAmount >= 0 ? `+₹${roundOffAmount.toFixed(2)}` : `-₹${Math.abs(roundOffAmount).toFixed(2)}`}
+                        Total Items: {orderItems.length} Products • Total Quantity: {totalOrderPacks} Packs
                       </p>
                     </div>
                   </div>
@@ -625,16 +626,12 @@ export const OrderPlannerPage: React.FC = () => {
 
               <div className="w-full sm:w-72 space-y-2 text-xs">
                 <div className="flex justify-between text-zinc-700">
-                  <span>Taxable Subtotal (Est.):</span>
-                  <span className="font-mono text-black">₹{totalTaxableSubtotal.toFixed(2)}</span>
+                  <span>Total Items:</span>
+                  <span className="font-mono text-black">{orderItems.length} Products</span>
                 </div>
                 <div className="flex justify-between text-zinc-700">
-                  <span>GST Tax Component (40% Est.):</span>
-                  <span className="font-mono text-black">₹{totalGstComponent.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-zinc-700">
-                  <span>Round Off Adjustment:</span>
-                  <span className="font-mono text-black">{roundOffAmount >= 0 ? `+₹${roundOffAmount.toFixed(2)}` : `-₹${Math.abs(roundOffAmount).toFixed(2)}`}</span>
+                  <span>Total Quantity:</span>
+                  <span className="font-mono text-black">{totalOrderPacks} Packs</span>
                 </div>
                 <div className="flex justify-between text-sm font-black text-black pt-2 border-t-2 border-black">
                   <span>TOTAL AMOUNT NEEDED:</span>

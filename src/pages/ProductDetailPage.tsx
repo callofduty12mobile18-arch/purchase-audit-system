@@ -67,11 +67,7 @@ export const ProductDetailPage: React.FC = () => {
       cell: (row: PurchaseItem) => <span className="font-mono font-bold text-[#4B49AC]">₹{row.purchase_rate.toFixed(2)}</span>
     },
     {
-      header: 'GST %',
-      cell: (row: PurchaseItem) => <Badge variant="purple">{row.gst_rate}%</Badge>
-    },
-    {
-      header: 'Total Paid (₹)',
+      header: 'Line Total (₹)',
       cell: (row: PurchaseItem) => <span className="font-mono font-bold text-[#1F1F2C]">₹{row.total.toFixed(2)}</span>
     }
   ];
