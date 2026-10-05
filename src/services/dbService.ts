@@ -245,8 +245,36 @@ export const DEFAULT_17_PRODUCTS: Product[] = [
     is_active: true,
     created_at: '2026-08-08T00:00:00.000Z',
     updated_at: '2026-08-08T00:00:00.000Z'
+  },
+  {
+    id: 'b0000000-0000-0000-0000-000000000018',
+    supplier_item_name: 'GOLD FLAKE FX SPECIAL 2-POD',
+    nickname: 'Gold Flake FX Special 2-Pod',
+    hsn: '24022090',
+    uom: 'PAC',
+    current_purchase_ref_price: 337.30,
+    current_selling_price: 390.00,
+    min_stock_level: 5,
+    is_active: true,
+    created_at: '2026-08-08T00:00:00.000Z',
+    updated_at: '2026-08-08T00:00:00.000Z'
+  },
+  {
+    id: 'b0000000-0000-0000-0000-000000000019',
+    supplier_item_name: 'CI CONNECT FT 20R C 390/-',
+    nickname: 'Capstan Connect FT 20R',
+    hsn: '24022090',
+    uom: 'PAC',
+    current_purchase_ref_price: 392.86,
+    current_selling_price: 390.00,
+    min_stock_level: 5,
+    is_active: true,
+    created_at: '2026-08-08T00:00:00.000Z',
+    updated_at: '2026-08-08T00:00:00.000Z'
   }
 ];
+
+export const DEFAULT_PRODUCTS = DEFAULT_17_PRODUCTS;
 
 const LOCAL_STORAGE_KEY_PRODUCTS = 'ramachandran_products_v1';
 const LOCAL_STORAGE_KEY_SUPPLIERS = 'ramachandran_suppliers_v1';
@@ -389,19 +417,41 @@ export const dbService = {
   },
 
   getProducts: async (): Promise<Product[]> => {
+    let prods: Product[] = [];
     try {
       const { data, error } = await supabase
         .from('products')
         .select('*, category:categories(*)')
         .order('nickname');
       if (!error && data && data.length > 0) {
-        setLocalData(LOCAL_STORAGE_KEY_PRODUCTS, data);
-        return data as Product[];
+        prods = data as Product[];
       }
     } catch (e) {
       console.warn('Supabase products fetch note:', e);
     }
-    return getLocalData<Product[]>(LOCAL_STORAGE_KEY_PRODUCTS, DEFAULT_17_PRODUCTS);
+
+    if (prods.length === 0) {
+      prods = getLocalData<Product[]>(LOCAL_STORAGE_KEY_PRODUCTS, DEFAULT_PRODUCTS);
+    }
+
+    // Ensure all default products exist and rates are up to date
+    const merged = [...prods];
+    DEFAULT_PRODUCTS.forEach(dp => {
+      const idx = merged.findIndex(p =>
+        p.supplier_item_name.trim().toLowerCase() === dp.supplier_item_name.trim().toLowerCase()
+      );
+      if (idx === -1) {
+        merged.push(dp);
+      } else {
+        // Update if existing had 0 or missing prices
+        if (dp.current_purchase_ref_price && !merged[idx].current_purchase_ref_price) {
+          merged[idx] = { ...merged[idx], current_purchase_ref_price: dp.current_purchase_ref_price };
+        }
+      }
+    });
+
+    setLocalData(LOCAL_STORAGE_KEY_PRODUCTS, merged);
+    return merged;
   },
 
   getProductById: async (id: string): Promise<Product | null> => {
