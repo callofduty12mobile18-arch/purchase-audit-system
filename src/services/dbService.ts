@@ -401,13 +401,28 @@ export const dbService = {
       console.warn('Supabase supplier exception:', e);
     }
 
+    const existingSupplier = current[idx];
+    const oldSupplierVal = existingSupplier ? {
+      name: existingSupplier.name,
+      gstin: existingSupplier.gstin,
+      payment_terms: existingSupplier.payment_terms,
+      phone: existingSupplier.phone
+    } : null;
+
+    const newSupplierVal = {
+      name: newRecord.name,
+      gstin: newRecord.gstin,
+      payment_terms: newRecord.payment_terms,
+      phone: newRecord.phone
+    };
+
     await dbService.logAudit(
-      supplier.id ? 'SUPPLIER_UPDATED' : 'SUPPLIER_CREATED',
+      existingSupplier ? 'SUPPLIER_UPDATED' : 'SUPPLIER_CREATED',
       'suppliers',
       newRecord.id,
-      null,
-      newRecord as unknown as Record<string, unknown>,
-      `Saved supplier master record: ${newRecord.name}`
+      oldSupplierVal,
+      newSupplierVal,
+      `Saved supplier record: ${newRecord.name} (GSTIN: ${newRecord.gstin || 'N/A'})`
     );
 
     return newRecord;
@@ -531,13 +546,37 @@ export const dbService = {
       });
     }
 
+    const oldProdVal = existing ? {
+      supplier_item_name: existing.supplier_item_name,
+      nickname: existing.nickname,
+      current_purchase_ref_price: existing.current_purchase_ref_price,
+      current_selling_price: existing.current_selling_price,
+      min_stock_level: existing.min_stock_level,
+      uom: existing.uom,
+      hsn: existing.hsn
+    } : null;
+
+    const newProdVal = {
+      supplier_item_name: savedProd.supplier_item_name,
+      nickname: savedProd.nickname,
+      current_purchase_ref_price: savedProd.current_purchase_ref_price,
+      current_selling_price: savedProd.current_selling_price,
+      min_stock_level: savedProd.min_stock_level,
+      uom: savedProd.uom,
+      hsn: savedProd.hsn
+    };
+
+    const auditReasonText = priceChangeReason
+      ? `${priceChangeReason}: ${savedProd.nickname} (Ref Rate: ₹${savedProd.current_purchase_ref_price})`
+      : `Saved product: ${savedProd.nickname} (${savedProd.supplier_item_name})`;
+
     await dbService.logAudit(
       existing ? 'PRODUCT_UPDATED' : 'PRODUCT_CREATED',
       'products',
       savedProd.id,
-      null,
-      savedProd as unknown as Record<string, unknown>,
-      priceChangeReason || `Saved product: ${savedProd.nickname}`
+      oldProdVal,
+      newProdVal,
+      auditReasonText
     );
 
     return savedProd;
@@ -852,19 +891,33 @@ export const dbService = {
 
   // --- AUDIT LOGS ---
   getAuditLogs: async (): Promise<AuditLog[]> => {
+    const local = getLocalData<AuditLog[]>(LOCAL_STORAGE_KEY_AUDIT, []);
     try {
       const { data, error } = await supabase
         .from('audit_logs')
         .select('*')
         .order('timestamp', { ascending: false });
-      if (!error && data && data.length > 0) {
-        setLocalData(LOCAL_STORAGE_KEY_AUDIT, data);
-        return data as AuditLog[];
+
+      if (!error && data) {
+        const map = new Map<string, AuditLog>();
+        data.forEach(item => map.set(item.id, item as AuditLog));
+        local.forEach(item => {
+          if (!map.has(item.id)) {
+            map.set(item.id, item);
+          }
+        });
+        const merged = Array.from(map.values()).sort(
+          (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        );
+        setLocalData(LOCAL_STORAGE_KEY_AUDIT, merged);
+        return merged;
       }
     } catch {
       // Fallback
     }
-    return getLocalData<AuditLog[]>(LOCAL_STORAGE_KEY_AUDIT, []);
+    return local.sort(
+      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
   },
 
   logAudit: async (
@@ -889,8 +942,10 @@ export const dbService = {
       timestamp: now
     };
 
-    const currentLogs = await dbService.getAuditLogs();
-    setLocalData(LOCAL_STORAGE_KEY_AUDIT, [newLog, ...currentLogs]);
+    // Synchronous local state write to prevent concurrent race conditions
+    const currentLogs = getLocalData<AuditLog[]>(LOCAL_STORAGE_KEY_AUDIT, []);
+    const updatedLogs = [newLog, ...currentLogs.filter(l => l.id !== id)];
+    setLocalData(LOCAL_STORAGE_KEY_AUDIT, updatedLogs);
 
     try {
       await supabase
