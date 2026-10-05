@@ -59,8 +59,8 @@ export const ProductDetailPage: React.FC = () => {
       )
     },
     {
-      header: 'Qty & UOM',
-      cell: (row: PurchaseItem) => <span className="text-[#1F1F2C] font-mono font-medium">{row.quantity} {row.uom_snapshot}</span>
+      header: 'Packs / Quantity',
+      cell: (row: PurchaseItem) => <span className="text-[#1F1F2C] font-mono font-medium">{row.quantity}</span>
     },
     {
       header: 'Purchase Rate (₹)',
@@ -92,7 +92,7 @@ export const ProductDetailPage: React.FC = () => {
             <div>
               <div className="flex items-center gap-3">
                 <h1 className="text-xl sm:text-2xl font-bold text-[#1F1F2C] tracking-tight">{product?.nickname}</h1>
-                <Badge variant="purple">{product?.uom}</Badge>
+                {product?.hsn && <Badge variant="purple">HSN: {product.hsn}</Badge>}
               </div>
               <p className="text-xs text-[#6C7383] font-mono mt-1">
                 Supplier Exact Item Text: "{product?.supplier_item_name}"

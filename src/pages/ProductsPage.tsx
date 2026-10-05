@@ -53,16 +53,13 @@ export const ProductsPage: React.FC = () => {
   const filteredProducts = products.filter(p =>
     p.nickname.toLowerCase().includes(search.toLowerCase()) ||
     p.supplier_item_name.toLowerCase().includes(search.toLowerCase()) ||
-    (p.sku && p.sku.toLowerCase().includes(search.toLowerCase())) ||
-    (p.barcode && p.barcode.toLowerCase().includes(search.toLowerCase()))
+    (p.hsn && p.hsn.toLowerCase().includes(search.toLowerCase()))
   );
 
   const handleOpenAdd = () => {
     setEditingProduct({
       supplier_item_name: '',
       nickname: '',
-      sku: `SKU-${Math.floor(100000 + Math.random() * 900000)}`,
-      barcode: '',
       hsn: '24022090',
       uom: 'PAC',
       current_purchase_ref_price: 0,
@@ -115,17 +112,12 @@ export const ProductsPage: React.FC = () => {
       )
     },
     {
-      header: 'HSN & SKU',
+      header: 'HSN Code',
       cell: (row: Product) => (
-        <div className="space-y-0.5 text-xs">
-          {row.hsn && <span className="font-mono text-[#1F1F2C] block font-semibold">HSN: {row.hsn}</span>}
-          {row.sku && <span className="font-mono text-[#6C7383] block text-[11px]">{row.sku}</span>}
-        </div>
+        <span className="font-mono text-[#1F1F2C] text-xs font-semibold">
+          {row.hsn || '24022090'}
+        </span>
       )
-    },
-    {
-      header: 'UOM',
-      cell: (row: Product) => <Badge variant="outline">{row.uom}</Badge>
     },
     {
       header: 'Purchase Ref Rate',
@@ -158,7 +150,7 @@ export const ProductsPage: React.FC = () => {
           </p>
         </div>
         <Button variant="primary" onClick={handleOpenAdd} icon={<Plus className="w-4 h-4" />}>
-          Add Product SKU
+          Add Product
         </Button>
       </div>
 
@@ -166,7 +158,7 @@ export const ProductsPage: React.FC = () => {
       <div className="p-4 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash flex items-center gap-3">
         <div className="w-full max-w-md">
           <Input
-            placeholder="Search by nickname, invoice item text, SKU, barcode..."
+            placeholder="Search by nickname, invoice item text, HSN code..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             icon={<Search className="w-4 h-4" />}
@@ -232,18 +224,12 @@ export const ProductsPage: React.FC = () => {
             helperText="Exact string written on purchase bills (e.g. 'CI Ice Burst 10M 10BE')"
           />
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            <Input
-              label="HSN Code"
-              value={editingProduct.hsn || ''}
-              onChange={(e) => setEditingProduct({ ...editingProduct, hsn: e.target.value })}
-            />
-            <Input
-              label="UOM (Unit of Measure)"
-              value={editingProduct.uom || 'PAC'}
-              onChange={(e) => setEditingProduct({ ...editingProduct, uom: e.target.value })}
-            />
-          </div>
+          <Input
+            label="HSN Code"
+            value={editingProduct.hsn || ''}
+            onChange={(e) => setEditingProduct({ ...editingProduct, hsn: e.target.value })}
+            placeholder="24022090"
+          />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <Input
@@ -282,19 +268,6 @@ export const ProductsPage: React.FC = () => {
               />
             </div>
           )}
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            <Input
-              label="SKU"
-              value={editingProduct.sku || ''}
-              onChange={(e) => setEditingProduct({ ...editingProduct, sku: e.target.value })}
-            />
-            <Input
-              label="Barcode / EAN"
-              value={editingProduct.barcode || ''}
-              onChange={(e) => setEditingProduct({ ...editingProduct, barcode: e.target.value })}
-            />
-          </div>
 
           <div className="pt-2 flex flex-col-reverse sm:flex-row justify-end gap-2.5 sm:gap-3">
             <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} className="w-full sm:w-auto justify-center">
