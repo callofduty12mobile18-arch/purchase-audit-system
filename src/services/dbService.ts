@@ -612,7 +612,16 @@ export const dbService = {
     // Merge remote and local invoices cleanly by unique ID
     const invMap = new Map<string, PurchaseInvoice>();
     remoteInvoices.forEach(inv => {
-      if (inv && inv.id) invMap.set(inv.id, inv);
+      if (inv && inv.id) {
+        const local = localInvoices.find(l => l.id === inv.id);
+        if ((!inv.items || inv.items.length === 0) && local?.items && local.items.length > 0) {
+          inv.items = local.items;
+        }
+        if (!inv.invoice_name && local?.invoice_name) {
+          inv.invoice_name = local.invoice_name;
+        }
+        invMap.set(inv.id, inv);
+      }
     });
 
     localInvoices.forEach(inv => {
@@ -646,6 +655,12 @@ export const dbService = {
 
       if (!error && data) {
         const freshInvoice = data as PurchaseInvoice;
+        if ((!freshInvoice.items || freshInvoice.items.length === 0) && localMatch?.items && localMatch.items.length > 0) {
+          freshInvoice.items = localMatch.items;
+        }
+        if (!freshInvoice.invoice_name && localMatch?.invoice_name) {
+          freshInvoice.invoice_name = localMatch.invoice_name;
+        }
         const updated = [freshInvoice, ...localInvoices.filter(i => i.id !== id)];
         setLocalData(LOCAL_STORAGE_KEY_INVOICES, updated);
         return freshInvoice;
@@ -821,22 +836,21 @@ export const dbService = {
         const { error: itemsErr } = await supabase
           .from('purchase_items')
           .upsert(
-            itemsToInsert.map((i, idx) => ({
+            itemsToInsert.map(i => ({
               id: i.id,
               purchase_invoice_id: invoiceId,
-              product_id: i.product_id,
+              product_id: (i.product_id && i.product_id.length === 36 && i.product_id.includes('-')) ? i.product_id : null,
               supplier_item_name_snapshot: i.supplier_item_name_snapshot,
               hsn_snapshot: i.hsn_snapshot,
               quantity: i.quantity,
-              uom_snapshot: i.uom_snapshot,
+              uom_snapshot: i.uom_snapshot || 'PAC',
               purchase_rate: i.purchase_rate,
-              gst_rate: i.gst_rate,
-              taxable_value: i.taxable_value,
-              cgst: i.cgst,
-              sgst: i.sgst,
-              igst: i.igst,
+              gst_rate: i.gst_rate || 0,
+              taxable_value: i.taxable_value || 0,
+              cgst: i.cgst || 0,
+              sgst: i.sgst || 0,
+              igst: i.igst || 0,
               total: i.total,
-              line_number: idx + 1,
               created_at: now
             }))
           );
