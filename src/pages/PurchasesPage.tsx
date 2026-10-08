@@ -104,7 +104,7 @@ export const PurchasesPage: React.FC = () => {
             <Receipt className="w-3.5 h-3.5 text-[#7DA0FA]" />
             {row.invoice_number}
           </span>
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-[#F0F3FF] text-[#4B49AC] border border-[#D5DCED]" title="Memo Name">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-[#F0F3FF] text-[#4B49AC] border border-[#D5DCED]" title="Invoice Name">
             🏷️ {row.invoice_name || 'RAMACHANDRAN'}
           </span>
         </div>

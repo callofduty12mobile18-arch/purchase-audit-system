@@ -26,12 +26,14 @@ import { dbService } from '../../services/dbService';
 import { useToast } from '../../context/ToastContext';
 import { getTodayIST, generateISTInvoiceNumber, formatISTTimestamp, formatDisplayDate } from '../../utils/dateUtils';
 
-export const MEMO_NAME_OPTIONS = [
+export const INVOICE_NAME_OPTIONS = [
   'RAMACHANDRAN',
   'ASHWIN KARTHIK',
   'BERRY QUEQ',
   'SUBIKSHA STORE'
 ] as const;
+
+export const MEMO_NAME_OPTIONS = INVOICE_NAME_OPTIONS;
 
 export const BillUploadWorkflow: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
@@ -516,7 +518,7 @@ export const BillUploadWorkflow: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5 sm:gap-4">
             {/* Invoice Number */}
             <div>
               <label className="block text-xs font-semibold text-[#1F1F2C] mb-1">
@@ -535,42 +537,26 @@ export const BillUploadWorkflow: React.FC = () => {
               />
             </div>
 
-            {/* Static Supplier Name */}
-            <div>
-              <label className="block text-xs font-semibold text-[#6C7383] uppercase tracking-wider mb-1">
-                Supplier Name
-              </label>
-              <div className="w-full px-3.5 py-2.5 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5] text-xs sm:text-sm font-bold text-[#1F1F2C] flex items-center justify-between">
-                <span>AYYAPPA ENTERPRISES</span>
-                <span className="text-[10px] uppercase font-bold text-[#4B49AC] bg-white px-2 py-0.5 rounded-md border border-[#ECEEF5]">Distributor</span>
-              </div>
-            </div>
-
-            {/* Static Supplier Agency */}
-            <div>
-              <label className="block text-xs font-semibold text-[#6C7383] uppercase tracking-wider mb-1">
-                Supplier Agency
-              </label>
-              <div className="w-full px-3.5 py-2.5 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5] text-xs sm:text-sm font-semibold text-[#1F1F2C]">
-                ITC Authorized Agency
-              </div>
-            </div>
-
-            {/* Memo Name Dropdown */}
+            {/* Invoice Name Dropdown */}
             <div>
               <label className="block text-xs font-semibold text-[#1F1F2C] mb-1">
-                Memo Name
+                Invoice Name <span className="text-rose-500">*</span>
               </label>
               <select
                 value={formData.invoice_name || 'RAMACHANDRAN'}
                 onChange={(e) => handleHeaderChange('invoice_name', e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#ECEEF5] text-xs sm:text-sm font-bold text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC] shadow-xs"
               >
-                {MEMO_NAME_OPTIONS.map(opt => (
+                {INVOICE_NAME_OPTIONS.map(opt => (
                   <option key={opt} value={opt}>
                     {opt}
                   </option>
                 ))}
+                {formData.invoice_name && !INVOICE_NAME_OPTIONS.includes(formData.invoice_name as any) && (
+                  <option value={formData.invoice_name}>
+                    {formData.invoice_name}
+                  </option>
+                )}
               </select>
             </div>
 
@@ -589,9 +575,6 @@ export const BillUploadWorkflow: React.FC = () => {
                 }}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#ECEEF5] text-xs sm:text-sm font-mono text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC] shadow-xs"
               />
-              <p className="text-[10px] text-[#6C7383] mt-0.5 font-mono">
-                Format: {formatDisplayDate(formData.invoice_date)} (DD/MM/YYYY)
-              </p>
             </div>
 
             {/* Payment Mode (Cash & Cheque only) */}
@@ -634,7 +617,7 @@ export const BillUploadWorkflow: React.FC = () => {
 
             {/* Cheque Date Calendar Picker if Cheque is selected */}
             {(formData.payment_status === 'CHEQUE' || formData.payment_mode === 'CHEQUE') && (
-              <div className="sm:col-span-2 lg:col-span-3 p-3.5 rounded-xl bg-[#F5F7FF] border-2 border-[#7978E9]/40 space-y-1.5 animate-in fade-in duration-200">
+              <div className="sm:col-span-2 md:col-span-3 lg:col-span-5 p-3.5 rounded-xl bg-[#F5F7FF] border-2 border-[#7978E9]/40 space-y-1.5 animate-in fade-in duration-200">
                 <label className="block text-xs font-bold text-[#4B49AC] flex items-center gap-1.5">
                   <Calendar className="w-4 h-4 text-[#7978E9]" />
                   Cheque Clearance Date (Date Amount Will Pass) <span className="text-rose-500">*</span>
@@ -1085,7 +1068,7 @@ export const BillUploadWorkflow: React.FC = () => {
               </div>
               {savedInvoice.invoice_name && (
                 <div className="flex justify-between pb-1.5 border-b border-[#ECEEF5]">
-                  <span className="text-[#6C7383]">Memo Name:</span>
+                  <span className="text-[#6C7383]">Invoice Name:</span>
                   <span className="font-bold text-[#4B49AC]">{savedInvoice.invoice_name}</span>
                 </div>
               )}
