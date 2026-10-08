@@ -12,7 +12,6 @@ import {
   LogOut,
   Menu,
   X,
-  Search,
   PlusCircle,
   Bell,
   Sparkles
@@ -26,7 +25,6 @@ import { ErrorBoundary } from '../components/ui/ErrorBoundary';
 export const AppLayout: React.FC = () => {
   const { profile, signOut, user } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
   const [sessionExpired, setSessionExpired] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -73,14 +71,6 @@ export const AppLayout: React.FC = () => {
     if (href === '/suppliers') return location.pathname.startsWith('/suppliers');
     if (href === '/products') return location.pathname.startsWith('/products');
     return location.pathname === href || location.pathname.startsWith(`${href}/`);
-  };
-
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      navigate(`/products?search=${encodeURIComponent(searchQuery.trim())}`);
-      setMobileMenuOpen(false);
-    }
   };
 
   return (
@@ -159,20 +149,6 @@ export const AppLayout: React.FC = () => {
             </button>
           </div>
 
-          {/* Mobile Search Form in Drawer */}
-          <div className="md:hidden p-4 border-b border-[#ECEEF5]">
-            <form onSubmit={handleSearchSubmit} className="relative">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#8F93A0]" />
-              <input
-                type="search"
-                placeholder="Quick search products..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5] text-[#1F1F2C] text-xs placeholder-[#8F93A0] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC]"
-              />
-            </form>
-          </div>
-
           {/* Navigation Items */}
           <nav className="flex-1 px-3.5 py-4 space-y-1.5 overflow-y-auto pb-[max(1rem,env(safe-area-inset-bottom))]">
             {navigation.map((item) => {
@@ -222,20 +198,11 @@ export const AppLayout: React.FC = () => {
         <div className="flex-1 flex flex-col min-w-0 min-h-0">
           {/* Desktop Top Header */}
           <header className="no-print hidden md:flex items-center justify-between px-8 py-3.5 bg-white/90 backdrop-blur-xl border-b border-[#ECEEF5] sticky top-0 z-30 shadow-xs">
-            <div className="relative w-96 max-w-full">
-              <form onSubmit={handleSearchSubmit}>
-                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8F93A0]" />
-                <input
-                  type="text"
-                  placeholder="Search supplier, invoice #, product nickname, SKU..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-12 py-2 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5] text-xs text-[#1F1F2C] placeholder-[#8F93A0] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC] transition-all"
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded text-[10px] font-mono text-[#8F93A0] border border-[#ECEEF5] bg-white pointer-events-none">
-                  ↵
-                </span>
-              </form>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span className="text-xs font-semibold text-[#6C7383]">
+                Purchase Audit & Procurement Intelligence
+              </span>
             </div>
 
             <div className="flex items-center gap-3.5">
