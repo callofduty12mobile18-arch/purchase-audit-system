@@ -158,24 +158,6 @@ export const PurchasesPage: React.FC = () => {
       cell: (row: PurchaseInvoice) => (
         <span className="font-mono font-bold text-[#4B49AC] text-sm">₹{row.grand_total.toFixed(2)}</span>
       )
-    },
-    {
-      header: 'Actions',
-      className: 'text-right',
-      cell: (row: PurchaseInvoice) => (
-        <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate(`/purchases/edit/${row.id}`)}
-            icon={<Edit3 className="w-3.5 h-3.5 text-[#4B49AC]" />}
-            className="h-8 px-2 text-[#4B49AC] hover:bg-[#F5F7FF] font-medium"
-            title="Edit Invoice"
-          >
-            Edit
-          </Button>
-        </div>
-      )
     }
   ];
 
