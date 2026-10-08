@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Receipt, PlusCircle, Search, Building2, Calendar, Package, DollarSign, Printer, X, Tag, Trash2, Edit3 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { Select } from '../components/ui/Select';
 import { Badge } from '../components/ui/Badge';
 import { Table } from '../components/ui/Table';
 import { Modal } from '../components/ui/Modal';
@@ -12,7 +13,7 @@ import { ShimmerBar } from '../components/ui/LoadingSkeleton';
 import { PurchaseInvoice, PurchaseItem } from '../types';
 import { dbService } from '../services/dbService';
 import { useToast } from '../context/ToastContext';
-import { formatDisplayDate, formatINR } from '../utils/dateUtils';
+import { formatDisplayDate, formatINR, getTodayIST } from '../utils/dateUtils';
 
 export const PurchasesPage: React.FC = () => {
   const navigate = useNavigate();
@@ -21,11 +22,75 @@ export const PurchasesPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [memoNameFilter, setMemoNameFilter] = useState('ALL');
+  const [dateFilter, setDateFilter] = useState('ALL');
+  const [customDate, setCustomDate] = useState('');
   const [selectedInvoice, setSelectedInvoice] = useState<PurchaseInvoice | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
+
+  const memoNameOptions = React.useMemo(() => {
+    const predefined = ['RAMACHANDRAN', 'ASHWIN KARTHIK', 'BERRY QUEQ', 'SUBIKSHA STORE'];
+    const fromInvoices = invoices.map(i => i.invoice_name).filter(Boolean) as string[];
+    const unique = Array.from(new Set([...predefined, ...fromInvoices]));
+    return [
+      { value: 'ALL', label: 'All Memo Names' },
+      ...unique.map(name => ({ value: name, label: `🏷️ ${name}` }))
+    ];
+  }, [invoices]);
+
+  const dateFilterOptions = [
+    { value: 'ALL', label: 'All Dates' },
+    { value: 'TODAY', label: 'Today' },
+    { value: 'THIS_WEEK', label: 'This Week' },
+    { value: 'THIS_MONTH', label: 'This Month' },
+    { value: 'LAST_MONTH', label: 'Last Month' },
+    { value: 'THIS_YEAR', label: 'This Year' },
+    { value: 'CUSTOM', label: 'Specific Date...' },
+  ];
+
+  const matchesDateFilter = (invoiceDate: string, filter: string, customDt: string) => {
+    if (filter === 'ALL') return true;
+    if (!invoiceDate) return false;
+    const invDateStr = invoiceDate.slice(0, 10);
+    const todayIST = getTodayIST();
+
+    if (filter === 'CUSTOM') {
+      return customDt ? invDateStr === customDt : true;
+    }
+    if (filter === 'TODAY') {
+      return invDateStr === todayIST;
+    }
+    if (filter === 'THIS_WEEK') {
+      const todayDate = new Date();
+      const currentDay = todayDate.getDay();
+      const weekStartDate = new Date(todayDate);
+      weekStartDate.setDate(todayDate.getDate() - currentDay);
+      const weekStartStr = getTodayIST(weekStartDate);
+      return invDateStr >= weekStartStr && invDateStr <= todayIST;
+    }
+    if (filter === 'THIS_MONTH') {
+      return invDateStr.slice(0, 7) === todayIST.slice(0, 7);
+    }
+    if (filter === 'LAST_MONTH') {
+      const today = new Date();
+      const lastMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      const lastMonthPrefix = getTodayIST(lastMonthDate).slice(0, 7);
+      return invDateStr.slice(0, 7) === lastMonthPrefix;
+    }
+    if (filter === 'THIS_YEAR') {
+      return invDateStr.slice(0, 4) === todayIST.slice(0, 4);
+    }
+    return true;
+  };
+
+  const matchesMemoName = (invName: string | undefined, filter: string) => {
+    if (filter === 'ALL') return true;
+    const effectiveName = invName || 'RAMACHANDRAN';
+    return effectiveName.toUpperCase() === filter.toUpperCase();
+  };
 
   useEffect(() => {
     loadInvoices();
@@ -83,13 +148,17 @@ export const PurchasesPage: React.FC = () => {
   };
 
   const filteredInvoices = invoices.filter(inv => {
-    const q = search.toLowerCase();
-    const matchesSearch =
+    const q = search.trim().toLowerCase();
+    const matchesSearch = !q || (
       inv.invoice_number.toLowerCase().includes(q) ||
       (inv.invoice_name && inv.invoice_name.toLowerCase().includes(q)) ||
-      (inv.supplier?.name && inv.supplier.name.toLowerCase().includes(q));
+      (inv.supplier?.name && inv.supplier.name.toLowerCase().includes(q))
+    );
 
-    return matchesSearch;
+    const matchesDate = matchesDateFilter(inv.invoice_date, dateFilter, customDate);
+    const matchesMemo = matchesMemoName(inv.invoice_name, memoNameFilter);
+
+    return matchesSearch && matchesDate && matchesMemo;
   });
 
   const totalPages = Math.ceil(filteredInvoices.length / pageSize) || 1;
@@ -212,18 +281,78 @@ export const PurchasesPage: React.FC = () => {
       </div>
 
       {/* Filters Bar */}
-      <div className="p-4 rounded-2xl bg-white border border-[#ECEEF5] flex flex-col sm:flex-row items-center gap-3.5 shadow-skydash">
-        <div className="flex-1 w-full">
+      <div className="p-4 rounded-2xl bg-white border border-[#ECEEF5] flex flex-col md:flex-row items-stretch md:items-center gap-3 shadow-skydash">
+        {/* Search Input (reduced width) */}
+        <div className="flex-1 min-w-[200px]">
           <Input
-            placeholder="Search by invoice number, memo name, or supplier..."
+            placeholder="Search invoice # or supplier..."
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
               setCurrentPage(1);
             }}
-            icon={<Search className="w-4 h-4" />}
+            icon={<Search className="w-4 h-4 text-[#8F93A0]" />}
           />
         </div>
+
+        {/* Memo Name Filter */}
+        <div className="w-full md:w-56">
+          <Select
+            value={memoNameFilter}
+            onChange={(e) => {
+              setMemoNameFilter(e.target.value);
+              setCurrentPage(1);
+            }}
+            options={memoNameOptions}
+          />
+        </div>
+
+        {/* Date Filter */}
+        <div className="w-full md:w-48">
+          <Select
+            value={dateFilter}
+            onChange={(e) => {
+              setDateFilter(e.target.value);
+              setCurrentPage(1);
+            }}
+            options={dateFilterOptions}
+          />
+        </div>
+
+        {/* Specific Date Picker if CUSTOM is selected */}
+        {dateFilter === 'CUSTOM' && (
+          <div className="w-full md:w-40 animate-in fade-in duration-200">
+            <input
+              type="date"
+              value={customDate}
+              onChange={(e) => {
+                setCustomDate(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#ECEEF5] text-xs font-mono text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC] shadow-xs cursor-pointer"
+            />
+          </div>
+        )}
+
+        {/* Clear Filters Button */}
+        {(search || memoNameFilter !== 'ALL' || dateFilter !== 'ALL' || customDate) && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setSearch('');
+              setMemoNameFilter('ALL');
+              setDateFilter('ALL');
+              setCustomDate('');
+              setCurrentPage(1);
+            }}
+            icon={<X className="w-3.5 h-3.5" />}
+            className="text-xs text-[#6C7383] hover:text-rose-600 hover:bg-rose-50 px-3 shrink-0"
+            title="Clear all filters"
+          >
+            Reset
+          </Button>
+        )}
       </div>
 
       {/* Invoices Table with Complete States */}
@@ -236,8 +365,14 @@ export const PurchasesPage: React.FC = () => {
           isLoading={loading}
           isError={fetchError}
           onRetry={loadInvoices}
-          searchQuery={search}
-          onClearSearch={() => setSearch('')}
+          searchQuery={search || (memoNameFilter !== 'ALL' ? memoNameFilter : '') || (dateFilter !== 'ALL' ? dateFilter : '')}
+          onClearSearch={() => {
+            setSearch('');
+            setMemoNameFilter('ALL');
+            setDateFilter('ALL');
+            setCustomDate('');
+            setCurrentPage(1);
+          }}
           emptyVariant="invoices"
           emptyTitle="No Purchase Invoices Recorded Yet"
           emptyText="Start logging your purchase bills to keep track of supplier procurement, item rates, and totals."
