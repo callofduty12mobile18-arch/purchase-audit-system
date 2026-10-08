@@ -301,15 +301,15 @@ export const PurchasesPage: React.FC = () => {
                   Delete
                 </Button>
                 <Button
-                  variant="secondary"
+                  variant="primary"
                   size="sm"
                   onClick={() => {
                     const invId = selectedInvoice.id;
                     setSelectedInvoice(null);
                     navigate(`/purchases/edit/${invId}`);
                   }}
-                  icon={<Edit3 className="w-3.5 h-3.5 text-[#4B49AC]" />}
-                  className="bg-[#F5F7FF] text-[#4B49AC] hover:bg-[#EBEEFF] border border-[#D5DCED] font-semibold"
+                  icon={<Edit3 className="w-3.5 h-3.5 text-white" />}
+                  className="!bg-[#5E50F9] hover:!bg-[#4d3fe6] !text-white font-bold shadow-md shadow-[#5E50F9]/25"
                 >
                   Edit Invoice
                 </Button>
@@ -321,7 +321,7 @@ export const PurchasesPage: React.FC = () => {
                 >
                   Print Invoice
                 </Button>
-                <Button variant="primary" size="sm" onClick={() => setSelectedInvoice(null)}>
+                <Button variant="outline" size="sm" onClick={() => setSelectedInvoice(null)} className="!bg-[#F5F7FF] !text-[#6C7383] hover:!bg-[#ECEEF5] border-[#D5DCED]">
                   Close
                 </Button>
               </div>
