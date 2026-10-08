@@ -24,7 +24,7 @@ import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { PurchaseInvoice, Product, PurchaseItem } from '../types';
 import { dbService } from '../services/dbService';
 import { useToast } from '../context/ToastContext';
-import { getTodayIST, formatDisplayDate } from '../utils/dateUtils';
+import { getTodayIST, formatDisplayDate, formatINR } from '../utils/dateUtils';
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -267,7 +267,7 @@ export const DashboardPage: React.FC = () => {
             <StatCard
               color="blue"
               title="Total Purchase Value"
-              value={`₹${totalPurchaseValue.toFixed(2)}`}
+              value={`₹${formatINR(totalPurchaseValue)}`}
               subtitle="Total procurement spend"
               change={visibleInvoices.length > 0 ? `${visibleInvoices.length} Invoices` : undefined}
               changeType="positive"
@@ -324,7 +324,7 @@ export const DashboardPage: React.FC = () => {
               <div className="text-xs text-[#6C7383] font-mono">
                 Invoice Total:{' '}
                 <strong className="text-base text-[#4B49AC] font-bold">
-                  ₹{selectedInvoice.grand_total.toFixed(2)}
+                  ₹{formatINR(selectedInvoice.grand_total)}
                 </strong>
               </div>
               <div className="flex items-center justify-end gap-2 flex-wrap">

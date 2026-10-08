@@ -9,7 +9,7 @@ import { CardSkeleton } from '../components/ui/LoadingSkeleton';
 import { ErrorState } from '../components/ui/ErrorState';
 import { PurchaseInvoice, PurchaseItem } from '../types';
 import { dbService } from '../services/dbService';
-import { formatDisplayDate, formatISTTimestamp } from '../utils/dateUtils';
+import { formatDisplayDate, formatISTTimestamp, formatINR } from '../utils/dateUtils';
 
 export const PurchaseDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -165,7 +165,7 @@ export const PurchaseDetailPage: React.FC = () => {
           <div className="text-left sm:text-right">
             <span className="text-xs text-[#6C7383] uppercase font-bold tracking-wider block">Grand Total</span>
             <span className="text-2xl sm:text-3xl font-bold font-mono text-[#4B49AC]">
-              ₹{invoice.grand_total.toFixed(2)}
+              ₹{formatINR(invoice.grand_total)}
             </span>
           </div>
         </div>

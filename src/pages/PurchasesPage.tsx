@@ -12,7 +12,7 @@ import { ShimmerBar } from '../components/ui/LoadingSkeleton';
 import { PurchaseInvoice, PurchaseItem } from '../types';
 import { dbService } from '../services/dbService';
 import { useToast } from '../context/ToastContext';
-import { formatDisplayDate } from '../utils/dateUtils';
+import { formatDisplayDate, formatINR } from '../utils/dateUtils';
 
 export const PurchasesPage: React.FC = () => {
   const navigate = useNavigate();
@@ -205,7 +205,7 @@ export const PurchasesPage: React.FC = () => {
             <ShimmerBar className="h-7 w-32 mt-1" />
           ) : (
             <span className="text-xl sm:text-2xl font-bold font-mono text-[#4B49AC] mt-1 block">
-              ₹{totalSpend.toFixed(2)}
+              ₹{formatINR(totalSpend)}
             </span>
           )}
         </div>
@@ -270,7 +270,7 @@ export const PurchasesPage: React.FC = () => {
               <div className="text-xs text-[#6C7383] font-mono">
                 Invoice Total:{' '}
                 <strong className="text-base text-[#4B49AC] font-bold">
-                  ₹{selectedInvoice.grand_total.toFixed(2)}
+                  ₹{formatINR(selectedInvoice.grand_total)}
                 </strong>
               </div>
               <div className="flex items-center justify-end gap-2 flex-wrap">
@@ -338,7 +338,7 @@ export const PurchasesPage: React.FC = () => {
                     Grand Total
                   </span>
                   <span className="text-xl sm:text-2xl font-bold font-mono text-[#4B49AC]">
-                    ₹{selectedInvoice.grand_total.toFixed(2)}
+                    ₹{formatINR(selectedInvoice.grand_total)}
                   </span>
                 </div>
               </div>

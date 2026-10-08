@@ -123,4 +123,16 @@ export const formatDisplayMonthYear = (monthInput?: string | Date | null): strin
   }
 };
 
+/**
+ * Formats numeric amounts into localized Indian Rupee (INR) currency format with comma grouping:
+ * e.g. 68236.6 -> "68,236.60", 1500000 -> "15,00,000.00"
+ */
+export const formatINR = (amount: number = 0): string => {
+  const num = Number(amount) || 0;
+  return num.toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+};
+
 

@@ -9,7 +9,7 @@ import { CardSkeleton } from '../components/ui/LoadingSkeleton';
 import { ErrorState } from '../components/ui/ErrorState';
 import { Supplier, PurchaseInvoice } from '../types';
 import { dbService } from '../services/dbService';
-import { formatDisplayDate } from '../utils/dateUtils';
+import { formatDisplayDate, formatINR } from '../utils/dateUtils';
 
 export const SupplierDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -157,7 +157,7 @@ export const SupplierDetailPage: React.FC = () => {
           <div className="text-left sm:text-right">
             <span className="text-xs text-[#6C7383] uppercase font-bold tracking-wider block">Total Billed Spend</span>
             <span className="text-2xl font-bold font-mono text-[#4B49AC]">
-              ₹{totalSpend.toFixed(2)}
+              ₹{formatINR(totalSpend)}
             </span>
           </div>
         </div>
