@@ -828,7 +828,7 @@ export const dbService = {
       if (invErr) {
         // Fallback retry if invoice_name column is not present in remote schema
         console.warn('Supabase purchase_invoices upsert note:', invErr.message);
-        await supabase
+        const { error: retryErr } = await supabase
           .from('purchase_invoices')
           .upsert({
             id: invoiceId,
@@ -850,7 +850,13 @@ export const dbService = {
             created_at: now,
             updated_at: now
           });
-      } else {
+        if (retryErr) {
+          console.error('Supabase purchase_invoices retry error:', retryErr);
+        }
+      }
+
+      // ALWAYS insert line items to remote Supabase database
+      if (itemsToInsert.length > 0) {
         const { error: itemsErr } = await supabase
           .from('purchase_items')
           .upsert(
