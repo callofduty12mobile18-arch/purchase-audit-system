@@ -63,13 +63,16 @@ export const formatDisplayDate = (dateInput?: string | Date | null): string => {
 };
 
 /**
- * Generates an auto-increment style invoice number prefixed with the current IST date code:
- * e.g. INV-20261006-4821
+ * Generates an invoice number prefixed with the current IST date code in DDMMYYYY format:
+ * e.g. INV-08102026-0001 or INV-08102026-0042
  */
-export const generateISTInvoiceNumber = (date: Date = new Date()): string => {
-  const istDateCompact = getTodayIST(date).replace(/-/g, '');
-  const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-  return `INV-${istDateCompact}-${randomSuffix}`;
+export const generateISTInvoiceNumber = (date: Date = new Date(), sequence?: number): string => {
+  const [y, m, d] = getTodayIST(date).split('-');
+  const istDateCompact = `${d}${m}${y}`;
+  const suffix = typeof sequence === 'number'
+    ? String(sequence).padStart(4, '0')
+    : String(Math.floor(Math.random() * 10000)).padStart(4, '0');
+  return `INV-${istDateCompact}-${suffix}`;
 };
 
 /**

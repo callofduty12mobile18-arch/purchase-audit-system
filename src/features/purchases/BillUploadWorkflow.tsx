@@ -527,7 +527,7 @@ export const BillUploadWorkflow: React.FC = () => {
               <input
                 type="text"
                 required
-                placeholder="e.g. INV-20261008-1835"
+                placeholder="e.g. INV-08102026-0001"
                 value={formData.invoice_number}
                 onChange={(e) => {
                   handleHeaderChange('invoice_number', e.target.value);
