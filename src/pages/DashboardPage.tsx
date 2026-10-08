@@ -8,7 +8,8 @@ import {
   Building2,
   Calendar,
   Printer,
-  Trash2
+  Trash2,
+  Edit3
 } from 'lucide-react';
 import { StatCard } from '../components/ui/StatCard';
 import { Card } from '../components/ui/Card';
@@ -334,6 +335,19 @@ export const DashboardPage: React.FC = () => {
                   icon={<Trash2 className="w-3.5 h-3.5" />}
                 >
                   Delete
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    const invId = selectedInvoice.id;
+                    setSelectedInvoice(null);
+                    navigate(`/purchases/edit/${invId}`);
+                  }}
+                  icon={<Edit3 className="w-3.5 h-3.5 text-[#4B49AC]" />}
+                  className="bg-[#F5F7FF] text-[#4B49AC] hover:bg-[#EBEEFF] border border-[#D5DCED] font-semibold"
+                >
+                  Edit Invoice
                 </Button>
                 <Button
                   variant="outline"

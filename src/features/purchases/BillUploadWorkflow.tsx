@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   CheckCircle2,
   Trash2,
@@ -13,7 +13,9 @@ import {
   Calendar,
   Eye,
   AlertTriangle,
-  WifiOff
+  WifiOff,
+  Edit3,
+  Save
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
@@ -32,6 +34,8 @@ export const MEMO_NAME_OPTIONS = [
 ] as const;
 
 export const BillUploadWorkflow: React.FC = () => {
+  const { id } = useParams<{ id?: string }>();
+  const isEditMode = Boolean(id);
   const navigate = useNavigate();
   const { success: toastSuccess, error: toastError, warning: toastWarning } = useToast();
   const [formData, setFormData] = useState<InvoiceFormData>(createBlankInvoice());
@@ -47,7 +51,7 @@ export const BillUploadWorkflow: React.FC = () => {
 
   useEffect(() => {
     loadMetadata();
-  }, []);
+  }, [id]);
 
   const loadMetadata = async () => {
     try {
@@ -58,6 +62,61 @@ export const BillUploadWorkflow: React.FC = () => {
       ]);
       setSuppliers(fetchedSuppliers);
       setProducts(fetchedProducts);
+
+      if (id) {
+        const existingInv = await dbService.getInvoiceById(id);
+        if (existingInv) {
+          const mappedItems: InvoiceFormItem[] = (existingInv.items || []).map(item => ({
+            supplier_item_name: item.supplier_item_name_snapshot,
+            item_name: item.product?.nickname || item.supplier_item_name_snapshot,
+            product_id: item.product_id,
+            hsn: item.hsn_snapshot || '24022090',
+            uom: item.uom_snapshot || 'PAC',
+            pack_qty: Number(item.quantity) || 0,
+            qty: Number(item.quantity) || 0,
+            quantity: Number(item.quantity) || 0,
+            each_pack_rate: Number(item.purchase_rate) || 0,
+            purchase_rate: Number(item.purchase_rate) || 0,
+            mrp_rsp: item.product?.current_selling_price || Math.round((Number(item.purchase_rate) || 0) * 1.3),
+            invoice_amount: Number(item.total) || 0,
+            total: Number(item.total) || 0,
+            gst_rate: Number(item.gst_rate) || 40,
+            taxable_value: Number(item.taxable_value) || 0,
+            cgst: Number(item.cgst) || 0,
+            sgst: Number(item.sgst) || 0,
+            igst: Number(item.igst) || 0,
+            validation: { valid: true, warnings: [] }
+          }));
+
+          const baseFormData: InvoiceFormData = {
+            supplier_name: existingInv.supplier?.name || 'AYYAPPA ENTERPRISES',
+            supplier_gstin: existingInv.supplier?.gstin || '33AABFA2949R1Z5',
+            invoice_name: existingInv.invoice_name || 'RAMACHANDRAN',
+            invoice_date: existingInv.invoice_date || getTodayIST(),
+            invoice_number: existingInv.invoice_number || '',
+            payment_mode: existingInv.payment_mode || 'CASH',
+            payment_status: existingInv.payment_status || 'PAID',
+            cheque_date: existingInv.cheque_date || existingInv.invoice_date || getTodayIST(),
+            items: mappedItems.length > 0 ? mappedItems : [createBlankInvoiceItem()],
+            subtotal: existingInv.subtotal,
+            taxable_amount: existingInv.taxable_amount,
+            cgst: existingInv.cgst,
+            sgst: existingInv.sgst,
+            igst: existingInv.igst,
+            total_tax: existingInv.total_tax,
+            round_off: existingInv.round_off,
+            grand_total: existingInv.grand_total,
+          };
+
+          setFormData(baseFormData);
+          setLoadingInitial(false);
+          return;
+        } else {
+          toastError('Invoice Not Found', `Invoice record with ID "${id}" could not be found.`);
+          navigate('/purchases');
+          return;
+        }
+      }
 
       setFormData(prev => ({
         ...prev,
@@ -71,7 +130,6 @@ export const BillUploadWorkflow: React.FC = () => {
         cheque_date: prev.cheque_date || prev.invoice_date || getTodayIST()
       }));
     } catch (err: any) {
-
       console.error('Failed to load suppliers/products:', err);
       toastError('Failed to load catalog', err.message || 'Check database connection.');
     } finally {
@@ -330,7 +388,8 @@ export const BillUploadWorkflow: React.FC = () => {
         const duplicate = await dbService.checkDuplicateInvoice(
           matchedSupplier.id,
           finalInvoiceNumber,
-          submissionData.invoice_date
+          submissionData.invoice_date,
+          id
         );
         if (duplicate) {
           setExistingDuplicate(duplicate);
@@ -343,7 +402,7 @@ export const BillUploadWorkflow: React.FC = () => {
       await executeSave(submissionData);
     } catch (err: any) {
       console.error('Save error:', err);
-      toastError('Save Failed', err.message || 'Failed to save purchase invoice');
+      toastError(isEditMode ? 'Update Failed' : 'Save Failed', err.message || 'Failed to save purchase invoice');
       setIsSubmitting(false);
     }
   };
@@ -352,12 +411,15 @@ export const BillUploadWorkflow: React.FC = () => {
     setIsSubmitting(true);
     setShowDuplicateModal(false);
     try {
-      const saved = await dbService.confirmAndSaveInvoice(overrideData || formData);
+      const saved = await dbService.confirmAndSaveInvoice(overrideData || formData, undefined, id);
       setSavedInvoice(saved);
       setShowSuccessModal(true);
-      toastSuccess('Invoice Saved', `Invoice #${saved.invoice_number} successfully recorded.`);
+      toastSuccess(
+        isEditMode ? 'Invoice Updated' : 'Invoice Saved',
+        `Invoice #${saved.invoice_number} successfully ${isEditMode ? 'updated' : 'recorded'}.`
+      );
     } catch (err: any) {
-      toastError('Save Error', err.message || 'Error saving invoice to database');
+      toastError(isEditMode ? 'Update Error' : 'Save Error', err.message || 'Error saving invoice to database');
     } finally {
       setIsSubmitting(false);
     }
@@ -393,11 +455,17 @@ export const BillUploadWorkflow: React.FC = () => {
             Back to Invoices Ledger
           </Button>
           <h1 className="page-title flex items-center gap-2.5">
-            <Receipt className="w-5.5 h-5.5 text-[#4B49AC]" />
-            New Purchase Invoice Entry
+            {isEditMode ? (
+              <Edit3 className="w-5.5 h-5.5 text-[#4B49AC]" />
+            ) : (
+              <Receipt className="w-5.5 h-5.5 text-[#4B49AC]" />
+            )}
+            {isEditMode ? `Edit Purchase Invoice #${formData.invoice_number}` : 'New Purchase Invoice Entry'}
           </h1>
           <p className="page-subtitle">
-            Record supplier purchase bills, select items from catalog, and maintain inventory purchase history.
+            {isEditMode
+              ? 'Update bill line items, quantities, purchase rates, memo name, or payment details.'
+              : 'Record supplier purchase bills, select items from catalog, and maintain inventory purchase history.'}
           </p>
         </div>
 
@@ -413,10 +481,10 @@ export const BillUploadWorkflow: React.FC = () => {
             variant="primary"
             onClick={handleInitiateConfirm}
             isLoading={isSubmitting}
-            icon={<CheckCircle2 className="w-4 h-4" />}
+            icon={isEditMode ? <Save className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
             className="flex-1 sm:flex-none justify-center shadow-md shadow-[#4B49AC]/25 font-bold"
           >
-            Save this Invoice
+            {isEditMode ? 'Update Invoice' : 'Save this Invoice'}
           </Button>
         </div>
       </div>
@@ -449,6 +517,24 @@ export const BillUploadWorkflow: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
+            {/* Invoice Number */}
+            <div>
+              <label className="block text-xs font-semibold text-[#1F1F2C] mb-1">
+                Invoice Number <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. INV-20261008-1835"
+                value={formData.invoice_number}
+                onChange={(e) => {
+                  handleHeaderChange('invoice_number', e.target.value);
+                  if (formValidationErrors.length > 0) setFormValidationErrors([]);
+                }}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#ECEEF5] text-xs sm:text-sm font-mono font-bold text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC] shadow-xs"
+              />
+            </div>
+
             {/* Static Supplier Name */}
             <div>
               <label className="block text-xs font-semibold text-[#6C7383] uppercase tracking-wider mb-1">
@@ -893,10 +979,10 @@ export const BillUploadWorkflow: React.FC = () => {
               variant="primary"
               onClick={handleInitiateConfirm}
               isLoading={isSubmitting}
-              icon={<CheckCircle2 className="w-5 h-5" />}
+              icon={isEditMode ? <Save className="w-5 h-5" /> : <CheckCircle2 className="w-5 h-5" />}
               className="w-full sm:w-auto justify-center px-8 py-3 text-sm font-bold shadow-lg shadow-[#4B49AC]/30 bg-[#4B49AC] hover:bg-[#3f3da0] text-white"
             >
-              Save this Invoice
+              {isEditMode ? 'Update Invoice' : 'Save this Invoice'}
             </Button>
           </div>
         </div>
@@ -915,10 +1001,10 @@ export const BillUploadWorkflow: React.FC = () => {
           size="sm"
           onClick={handleInitiateConfirm}
           isLoading={isSubmitting}
-          icon={<CheckCircle2 className="w-4 h-4" />}
+          icon={isEditMode ? <Save className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
           className="shadow-lg shadow-[#4B49AC]/30 font-bold px-5"
         >
-          Save this Invoice
+          {isEditMode ? 'Update Invoice' : 'Save this Invoice'}
         </Button>
       </div>
 
@@ -972,7 +1058,7 @@ export const BillUploadWorkflow: React.FC = () => {
           setShowSuccessModal(false);
           if (savedInvoice) navigate(`/purchases/${savedInvoice.id}`);
         }}
-        title="Invoice Saved"
+        title={isEditMode ? 'Invoice Updated' : 'Invoice Saved'}
         size="md"
       >
         <div className="text-center py-2 space-y-4">
@@ -982,10 +1068,12 @@ export const BillUploadWorkflow: React.FC = () => {
 
           <div>
             <h3 className="text-lg font-bold text-[#1F1F2C]">
-              Invoice Saved Successfully!
+              {isEditMode ? 'Invoice Updated Successfully!' : 'Invoice Saved Successfully!'}
             </h3>
             <p className="text-xs text-[#6C7383] mt-1">
-              Purchase invoice has been recorded in your database ledger.
+              {isEditMode
+                ? 'Purchase invoice details have been updated in your database ledger.'
+                : 'Purchase invoice has been recorded in your database ledger.'}
             </p>
           </div>
 
@@ -1032,14 +1120,18 @@ export const BillUploadWorkflow: React.FC = () => {
               size="sm"
               onClick={() => {
                 setShowSuccessModal(false);
-                setSavedInvoice(null);
-                setFormData(createBlankInvoice());
-                loadMetadata();
+                if (isEditMode) {
+                  navigate('/purchases');
+                } else {
+                  setSavedInvoice(null);
+                  setFormData(createBlankInvoice());
+                  loadMetadata();
+                }
               }}
-              icon={<Plus className="w-3.5 h-3.5" />}
+              icon={isEditMode ? <ArrowLeft className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
               className="flex-1 justify-center"
             >
-              Add Another Invoice
+              {isEditMode ? 'Back to Invoices' : 'Add Another Invoice'}
             </Button>
             <Button
               variant="primary"

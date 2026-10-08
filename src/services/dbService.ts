@@ -671,9 +671,10 @@ export const dbService = {
     return localInvoices.find(inv => inv.id === id) || null;
   },
 
-  checkDuplicateInvoice: async (supplierId: string, invoiceNumber: string, invoiceDate?: string): Promise<PurchaseInvoice | null> => {
+  checkDuplicateInvoice: async (supplierId: string, invoiceNumber: string, invoiceDate?: string, excludeInvoiceId?: string): Promise<PurchaseInvoice | null> => {
     const invoices = await dbService.getInvoices();
     const dup = invoices.find(inv => {
+      if (excludeInvoiceId && inv.id === excludeInvoiceId) return false;
       const numMatch = inv.invoice_number.trim().toLowerCase() === invoiceNumber.trim().toLowerCase();
       const supMatch = inv.supplier_id === supplierId || inv.supplier?.id === supplierId;
       const dateMatch = invoiceDate ? inv.invoice_date === invoiceDate : true;
@@ -682,8 +683,18 @@ export const dbService = {
     return dup || null;
   },
 
-  confirmAndSaveInvoice: async (extractedData: InvoiceFormData, _documentPath?: string): Promise<PurchaseInvoice> => {
+  confirmAndSaveInvoice: async (extractedData: InvoiceFormData, _documentPath?: string, existingInvoiceId?: string): Promise<PurchaseInvoice> => {
     const now = new Date().toISOString();
+    const isEdit = Boolean(existingInvoiceId);
+    const invoiceId = existingInvoiceId || generateUUID();
+
+    // Fetch previous invoice if editing for audit log diff
+    let oldInvoice: PurchaseInvoice | undefined;
+    if (isEdit) {
+      const currentInvoices = await dbService.getInvoices();
+      oldInvoice = currentInvoices.find(i => i.id === invoiceId);
+    }
+
     const suppliers = await dbService.getSuppliers();
     let supplier = suppliers.find(
       s => s.name.trim().toLowerCase() === extractedData.supplier_name.trim().toLowerCase()
@@ -713,8 +724,6 @@ export const dbService = {
         console.warn('Supplier remote sync note:', e);
       }
     }
-
-    const invoiceId = generateUUID();
 
     // 1. Process and Insert Line Items & Auto-map Products
     const itemsToInsert: PurchaseItem[] = [];
@@ -757,7 +766,7 @@ export const dbService = {
       });
     }
 
-    const invoiceNumber = extractedData.invoice_number?.trim() || generateISTInvoiceNumber();
+    const invoiceNumber = extractedData.invoice_number?.trim() || (isEdit && oldInvoice ? oldInvoice.invoice_number : generateISTInvoiceNumber());
 
     const validPaymentModes = ['CASH', 'UPI', 'BANK_TRANSFER', 'CREDIT', 'CHEQUE', 'OTHER'];
     const safePaymentMode = (extractedData.payment_mode && validPaymentModes.includes(extractedData.payment_mode))
@@ -765,7 +774,7 @@ export const dbService = {
       : 'CASH';
     const safePaymentStatus = (extractedData.payment_status === 'UNPAID' || extractedData.payment_status === 'PARTIALLY_PAID')
       ? extractedData.payment_status
-      : 'PAID';
+      : (extractedData.payment_status === 'CHEQUE' ? 'CHEQUE' : 'PAID');
 
     const effectiveInvoiceName = extractedData.invoice_name?.trim() || 'RAMACHANDRAN';
 
@@ -787,10 +796,10 @@ export const dbService = {
       total_tax: extractedData.total_tax,
       round_off: extractedData.round_off,
       grand_total: extractedData.grand_total,
-      verification_status: 'VERIFIED' as const,
-      ocr_status: 'MANUAL' as const,
+      verification_status: 'VERIFIED',
+      ocr_status: (isEdit && oldInvoice ? oldInvoice.ocr_status : 'MANUAL'),
       items: itemsToInsert,
-      created_at: now,
+      created_at: oldInvoice?.created_at || now,
       updated_at: now
     };
 
@@ -801,6 +810,11 @@ export const dbService = {
 
     // Sync to Supabase in parallel
     try {
+      // If updating, delete existing items from remote table to cleanly replace with new line items
+      if (isEdit) {
+        await supabase.from('purchase_items').delete().eq('purchase_invoice_id', invoiceId);
+      }
+
       const { error: invErr } = await supabase
         .from('purchase_invoices')
         .upsert({
@@ -820,8 +834,8 @@ export const dbService = {
           round_off: extractedData.round_off,
           grand_total: extractedData.grand_total,
           verification_status: 'VERIFIED',
-          ocr_status: 'MANUAL',
-          created_at: now,
+          ocr_status: (isEdit && oldInvoice ? oldInvoice.ocr_status : 'MANUAL'),
+          created_at: oldInvoice?.created_at || now,
           updated_at: now
         });
 
@@ -846,8 +860,8 @@ export const dbService = {
             round_off: extractedData.round_off,
             grand_total: extractedData.grand_total,
             verification_status: 'VERIFIED',
-            ocr_status: 'MANUAL',
-            created_at: now,
+            ocr_status: (isEdit && oldInvoice ? oldInvoice.ocr_status : 'MANUAL'),
+            created_at: oldInvoice?.created_at || now,
             updated_at: now
           });
         if (retryErr) {
@@ -887,16 +901,31 @@ export const dbService = {
     }
 
     // Audit Log
-    await dbService.logAudit(
-      'INVOICE_CONFIRMED',
-      'purchase_invoices',
-      invoiceId,
-      null,
-      { invoice_number: newInvoice.invoice_number, grand_total: newInvoice.grand_total, item_count: itemsToInsert.length },
-      `Confirmed purchase invoice #${newInvoice.invoice_number} from ${supplier.name}`
-    );
+    if (isEdit) {
+      await dbService.logAudit(
+        'INVOICE_UPDATED',
+        'purchase_invoices',
+        invoiceId,
+        oldInvoice ? { invoice_number: oldInvoice.invoice_number, grand_total: oldInvoice.grand_total, item_count: oldInvoice.items?.length } : null,
+        { invoice_number: newInvoice.invoice_number, grand_total: newInvoice.grand_total, item_count: itemsToInsert.length },
+        `Updated purchase invoice #${newInvoice.invoice_number} from ${supplier.name}`
+      );
+    } else {
+      await dbService.logAudit(
+        'INVOICE_CONFIRMED',
+        'purchase_invoices',
+        invoiceId,
+        null,
+        { invoice_number: newInvoice.invoice_number, grand_total: newInvoice.grand_total, item_count: itemsToInsert.length },
+        `Confirmed purchase invoice #${newInvoice.invoice_number} from ${supplier.name}`
+      );
+    }
 
     return newInvoice;
+  },
+
+  updateInvoice: async (id: string, extractedData: InvoiceFormData): Promise<PurchaseInvoice> => {
+    return dbService.confirmAndSaveInvoice(extractedData, undefined, id);
   },
 
   deleteInvoice: async (id: string): Promise<boolean> => {

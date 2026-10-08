@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Receipt, ArrowLeft, Building2, Calendar, Package2 } from 'lucide-react';
+import { Receipt, ArrowLeft, Building2, Calendar, Package2, Edit3 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
@@ -127,6 +127,15 @@ export const PurchaseDetailPage: React.FC = () => {
           className="text-xs"
         >
           Back to Ledger
+        </Button>
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={() => navigate(`/purchases/edit/${invoice.id}`)}
+          icon={<Edit3 className="w-4 h-4" />}
+          className="text-xs font-semibold"
+        >
+          Edit Invoice
         </Button>
       </div>
 
