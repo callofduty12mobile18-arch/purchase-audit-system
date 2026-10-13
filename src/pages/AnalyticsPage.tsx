@@ -1,9 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { LineChart as ChartIcon, TrendingUp, Receipt, Package, Layers } from 'lucide-react';
+import { LineChart as ChartIcon, TrendingUp, Receipt, Package, Layers, BarChart3 } from 'lucide-react';
 import {
   ResponsiveContainer,
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
   AreaChart,
   Area,
+  CartesianGrid,
   PieChart,
   Pie,
   Cell,
@@ -20,12 +25,13 @@ import { StatCardSkeleton, CardSkeleton } from '../components/ui/LoadingSkeleton
 import { ErrorState } from '../components/ui/ErrorState';
 import { PurchaseInvoice, Product } from '../types';
 import { dbService } from '../services/dbService';
-import { getTodayIST, formatDisplayMonthYear } from '../utils/dateUtils';
+import { getTodayIST, formatDisplayMonthYear, formatINR } from '../utils/dateUtils';
 
 export const AnalyticsPage: React.FC = () => {
   const [invoices, setInvoices] = useState<PurchaseInvoice[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [timeFilter, setTimeFilter] = useState('ALL');
+  const [chartType, setChartType] = useState<'bar' | 'line' | 'area'>('bar');
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
@@ -144,7 +150,7 @@ export const AnalyticsPage: React.FC = () => {
     {
       header: 'Total Spend (₹)',
       cell: (row: { nickname: string; spend: number; totalPacks: number }) => (
-        <span className="font-mono text-xs font-bold text-[#4B49AC]">₹{row.spend.toFixed(2)}</span>
+        <span className="font-mono text-xs font-bold text-[#4B49AC]">₹{formatINR(row.spend)}</span>
       )
     }
   ];
@@ -202,7 +208,7 @@ export const AnalyticsPage: React.FC = () => {
             <StatCard
               color="blue"
               title="Total Billed Spend"
-              value={`₹${totalSpend.toFixed(2)}`}
+              value={`₹${formatINR(totalSpend)}`}
               subtitle="Procurement total"
               icon={<Receipt className="w-5 h-5" />}
             />
@@ -231,6 +237,49 @@ export const AnalyticsPage: React.FC = () => {
           <Card
             title="Procurement Spend Timeline"
             subtitle="Monthly billed amount distribution"
+            action={
+              <div className="flex items-center gap-1 bg-[#F5F7FF] p-1 rounded-xl border border-[#ECEEF5]">
+                <button
+                  type="button"
+                  onClick={() => setChartType('bar')}
+                  className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 ${
+                    chartType === 'bar'
+                      ? 'bg-white text-[#4B49AC] shadow-xs font-bold'
+                      : 'text-[#6C7383] hover:text-[#1F1F2C]'
+                  }`}
+                  title="Monthly Bar / Column Chart"
+                >
+                  <BarChart3 className="w-3.5 h-3.5" />
+                  <span>Bar</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChartType('line')}
+                  className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 ${
+                    chartType === 'line'
+                      ? 'bg-white text-[#4B49AC] shadow-xs font-bold'
+                      : 'text-[#6C7383] hover:text-[#1F1F2C]'
+                  }`}
+                  title="Monthly Trend Line"
+                >
+                  <TrendingUp className="w-3.5 h-3.5" />
+                  <span>Line</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChartType('area')}
+                  className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 ${
+                    chartType === 'area'
+                      ? 'bg-white text-[#4B49AC] shadow-xs font-bold'
+                      : 'text-[#6C7383] hover:text-[#1F1F2C]'
+                  }`}
+                  title="Shaded Area Distribution"
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>Area</span>
+                </button>
+              </div>
+            }
           >
             {loading ? (
               <div className="h-72 bg-[#F5F7FF] rounded-xl animate-pulse flex items-center justify-center">
@@ -243,46 +292,177 @@ export const AnalyticsPage: React.FC = () => {
             ) : (
               <div className="h-72 w-full pt-2">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={timelineData}>
-                    <defs>
-                      <linearGradient id="spendGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#4B49AC" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#4B49AC" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <XAxis
-                      dataKey="month"
-                      stroke="#8F93A0"
-                      fontSize={11}
-                      tickLine={false}
-                      tickFormatter={(m) => formatDisplayMonthYear(m)}
-                    />
-                    <YAxis
-                      stroke="#8F93A0"
-                      fontSize={11}
-                      tickLine={false}
-                      tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`}
-                    />
-                    <Tooltip
-                      labelFormatter={(label) => `Period: ${formatDisplayMonthYear(label)}`}
-                      formatter={(val: number) => [`₹${val.toFixed(2)}`, 'Total Spend']}
-                      contentStyle={{
-                        backgroundColor: '#FFFFFF',
-                        borderColor: '#ECEEF5',
-                        borderRadius: '12px',
-                        boxShadow: '0 4px 20px 0 rgba(75, 73, 172, 0.1)',
-                        fontSize: '12px',
-                      }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="spend"
-                      stroke="#4B49AC"
-                      strokeWidth={2.5}
-                      fillOpacity={1}
-                      fill="url(#spendGradient)"
-                    />
-                  </AreaChart>
+                  {chartType === 'bar' ? (
+                    <BarChart data={timelineData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="barSpendGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#4B49AC" stopOpacity={1} />
+                          <stop offset="100%" stopColor="#7978E9" stopOpacity={0.85} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ECEEF5" />
+                      <XAxis
+                        dataKey="month"
+                        stroke="#8F93A0"
+                        fontSize={11}
+                        tickLine={false}
+                        axisLine={{ stroke: '#ECEEF5' }}
+                        tickFormatter={(m) => formatDisplayMonthYear(m)}
+                      />
+                      <YAxis
+                        stroke="#8F93A0"
+                        fontSize={11}
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`}
+                      />
+                      <Tooltip
+                        content={({ active, payload, label }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload;
+                            return (
+                              <div className="bg-white border border-[#ECEEF5] rounded-xl p-3 shadow-skydash text-xs space-y-1.5 min-w-[190px]">
+                                <div className="flex items-center justify-between gap-3 border-b border-[#ECEEF5] pb-1.5">
+                                  <span className="font-bold text-[#1F1F2C] text-xs">
+                                    {formatDisplayMonthYear(label)}
+                                  </span>
+                                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-[#F0F3FF] text-[#4B49AC] border border-[#D5DCED]">
+                                    {data.invoiceCount} {data.invoiceCount === 1 ? 'bill' : 'bills'}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between gap-2 pt-0.5">
+                                  <span className="text-[#6C7383] text-[11px]">Billed Spend:</span>
+                                  <span className="font-mono font-bold text-[#4B49AC] text-xs">
+                                    ₹{formatINR(data.spend)}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                        cursor={{ fill: 'rgba(75, 73, 172, 0.05)', radius: 8 }}
+                      />
+                      <Bar
+                        dataKey="spend"
+                        fill="url(#barSpendGradient)"
+                        radius={[8, 8, 0, 0]}
+                        maxBarSize={56}
+                      />
+                    </BarChart>
+                  ) : chartType === 'line' ? (
+                    <LineChart data={timelineData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ECEEF5" />
+                      <XAxis
+                        dataKey="month"
+                        stroke="#8F93A0"
+                        fontSize={11}
+                        tickLine={false}
+                        axisLine={{ stroke: '#ECEEF5' }}
+                        tickFormatter={(m) => formatDisplayMonthYear(m)}
+                      />
+                      <YAxis
+                        stroke="#8F93A0"
+                        fontSize={11}
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`}
+                      />
+                      <Tooltip
+                        content={({ active, payload, label }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload;
+                            return (
+                              <div className="bg-white border border-[#ECEEF5] rounded-xl p-3 shadow-skydash text-xs space-y-1.5 min-w-[190px]">
+                                <div className="flex items-center justify-between gap-3 border-b border-[#ECEEF5] pb-1.5">
+                                  <span className="font-bold text-[#1F1F2C] text-xs">
+                                    {formatDisplayMonthYear(label)}
+                                  </span>
+                                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-[#F0F3FF] text-[#4B49AC] border border-[#D5DCED]">
+                                    {data.invoiceCount} {data.invoiceCount === 1 ? 'bill' : 'bills'}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between gap-2 pt-0.5">
+                                  <span className="text-[#6C7383] text-[11px]">Billed Spend:</span>
+                                  <span className="font-mono font-bold text-[#4B49AC] text-xs">
+                                    ₹{formatINR(data.spend)}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="spend"
+                        stroke="#4B49AC"
+                        strokeWidth={3}
+                        dot={{ r: 5, fill: '#4B49AC', strokeWidth: 2, stroke: '#FFFFFF' }}
+                        activeDot={{ r: 7, fill: '#4B49AC', stroke: '#FFFFFF', strokeWidth: 2 }}
+                      />
+                    </LineChart>
+                  ) : (
+                    <AreaChart data={timelineData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="spendGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#4B49AC" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="#4B49AC" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ECEEF5" />
+                      <XAxis
+                        dataKey="month"
+                        stroke="#8F93A0"
+                        fontSize={11}
+                        tickLine={false}
+                        axisLine={{ stroke: '#ECEEF5' }}
+                        tickFormatter={(m) => formatDisplayMonthYear(m)}
+                      />
+                      <YAxis
+                        stroke="#8F93A0"
+                        fontSize={11}
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`}
+                      />
+                      <Tooltip
+                        content={({ active, payload, label }) => {
+                          if (active && payload && payload.length) {
+                            const data = payload[0].payload;
+                            return (
+                              <div className="bg-white border border-[#ECEEF5] rounded-xl p-3 shadow-skydash text-xs space-y-1.5 min-w-[190px]">
+                                <div className="flex items-center justify-between gap-3 border-b border-[#ECEEF5] pb-1.5">
+                                  <span className="font-bold text-[#1F1F2C] text-xs">
+                                    {formatDisplayMonthYear(label)}
+                                  </span>
+                                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-[#F0F3FF] text-[#4B49AC] border border-[#D5DCED]">
+                                    {data.invoiceCount} {data.invoiceCount === 1 ? 'bill' : 'bills'}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between gap-2 pt-0.5">
+                                  <span className="text-[#6C7383] text-[11px]">Billed Spend:</span>
+                                  <span className="font-mono font-bold text-[#4B49AC] text-xs">
+                                    ₹{formatINR(data.spend)}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="spend"
+                        stroke="#4B49AC"
+                        strokeWidth={2.5}
+                        fillOpacity={1}
+                        fill="url(#spendGradient)"
+                      />
+                    </AreaChart>
+                  )}
                 </ResponsiveContainer>
               </div>
             )}
@@ -321,7 +501,7 @@ export const AnalyticsPage: React.FC = () => {
                     ))}
                   </Pie>
                   <Tooltip
-                    formatter={(val: number) => [`₹${val.toFixed(2)}`, 'Spend']}
+                    formatter={(val: number) => [`₹${formatINR(val)}`, 'Spend']}
                     contentStyle={{
                       backgroundColor: '#FFFFFF',
                       borderColor: '#ECEEF5',

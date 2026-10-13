@@ -8,6 +8,7 @@ import { Table } from '../components/ui/Table';
 import { Product } from '../types';
 import { dbService } from '../services/dbService';
 import { useToast } from '../context/ToastContext';
+import { formatINR } from '../utils/dateUtils';
 
 export const ProductsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -191,7 +192,7 @@ export const ProductsPage: React.FC = () => {
       header: 'Purchase Ref Rate',
       cell: (row: Product) => (
         <span className="font-mono font-bold text-[#4B49AC] text-sm">
-          ₹{row.current_purchase_ref_price.toFixed(2)}
+          ₹{formatINR(row.current_purchase_ref_price)}
         </span>
       )
     },
@@ -199,7 +200,7 @@ export const ProductsPage: React.FC = () => {
       header: 'Selling Price',
       cell: (row: Product) => (
         <span className="font-mono font-medium text-[#1F1F2C] text-sm">
-          ₹{row.current_selling_price.toFixed(2)}
+          ₹{formatINR(row.current_selling_price)}
         </span>
       )
     }

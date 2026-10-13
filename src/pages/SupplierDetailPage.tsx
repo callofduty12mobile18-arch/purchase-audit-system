@@ -112,7 +112,7 @@ export const SupplierDetailPage: React.FC = () => {
     {
       header: 'Grand Total',
       cell: (row: PurchaseInvoice) => (
-        <span className="font-mono font-bold text-[#1F1F2C] text-sm">₹{row.grand_total.toFixed(2)}</span>
+        <span className="font-mono font-bold text-[#1F1F2C] text-sm">₹{formatINR(row.grand_total)}</span>
       )
     }
   ];

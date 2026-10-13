@@ -9,7 +9,7 @@ import { CardSkeleton } from '../components/ui/LoadingSkeleton';
 import { ErrorState } from '../components/ui/ErrorState';
 import { Product, PurchaseItem, PriceHistory } from '../types';
 import { dbService } from '../services/dbService';
-import { formatISTTimestamp, formatDisplayDate } from '../utils/dateUtils';
+import { formatISTTimestamp, formatDisplayDate, formatINR } from '../utils/dateUtils';
 
 export const ProductDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -99,13 +99,13 @@ export const ProductDetailPage: React.FC = () => {
     {
       header: 'Historical Purchase Rate (₹)',
       cell: (row: PurchaseItem) => (
-        <span className="font-mono text-xs font-bold text-[#4B49AC]">₹{row.purchase_rate.toFixed(2)}</span>
+        <span className="font-mono text-xs font-bold text-[#4B49AC]">₹{formatINR(row.purchase_rate)}</span>
       )
     },
     {
       header: 'Line Total (₹)',
       cell: (row: PurchaseItem) => (
-        <span className="font-mono text-xs font-bold text-[#1F1F2C]">₹{row.total.toFixed(2)}</span>
+        <span className="font-mono text-xs font-bold text-[#1F1F2C]">₹{formatINR(row.total)}</span>
       )
     }
   ];
@@ -147,7 +147,7 @@ export const ProductDetailPage: React.FC = () => {
           <div className="text-left sm:text-right">
             <span className="text-xs text-[#6C7383] uppercase font-bold tracking-wider block">Current Reference Rate</span>
             <span className="text-2xl font-bold font-mono text-[#4B49AC]">
-              ₹{product.current_purchase_ref_price.toFixed(2)}
+              ₹{formatINR(product.current_purchase_ref_price)}
             </span>
           </div>
         </div>
@@ -159,7 +159,7 @@ export const ProductDetailPage: React.FC = () => {
           </div>
           <div className="p-3 bg-[#F5F7FF] rounded-xl border border-[#ECEEF5]">
             <span className="text-[11px] text-[#6C7383] font-bold block uppercase">Selling Price / MRP</span>
-            <span className="font-mono text-sm font-bold text-[#1F1F2C] mt-0.5 block">₹{product.current_selling_price.toFixed(2)}</span>
+            <span className="font-mono text-sm font-bold text-[#1F1F2C] mt-0.5 block">₹{formatINR(product.current_selling_price)}</span>
           </div>
           <div className="p-3 bg-[#F5F7FF] rounded-xl border border-[#ECEEF5]">
             <span className="text-[11px] text-[#6C7383] font-bold block uppercase">Total Procurement Invoices</span>
@@ -183,7 +183,7 @@ export const ProductDetailPage: React.FC = () => {
                   </div>
                   <div>
                     <span className="font-mono font-bold text-[#1F1F2C]">
-                      ₹{change.old_value.toFixed(2)} → <span className="text-[#4B49AC] font-black">₹{change.new_value.toFixed(2)}</span>
+                      ₹{formatINR(change.old_value)} → <span className="text-[#4B49AC] font-black">₹{formatINR(change.new_value)}</span>
                     </span>
                     <p className="text-[#6C7383] text-[11px] mt-0.5">"{change.reason}"</p>
                   </div>

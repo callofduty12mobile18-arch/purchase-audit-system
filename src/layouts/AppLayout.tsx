@@ -197,14 +197,7 @@ export const AppLayout: React.FC = () => {
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col min-w-0 min-h-0">
           {/* Desktop Top Header */}
-          <header className="no-print hidden md:flex items-center justify-between px-8 py-3.5 bg-white/90 backdrop-blur-xl border-b border-[#ECEEF5] sticky top-0 z-30 shadow-xs">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span className="text-xs font-semibold text-[#6C7383]">
-                Purchase Audit & Procurement Intelligence
-              </span>
-            </div>
-
+          <header className="no-print hidden md:flex items-center justify-end px-8 py-3.5 bg-white/90 backdrop-blur-xl border-b border-[#ECEEF5] sticky top-0 z-30 shadow-xs">
             <div className="flex items-center gap-3.5">
               <div className="w-8 h-8 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5] flex items-center justify-center text-[#6C7383] hover:text-[#4B49AC] cursor-pointer transition-colors" title="Notifications">
                 <Bell className="w-4 h-4" />

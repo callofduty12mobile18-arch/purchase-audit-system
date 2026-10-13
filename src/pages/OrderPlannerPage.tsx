@@ -17,16 +17,16 @@ import {
   Calendar,
   Layers,
   Check,
-  Percent,
-  X
+  X,
+  Copy,
+  ChevronRight
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
-import { Select } from '../components/ui/Select';
-import { Badge } from '../components/ui/Badge';
 import { Supplier, Product, PurchaseInvoice } from '../types';
 import { dbService } from '../services/dbService';
-import { getTodayIST, formatDisplayDate, formatISTTimestamp } from '../utils/dateUtils';
+import { getTodayIST, formatDisplayDate, formatISTTimestamp, formatINR } from '../utils/dateUtils';
+import { useToast } from '../context/ToastContext';
 
 interface OrderPlanRow {
   product_id: string;
@@ -43,6 +43,7 @@ interface OrderPlanRow {
 type FilterTab = 'ALL' | 'ORDERED' | 'ZERO';
 
 export const OrderPlannerPage: React.FC = () => {
+  const { success: toastSuccess } = useToast();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [invoices, setInvoices] = useState<PurchaseInvoice[]>([]);
@@ -145,7 +146,7 @@ export const OrderPlannerPage: React.FC = () => {
       const defaultSupplier = sups[0]?.id || '';
       setSelectedSupplierId(defaultSupplier);
 
-      // Initialize plan rows for all catalog products (sorted A-Z)
+      // Initialize plan rows for all catalog products
       const rows: OrderPlanRow[] = prods.map(prod => {
         const { rate, source, gstRate } = calculateRateEstimate(prod.id, defaultSupplier, prods, invs);
         return {
@@ -187,27 +188,6 @@ export const OrderPlannerPage: React.FC = () => {
     );
   };
 
-  // Update purchase rate
-  const handleUpdateRate = (productId: string, newRate: number) => {
-    const rate = Math.max(0, newRate || 0);
-    setPlanRows(prev =>
-      prev.map(row => {
-        if (row.product_id !== productId) return row;
-        const total = Number((row.quantity * rate).toFixed(2));
-        const divisor = 1 + (row.gst_rate / 100);
-        const taxable = Number((total / divisor).toFixed(2));
-        return {
-          ...row,
-          purchase_rate: rate,
-          rate_source: 'USER_OVERRIDE',
-          total,
-          taxable_value: taxable,
-          gst_amount: Number((total - taxable).toFixed(2))
-        };
-      })
-    );
-  };
-
   // Quick preset adder (e.g. +10, +50, -10)
   const handleAddPreset = (productId: string, delta: number) => {
     const row = planRows.find(r => r.product_id === productId);
@@ -216,7 +196,7 @@ export const OrderPlannerPage: React.FC = () => {
     }
   };
 
-  // Quick action: Load quantities from the latest bill
+  // Quick action: Load quantities from the latest confirmed bill
   const handleLoadLastBillQuantities = () => {
     if (invoices.length === 0) return;
     const latest = invoices[0];
@@ -240,6 +220,7 @@ export const OrderPlannerPage: React.FC = () => {
         };
       })
     );
+    toastSuccess('Quantities Loaded', 'Replicated pack quantities from latest confirmed bill');
   };
 
   // Quick action: Reset all quantities to 0
@@ -272,17 +253,16 @@ export const OrderPlannerPage: React.FC = () => {
         };
       })
     );
+    toastSuccess('Preset Applied', 'All catalog items updated to 10 packs');
   };
 
   const selectedSupplier = suppliers.find(s => s.id === selectedSupplierId);
 
   // Filtered rows for display
   const filteredRows = planRows.filter(row => {
-    // 1. Tab Filter
     if (activeTab === 'ORDERED' && row.quantity === 0) return false;
     if (activeTab === 'ZERO' && row.quantity > 0) return false;
 
-    // 2. Search Filter
     if (!search.trim()) return true;
     const q = search.toLowerCase();
     return (
@@ -300,6 +280,21 @@ export const OrderPlannerPage: React.FC = () => {
   const rawGrandTotal = orderedItems.reduce((sum, r) => sum + r.total, 0);
   const grandTotalRounded = Math.round(rawGrandTotal);
 
+  const handleCopyWhatsApp = () => {
+    if (orderedItems.length === 0) return;
+    const lines = [
+      `*ORDER TO: ${selectedSupplier?.name || 'DISTRIBUTOR AGENCY'}*`,
+      `*Date:* ${formatDisplayDate(new Date())}`,
+      `--------------------------------`,
+      ...orderedItems.map((item, idx) => `${idx + 1}. *${item.product.nickname}* — ${item.quantity} Packs (@ ₹${formatINR(item.purchase_rate)}) = ₹${formatINR(item.total)}`),
+      `--------------------------------`,
+      `*Total Volume:* ${totalPacksOrdered} Packs (${orderedItems.length} SKUs)`,
+      `*Estimated Amount:* ₹${formatINR(grandTotalRounded)} (Incl. 40% GST)`
+    ];
+    navigator.clipboard.writeText(lines.join('\n'));
+    toastSuccess('Order Copied!', 'Formatted WhatsApp order copied to clipboard');
+  };
+
   const handlePrint = () => {
     const originalTitle = document.title;
     const supplierClean = selectedSupplier?.name ? selectedSupplier.name.replace(/[^a-zA-Z0-9]/g, '_') : 'Ayyappa_Enterprises';
@@ -312,20 +307,20 @@ export const OrderPlannerPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-5 max-w-6xl mx-auto pb-28 md:pb-16">
-      {/* Header Bar */}
-      <div className="no-print flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
+    <div className="space-y-4 max-w-6xl mx-auto pb-28 md:pb-12">
+      {/* Top Header Banner */}
+      <div className="no-print flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="page-title flex items-center gap-2.5 text-xl sm:text-2xl font-black text-[#1F1F2C]">
             <ShoppingCart className="w-6 h-6 text-[#4B49AC]" />
             Wholesale Order Planner
           </h1>
           <p className="page-subtitle text-xs sm:text-sm text-[#6C7383] mt-0.5">
-            Configure pack quantities to calculate exact landed order amounts for distributor agencies.
+            Configure pack quantities for distributor agency orders and compute landed GST totals.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+        <div className="flex items-center gap-2">
           {isProformaMode ? (
             <>
               <Button
@@ -333,7 +328,7 @@ export const OrderPlannerPage: React.FC = () => {
                 size="sm"
                 onClick={() => setIsProformaMode(false)}
                 icon={<ArrowLeft className="w-4 h-4" />}
-                className="flex-1 sm:flex-none justify-center"
+                className="text-xs"
               >
                 Back to Edit
               </Button>
@@ -342,9 +337,9 @@ export const OrderPlannerPage: React.FC = () => {
                 size="sm"
                 onClick={handlePrint}
                 icon={<Printer className="w-4 h-4" />}
-                className="flex-1 sm:flex-none justify-center shadow-md shadow-[#4B49AC]/20"
+                className="text-xs shadow-md shadow-[#4B49AC]/20"
               >
-                Save as PDF / Print
+                Save PDF / Print
               </Button>
             </>
           ) : (
@@ -354,10 +349,10 @@ export const OrderPlannerPage: React.FC = () => {
                   variant="outline"
                   size="sm"
                   onClick={handleResetAll}
-                  icon={<RotateCcw className="w-4 h-4" />}
-                  className="flex-1 sm:flex-none justify-center"
+                  icon={<RotateCcw className="w-3.5 h-3.5" />}
+                  className="text-xs"
                 >
-                  Reset (0)
+                  Clear (0)
                 </Button>
               )}
               <Button
@@ -366,7 +361,7 @@ export const OrderPlannerPage: React.FC = () => {
                 disabled={orderedItems.length === 0}
                 onClick={() => setIsProformaMode(true)}
                 icon={<FileDown className="w-4 h-4" />}
-                className="flex-1 sm:flex-none justify-center shadow-md shadow-[#4B49AC]/20 font-bold"
+                className="text-xs shadow-md shadow-[#4B49AC]/20 font-bold"
               >
                 Generate PO ({orderedItems.length})
               </Button>
@@ -377,20 +372,21 @@ export const OrderPlannerPage: React.FC = () => {
 
       {!isProformaMode ? (
         <div className="no-print space-y-4">
-          {/* Top Control Card */}
-          <div className="p-4 sm:p-5 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-3.5 items-end">
+          {/* Agency & Control Bar */}
+          <div className="p-3.5 sm:p-5 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash space-y-3.5">
+            {/* Top Row: Agency Picker & Search */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
               {/* Agency Selector */}
               <div className="md:col-span-5">
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-[#6C7383] mb-1.5">
-                  Distributor Agency *
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-[#8F93A0] mb-1">
+                  Distributor Agency
                 </label>
-                <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5] focus-within:border-[#4B49AC] focus-within:ring-2 focus-within:ring-[#4B49AC]/20 transition-all">
+                <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5] focus-within:border-[#4B49AC] transition-colors">
                   <Building2 className="w-4 h-4 text-[#4B49AC] shrink-0" />
                   <select
                     value={selectedSupplierId}
                     onChange={(e) => setSelectedSupplierId(e.target.value)}
-                    className="w-full bg-transparent text-xs sm:text-sm font-bold text-[#1F1F2C] focus:outline-none cursor-pointer"
+                    className="w-full bg-transparent text-xs sm:text-sm font-bold text-[#1F1F2C] focus:outline-none cursor-pointer truncate"
                   >
                     {suppliers.map(s => (
                       <option key={s.id} value={s.id}>
@@ -401,25 +397,25 @@ export const OrderPlannerPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Quick Search */}
+              {/* Search Bar */}
               <div className="md:col-span-4">
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-[#6C7383] mb-1.5">
-                  Search Catalog Products
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-[#8F93A0] mb-1">
+                  Search Catalog
                 </label>
                 <div className="relative">
-                  <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8F93A0]" />
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#8F93A0]" />
                   <input
                     type="text"
-                    placeholder="Search by nickname, invoice text..."
+                    placeholder="Search by nickname, brand, alias..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="w-full pl-9 pr-8 py-2.5 rounded-xl bg-white border border-[#ECEEF5] text-xs sm:text-sm text-[#1F1F2C] placeholder-[#8F93A0] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC] shadow-xs font-medium"
+                    className="w-full pl-9 pr-8 py-2 rounded-xl bg-[#F5F7FF] md:bg-white border border-[#ECEEF5] text-xs sm:text-sm text-[#1F1F2C] placeholder-[#8F93A0] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC]"
                   />
                   {search && (
                     <button
                       type="button"
                       onClick={() => setSearch('')}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[#8F93A0] hover:text-[#1F1F2C] rounded-md"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[#8F93A0] hover:text-[#1F1F2C]"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
@@ -427,39 +423,37 @@ export const OrderPlannerPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Quick Action Presets (Last Bill / All 10s / Reset) */}
-              <div className="md:col-span-3 flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
+              {/* Quick Batch Presets */}
+              <div className="md:col-span-3 flex items-center gap-2 pt-1 md:pt-0">
+                <button
+                  type="button"
                   onClick={handleLoadLastBillQuantities}
-                  className="flex-1 text-xs justify-center font-semibold bg-[#F5F7FF] border-[#ECEEF5] hover:bg-[#EEF2FF] hover:text-[#4B49AC]"
-                  icon={<Sparkles className="w-3.5 h-3.5 text-[#7978E9]" />}
-                  title="Copy quantities from last confirmed invoice"
+                  className="flex-1 px-2.5 py-2 rounded-xl bg-[#F0F3FF] border border-[#D5DCED] text-[#4B49AC] hover:bg-[#4B49AC] hover:text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-xs"
+                  title="Replicate quantities from latest confirmed bill"
                 >
-                  Last Bill
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Last Bill</span>
+                </button>
+                <button
+                  type="button"
                   onClick={handleSetAllDefault}
-                  className="flex-1 text-xs justify-center font-semibold bg-[#F5F7FF] border-[#ECEEF5] hover:bg-[#EEF2FF] hover:text-[#4B49AC]"
-                  icon={<Layers className="w-3.5 h-3.5 text-[#4B49AC]" />}
-                  title="Fill all items with 10 packs"
+                  className="flex-1 px-2.5 py-2 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5] text-[#6C7383] hover:text-[#4B49AC] hover:bg-[#EEF2FF] text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-xs"
+                  title="Fill 10 packs for each item"
                 >
-                  All 10s
-                </Button>
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>All 10s</span>
+                </button>
               </div>
             </div>
 
-            {/* Filter Tabs Strip */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-3 border-t border-[#ECEEF5]">
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+            {/* Segmented Filter Pills */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-3 border-t border-[#ECEEF5]">
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
                 {(
                   [
                     { id: 'ALL', label: 'All Catalog', count: planRows.length },
                     { id: 'ORDERED', label: 'In Current Order', count: orderedItems.length },
-                    { id: 'ZERO', label: 'Unordered (0 Packs)', count: planRows.length - orderedItems.length }
+                    { id: 'ZERO', label: 'Unordered', count: planRows.length - orderedItems.length }
                   ] as const
                 ).map(tab => (
                   <button
@@ -467,7 +461,7 @@ export const OrderPlannerPage: React.FC = () => {
                     onClick={() => setActiveTab(tab.id)}
                     className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
                       activeTab === tab.id
-                        ? 'bg-[#4B49AC] text-white shadow-sm shadow-[#4B49AC]/20'
+                        ? 'bg-[#4B49AC] text-white shadow-xs'
                         : 'bg-[#F5F7FF] text-[#6C7383] hover:text-[#4B49AC] hover:bg-[#EEF2FF]'
                     }`}
                   >
@@ -483,390 +477,331 @@ export const OrderPlannerPage: React.FC = () => {
                 ))}
               </div>
 
-              <div className="text-xs text-[#6C7383] font-mono shrink-0">
-                Showing <strong className="text-[#1F1F2C]">{filteredRows.length}</strong> of {planRows.length} products
+              <div className="text-xs text-[#8F93A0] font-mono">
+                Showing <strong className="text-[#1F1F2C]">{filteredRows.length}</strong> of {planRows.length} items
               </div>
             </div>
           </div>
 
-          {/* 1. MOBILE RESPONSIVE CARDS VIEW (md:hidden) */}
-          <div className="md:hidden space-y-3">
-            {loading ? (
-              <div className="p-8 rounded-2xl bg-white border border-[#ECEEF5] text-center text-xs text-[#6C7383] shadow-skydash">
-                Loading products catalog...
-              </div>
-            ) : filteredRows.length === 0 ? (
-              <div className="p-8 rounded-2xl bg-white border border-[#ECEEF5] text-center text-xs text-[#6C7383] shadow-skydash">
-                No products match your search or filter.
-              </div>
-            ) : (
-              filteredRows.map((row, idx) => {
-                const isSelected = row.quantity > 0;
-                return (
-                  <div
-                    key={row.product_id}
-                    className={`p-4 rounded-2xl border transition-all duration-200 ${
-                      isSelected
-                        ? 'bg-[#F0F3FF]/70 border-[#4B49AC] shadow-md shadow-[#4B49AC]/10 ring-1 ring-[#4B49AC]/20'
-                        : 'bg-white border-[#ECEEF5] shadow-skydash hover:border-[#D5DCED]'
-                    }`}
-                  >
-                    {/* Top Row: Index, Nickname & Active Tag */}
-                    <div className="flex items-start justify-between gap-2.5 pb-2.5 border-b border-[#ECEEF5]">
-                      <div className="flex items-start gap-2.5 min-w-0">
-                        <span className="w-6 h-6 rounded-lg bg-[#ECEEF5] text-[#6C7383] font-mono text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
-                          {idx + 1}
-                        </span>
-                        <div className="min-w-0">
-                          <h3 className="font-bold text-[#1F1F2C] text-sm leading-tight truncate">
-                            {row.product.nickname}
-                          </h3>
-                          <p className="text-[11px] text-[#6C7383] font-mono truncate mt-0.5" title={row.product.supplier_item_name}>
-                            "{row.product.supplier_item_name}"
-                          </p>
-                        </div>
-                      </div>
-
-                      {isSelected && (
-                        <span className="shrink-0 px-2 py-0.5 rounded-full text-[11px] font-mono font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
-                          <Check className="w-3 h-3 text-emerald-700" />
-                          {row.quantity} Packs
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Middle Row: Rate & Computed Line Total */}
-                    <div className="grid grid-cols-2 gap-2.5 py-2.5 text-xs">
-                      <div className="p-2.5 rounded-xl bg-white border border-[#ECEEF5] space-y-0.5 shadow-xs">
-                        <span className="text-[10px] uppercase font-bold text-[#8F93A0] tracking-wider block">
-                          Purchase Ref Rate
-                        </span>
-                        <div className="flex items-baseline gap-1">
-                          <span className="font-mono font-bold text-sm text-[#4B49AC]">
-                            ₹{row.purchase_rate.toFixed(2)}
-                          </span>
-                          <span className="text-[10px] text-[#8F93A0] font-mono">
-                            {row.rate_source === 'SUPPLIER_LAST' ? 'Last Bill' : 'Ref'}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="p-2.5 rounded-xl bg-white border border-[#ECEEF5] space-y-0.5 text-right shadow-xs">
-                        <span className="text-[10px] uppercase font-bold text-[#8F93A0] tracking-wider block">
-                          Line Total
-                        </span>
-                        <span className={`font-mono font-bold text-sm block ${isSelected ? 'text-[#1F1F2C]' : 'text-[#8F93A0]'}`}>
-                          ₹{row.total.toFixed(2)}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Bottom Row: Full Touch Stepper Controls */}
-                    <div className="pt-2 border-t border-[#ECEEF5]">
-                      <div className="flex items-center justify-between gap-1.5">
-                        {/* -10 Preset */}
-                        <button
-                          type="button"
-                          onClick={() => handleAddPreset(row.product_id, -10)}
-                          disabled={row.quantity <= 0}
-                          className="px-2.5 h-9 rounded-xl bg-white border border-[#ECEEF5] text-[#6C7383] text-xs font-bold disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 transition-all hover:bg-[#F5F7FF] hover:text-[#4B49AC] shadow-xs"
-                          title="Decrease by 10"
-                        >
-                          -10
-                        </button>
-
-                        {/* -1 Stepper */}
-                        <button
-                          type="button"
-                          onClick={() => handleUpdateQuantity(row.product_id, row.quantity - 1)}
-                          disabled={row.quantity <= 0}
-                          className="w-9 h-9 rounded-xl bg-white border border-[#ECEEF5] text-[#6C7383] flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 transition-all hover:bg-[#F5F7FF] hover:text-[#4B49AC] shadow-xs"
-                          title="Decrease by 1"
-                        >
-                          <Minus className="w-4 h-4" />
-                        </button>
-
-                        {/* Centered Number Input */}
-                        <input
-                          type="number"
-                          min="0"
-                          value={row.quantity === 0 ? '' : row.quantity}
-                          placeholder="0"
-                          onChange={(e) => handleUpdateQuantity(row.product_id, parseInt(e.target.value) || 0)}
-                          onFocus={(e) => e.target.select()}
-                          className={`flex-1 min-w-0 max-w-[80px] h-9 px-2 rounded-xl border text-center font-mono font-bold text-base focus:outline-none transition-all ${
-                            isSelected
-                              ? 'bg-white border-[#4B49AC] text-[#4B49AC] ring-2 ring-[#4B49AC]/20 shadow-xs'
-                              : 'bg-white border-[#ECEEF5] text-[#1F1F2C]'
-                          }`}
-                        />
-
-                        {/* +1 Stepper */}
-                        <button
-                          type="button"
-                          onClick={() => handleUpdateQuantity(row.product_id, row.quantity + 1)}
-                          className="w-9 h-9 rounded-xl bg-white border border-[#ECEEF5] text-[#4B49AC] flex items-center justify-center active:scale-95 transition-all hover:bg-[#EEF2FF] hover:text-[#4B49AC] shadow-xs"
-                          title="Increase by 1"
-                        >
-                          <Plus className="w-4 h-4" />
-                        </button>
-
-                        {/* +10 Preset */}
-                        <button
-                          type="button"
-                          onClick={() => handleAddPreset(row.product_id, 10)}
-                          className="px-2.5 h-9 rounded-xl bg-[#F0F3FF] border border-[#D5DCED] text-[#4B49AC] text-xs font-bold active:scale-95 transition-all hover:bg-[#4B49AC] hover:text-white shadow-xs"
-                          title="Add 10 Packs"
-                        >
-                          +10
-                        </button>
-
-                        {/* +50 Preset */}
-                        <button
-                          type="button"
-                          onClick={() => handleAddPreset(row.product_id, 50)}
-                          className="px-2.5 h-9 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5] text-[#6C7383] text-xs font-bold active:scale-95 transition-all hover:bg-[#7978E9] hover:text-white shadow-xs"
-                          title="Add 50 Packs"
-                        >
-                          +50
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-
-          {/* 2. DESKTOP RESPONSIVE TABLE VIEW (hidden md:block) */}
-          <div className="hidden md:block rounded-2xl border border-[#ECEEF5] bg-white shadow-skydash overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-[#F5F7FF] text-[11px] font-bold text-[#6C7383] uppercase tracking-wider border-b border-[#ECEEF5]">
-                  <tr>
-                    <th className="px-4 py-3.5 text-center w-12">#</th>
-                    <th className="px-4 py-3.5">Product Alias / Nickname</th>
-                    <th className="px-4 py-3.5 text-right w-36">Purchase Ref Rate</th>
-                    <th className="px-4 py-3.5 text-center w-72">Order Packs (Quantity)</th>
-                    <th className="px-4 py-3.5 text-right w-36">Line Total (₹)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#ECEEF5]">
-                  {loading ? (
-                    <tr>
-                      <td colSpan={5} className="py-12 text-center text-xs text-[#6C7383]">
-                        Loading products catalog...
-                      </td>
-                    </tr>
-                  ) : filteredRows.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="py-12 text-center text-xs text-[#6C7383]">
-                        No products match your search/filter.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredRows.map((row, idx) => {
-                      const isSelected = row.quantity > 0;
-                      return (
-                        <tr
-                          key={row.product_id}
-                          className={`transition-colors ${
-                            isSelected ? 'bg-[#F5F7FF]/60 hover:bg-[#EEF2FF]' : 'hover:bg-[#F8F9FE]'
-                          }`}
-                        >
-                          {/* Row Index */}
-                          <td className="px-4 py-3 text-center font-mono text-[#8F93A0] font-semibold">
-                            {idx + 1}
-                          </td>
-
-                          {/* Product Alias & Subtitle */}
-                          <td className="px-4 py-3">
-                            <div className="space-y-0.5">
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-[#1F1F2C] text-sm hover:text-[#4B49AC] transition-colors">
-                                  {row.product.nickname}
-                                </span>
-                                {isSelected && (
-                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
-                                    {row.quantity} Packs
-                                  </span>
-                                )}
-                              </div>
-                              <span className="text-[11px] font-mono text-[#6C7383] block">
-                                Invoice Text: "{row.product.supplier_item_name}"
-                              </span>
+          {/* Main Workspace Grid (Products on Left, Live Cart on Desktop Right) */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+            {/* Products Column */}
+            <div className="lg:col-span-8 space-y-3">
+              {loading ? (
+                <div className="p-12 rounded-2xl bg-white border border-[#ECEEF5] text-center text-xs text-[#6C7383] shadow-skydash">
+                  Loading product catalog...
+                </div>
+              ) : filteredRows.length === 0 ? (
+                <div className="p-12 rounded-2xl bg-white border border-[#ECEEF5] text-center space-y-2 shadow-skydash">
+                  <Package className="w-8 h-8 text-[#8F93A0] mx-auto opacity-50" />
+                  <p className="text-sm font-bold text-[#1F1F2C]">No products found</p>
+                  <p className="text-xs text-[#8F93A0]">
+                    No items match "{search}" in the selected filter tab.
+                  </p>
+                  {search && (
+                    <Button variant="outline" size="sm" onClick={() => setSearch('')} className="mt-2 text-xs">
+                      Clear Search
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {filteredRows.map((row) => {
+                    const isSelected = row.quantity > 0;
+                    return (
+                      <div
+                        key={row.product_id}
+                        className={`p-3.5 sm:p-4 rounded-2xl border transition-all duration-200 flex flex-col justify-between ${
+                          isSelected
+                            ? 'bg-[#F8F9FE] border-[#4B49AC] shadow-md shadow-[#4B49AC]/10 ring-1 ring-[#4B49AC]/20'
+                            : 'bg-white border-[#ECEEF5] shadow-skydash hover:border-[#D5DCED]'
+                        }`}
+                      >
+                        {/* Top: Product Title & Price Tag */}
+                        <div>
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <h3 className="font-bold text-[#1F1F2C] text-sm sm:text-base leading-snug truncate">
+                                {row.product.nickname}
+                              </h3>
+                              <p className="text-[11px] text-[#6C7383] font-mono truncate mt-0.5" title={row.product.supplier_item_name}>
+                                "{row.product.supplier_item_name}"
+                              </p>
                             </div>
-                          </td>
 
-                          {/* Purchase Rate (₹) */}
-                          <td className="px-4 py-3 text-right">
-                            <div className="space-y-0.5">
-                              <span className="font-mono font-bold text-sm text-[#4B49AC]">
-                                ₹{row.purchase_rate.toFixed(2)}
-                              </span>
-                              <span className="text-[10px] font-mono text-[#8F93A0] block">
+                            {/* Line Total or Status Tag */}
+                            <div className="text-right shrink-0">
+                              <div className="flex items-baseline justify-end gap-1">
+                                <span className="font-mono font-bold text-sm text-[#4B49AC]">
+                                  ₹{formatINR(row.purchase_rate)}
+                                </span>
+                                <span className="text-[10px] text-[#8F93A0] font-mono">/pack</span>
+                              </div>
+                              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-[#F5F7FF] text-[#6C7383] border border-[#ECEEF5] inline-block mt-0.5">
                                 {row.rate_source === 'SUPPLIER_LAST' ? 'Last Bill' : 'Ref Rate'}
                               </span>
                             </div>
-                          </td>
+                          </div>
+                        </div>
 
-                          {/* Quantity (Packs) Controls */}
-                          <td className="px-4 py-3">
-                            <div className="flex items-center justify-center gap-1.5">
-                              {/* Minus 10 Button */}
+                        {/* Middle/Bottom: Interactive Controls */}
+                        <div className="mt-3.5 pt-3 border-t border-[#ECEEF5]/80">
+                          {row.quantity === 0 ? (
+                            /* State 1: Quantity is 0 -> Clean "+ Add" Button & Quick Chips */
+                            <div className="flex items-center justify-between gap-2">
                               <button
                                 type="button"
-                                onClick={() => handleAddPreset(row.product_id, -10)}
-                                disabled={row.quantity <= 0}
-                                className="w-7 h-7 rounded-lg bg-[#F5F7FF] text-[#6C7383] hover:bg-[#EEF2FF] hover:text-[#4B49AC] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center font-bold text-xs border border-[#ECEEF5] transition-all"
-                                title="Decrease by 10"
-                              >
-                                -10
-                              </button>
-
-                              {/* Minus 1 Button */}
-                              <button
-                                type="button"
-                                onClick={() => handleUpdateQuantity(row.product_id, row.quantity - 1)}
-                                disabled={row.quantity <= 0}
-                                className="w-7 h-7 rounded-lg bg-[#F5F7FF] text-[#6C7383] hover:bg-[#EEF2FF] hover:text-[#4B49AC] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center border border-[#ECEEF5] transition-all"
-                                title="Decrease by 1"
-                              >
-                                <Minus className="w-3.5 h-3.5" />
-                              </button>
-
-                              {/* Numeric Input */}
-                              <input
-                                type="number"
-                                min="0"
-                                value={row.quantity === 0 ? '' : row.quantity}
-                                placeholder="0"
-                                onChange={(e) => handleUpdateQuantity(row.product_id, parseInt(e.target.value) || 0)}
-                                onFocus={(e) => e.target.select()}
-                                className={`w-20 px-2 py-1.5 rounded-lg border text-center font-mono font-bold text-sm focus:outline-none transition-all ${
-                                  isSelected
-                                    ? 'bg-white border-[#4B49AC] text-[#4B49AC] ring-2 ring-[#4B49AC]/20 shadow-xs'
-                                    : 'bg-white border-[#ECEEF5] text-[#1F1F2C] hover:border-[#D5DCED]'
-                                }`}
-                              />
-
-                              {/* Plus 1 Button */}
-                              <button
-                                type="button"
-                                onClick={() => handleUpdateQuantity(row.product_id, row.quantity + 1)}
-                                className="w-7 h-7 rounded-lg bg-[#F5F7FF] text-[#6C7383] hover:bg-[#EEF2FF] hover:text-[#4B49AC] flex items-center justify-center border border-[#ECEEF5] transition-all"
-                                title="Increase by 1"
+                                onClick={() => handleUpdateQuantity(row.product_id, 10)}
+                                className="flex-1 py-2 px-3 rounded-xl bg-[#F0F3FF] hover:bg-[#4B49AC] text-[#4B49AC] hover:text-white font-bold text-xs transition-all flex items-center justify-center gap-1.5 border border-[#D5DCED] active:scale-95"
                               >
                                 <Plus className="w-3.5 h-3.5" />
+                                <span>Add 10 Packs</span>
                               </button>
 
-                              {/* Plus 10 Button */}
                               <button
                                 type="button"
-                                onClick={() => handleAddPreset(row.product_id, 10)}
-                                className="px-2 h-7 rounded-lg bg-[#F0F3FF] text-[#4B49AC] hover:bg-[#4B49AC] hover:text-white font-bold text-xs border border-[#D5DCED] transition-all"
-                                title="Add 10 Packs"
-                              >
-                                +10
-                              </button>
-
-                              {/* Plus 50 Button */}
-                              <button
-                                type="button"
-                                onClick={() => handleAddPreset(row.product_id, 50)}
-                                className="px-2 h-7 rounded-lg bg-[#F5F7FF] text-[#6C7383] hover:bg-[#7978E9] hover:text-white font-bold text-xs border border-[#ECEEF5] transition-all hidden sm:inline-flex items-center"
+                                onClick={() => handleUpdateQuantity(row.product_id, 50)}
+                                className="py-2 px-3 rounded-xl bg-white hover:bg-[#F5F7FF] text-[#6C7383] hover:text-[#4B49AC] font-bold text-xs transition-all border border-[#ECEEF5] active:scale-95 shadow-xs"
                                 title="Add 50 Packs"
                               >
                                 +50
                               </button>
                             </div>
-                          </td>
+                          ) : (
+                            /* State 2: Quantity > 0 -> Touch Stepper & Line Total */
+                            <div className="space-y-2.5">
+                              {/* Quantity Stepper Row */}
+                              <div className="flex items-center justify-between gap-1.5">
+                                {/* Minus Button */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateQuantity(row.product_id, row.quantity - 1)}
+                                  className="w-9 h-9 rounded-xl bg-white border border-[#D5DCED] text-[#6C7383] hover:text-rose-600 hover:border-rose-300 flex items-center justify-center active:scale-95 transition-all shadow-xs"
+                                  title="Decrease by 1"
+                                >
+                                  <Minus className="w-4 h-4" />
+                                </button>
 
-                          {/* Line Total */}
-                          <td className="px-4 py-3 text-right">
-                            {isSelected ? (
-                              <span className="font-mono font-bold text-sm text-[#1F1F2C] block">
-                                ₹{row.total.toFixed(2)}
-                              </span>
-                            ) : (
-                              <span className="font-mono text-xs text-[#8F93A0] italic block">
-                                ₹0.00
-                              </span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
+                                {/* Direct Input for Number of Packs */}
+                                <div className="flex-1 relative">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={row.quantity}
+                                    onChange={(e) => handleUpdateQuantity(row.product_id, parseInt(e.target.value) || 0)}
+                                    onFocus={(e) => e.target.select()}
+                                    className="w-full h-9 px-2 text-center rounded-xl font-mono font-bold text-sm bg-white border border-[#4B49AC] text-[#4B49AC] ring-2 ring-[#4B49AC]/20 shadow-xs focus:outline-none"
+                                  />
+                                  <span className="text-[10px] text-[#8F93A0] absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none font-bold">
+                                    pk
+                                  </span>
+                                </div>
+
+                                {/* Plus Button */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateQuantity(row.product_id, row.quantity + 1)}
+                                  className="w-9 h-9 rounded-xl bg-[#4B49AC] text-white flex items-center justify-center active:scale-95 transition-all shadow-xs hover:bg-[#3f3da0]"
+                                  title="Increase by 1"
+                                >
+                                  <Plus className="w-4 h-4" />
+                                </button>
+
+                                {/* Quick Boost Chips: +10 / +50 */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddPreset(row.product_id, 10)}
+                                  className="px-2.5 h-9 rounded-xl bg-[#F0F3FF] border border-[#D5DCED] text-[#4B49AC] font-bold text-xs hover:bg-[#4B49AC] hover:text-white transition-all shadow-xs"
+                                  title="Add 10 Packs"
+                                >
+                                  +10
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddPreset(row.product_id, 50)}
+                                  className="px-2.5 h-9 rounded-xl bg-white border border-[#ECEEF5] text-[#6C7383] font-bold text-xs hover:bg-[#F5F7FF] hover:text-[#4B49AC] transition-all shadow-xs"
+                                  title="Add 50 Packs"
+                                >
+                                  +50
+                                </button>
+
+                                {/* Trash / Reset */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateQuantity(row.product_id, 0)}
+                                  className="w-8 h-9 rounded-xl text-[#8F93A0] hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition-colors"
+                                  title="Remove from Order"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+
+                              {/* Subtotal Line Display */}
+                              <div className="flex items-center justify-between text-xs pt-1 border-t border-[#ECEEF5]/60">
+                                <span className="text-[11px] font-semibold text-[#6C7383]">
+                                  {row.quantity} Packs × ₹{formatINR(row.purchase_rate)}
+                                </span>
+                                <span className="font-mono font-bold text-sm text-[#1F1F2C]">
+                                  ₹{formatINR(row.total)}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          </div>
 
-          {/* 3. DESKTOP LIVE ORDER SUMMARY BANNER (hidden md:flex) */}
-          <div className="hidden md:flex p-5 rounded-2xl bg-gradient-to-r from-[#4B49AC] via-[#5C59BE] to-[#7978E9] text-white shadow-skydash-primary items-center justify-between gap-5">
-            <div className="flex items-center gap-4">
-              <div className="p-3.5 rounded-2xl bg-white/20 text-white backdrop-blur-md shrink-0 shadow-sm">
-                <Wallet className="w-7 h-7" />
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-base font-extrabold text-white tracking-wide uppercase">
-                    Order Landed Estimate
-                  </h3>
-                  <span className="px-2.5 py-0.5 rounded-full bg-white/25 text-white text-xs font-mono font-bold">
-                    {orderedItems.length} Products
+            {/* Desktop Sticky Live Order Cart Summary (lg:block) */}
+            <div className="hidden lg:block lg:col-span-4 sticky top-20 space-y-4">
+              <div className="p-5 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-[#ECEEF5]">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 rounded-xl bg-[#F0F3FF] text-[#4B49AC]">
+                      <Wallet className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-sm text-[#1F1F2C]">Order Estimate</h3>
+                      <p className="text-[11px] text-[#6C7383] truncate max-w-[160px]">
+                        {selectedSupplier?.name || 'Agency'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <span className="px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-[#F0F3FF] text-[#4B49AC]">
+                    {orderedItems.length} SKUs
                   </span>
                 </div>
-                <p className="text-xs text-white/80 font-medium">
-                  Total Volume: <strong>{totalPacksOrdered} Packs</strong> • Taxable: ₹{totalTaxable.toFixed(2)} • GST (40%): ₹{totalGst.toFixed(2)}
-                </p>
-              </div>
-            </div>
 
-            <div className="flex items-center gap-4 shrink-0">
-              <div className="text-right">
-                <span className="text-[11px] uppercase font-bold text-white/80 tracking-wider block">
-                  Total Amount Needed
-                </span>
-                <span className="text-2xl sm:text-3xl font-black font-mono text-white tracking-tight">
-                  ₹{grandTotalRounded.toFixed(2)}
-                </span>
-              </div>
+                {/* Ordered Items Mini List */}
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                  {orderedItems.length === 0 ? (
+                    <div className="py-6 text-center text-xs text-[#8F93A0]">
+                      No products added yet. Click <strong>+ Add Packs</strong> on any product card.
+                    </div>
+                  ) : (
+                    orderedItems.map(item => (
+                      <div
+                        key={item.product_id}
+                        className="p-2.5 rounded-xl bg-[#F8F9FE] border border-[#ECEEF5] flex items-center justify-between text-xs gap-2"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <span className="font-bold text-[#1F1F2C] block truncate">
+                            {item.product.nickname}
+                          </span>
+                          <span className="text-[11px] text-[#6C7383] font-mono">
+                            {item.quantity} packs × ₹{formatINR(item.purchase_rate)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="font-mono font-bold text-xs text-[#4B49AC]">
+                            ₹{formatINR(item.total)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateQuantity(item.product_id, 0)}
+                            className="text-[#8F93A0] hover:text-rose-600 p-1 rounded-md"
+                            title="Remove item"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
 
-              <Button
-                variant="outline"
-                size="lg"
-                disabled={orderedItems.length === 0}
-                onClick={() => setIsProformaMode(true)}
-                className="bg-white text-[#4B49AC] hover:bg-[#F5F7FF] font-extrabold border-transparent shadow-md"
-                icon={<FileDown className="w-4 h-4 text-[#4B49AC]" />}
-              >
-                Generate PO Sheet
-              </Button>
+                {/* Landed Cost Breakdown */}
+                <div className="pt-3 border-t border-[#ECEEF5] space-y-2 text-xs">
+                  <div className="flex justify-between text-[#6C7383]">
+                    <span>Total Pack Volume:</span>
+                    <strong className="text-[#1F1F2C] font-mono">{totalPacksOrdered} Packs</strong>
+                  </div>
+                  <div className="flex justify-between text-[#6C7383]">
+                    <span>Taxable Subtotal:</span>
+                    <span className="font-mono text-[#1F1F2C]">₹{formatINR(totalTaxable)}</span>
+                  </div>
+                  <div className="flex justify-between text-[#6C7383]">
+                    <span>GST Component (40%):</span>
+                    <span className="font-mono text-[#1F1F2C]">₹{formatINR(totalGst)}</span>
+                  </div>
+
+                  <div className="pt-3 border-t-2 border-[#ECEEF5] flex items-baseline justify-between">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-[#8F93A0] tracking-wider block">
+                        Estimated Grand Total
+                      </span>
+                      <span className="text-2xl font-black font-mono text-[#4B49AC]">
+                        ₹{formatINR(grandTotalRounded)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="space-y-2 pt-2">
+                  <Button
+                    variant="primary"
+                    disabled={orderedItems.length === 0}
+                    onClick={() => setIsProformaMode(true)}
+                    className="w-full justify-center py-3 text-xs font-bold shadow-lg shadow-[#4B49AC]/25"
+                    icon={<FileDown className="w-4 h-4" />}
+                  >
+                    Generate PO Sheet ({orderedItems.length})
+                  </Button>
+
+                  <button
+                    type="button"
+                    disabled={orderedItems.length === 0}
+                    onClick={handleCopyWhatsApp}
+                    className="w-full py-2.5 px-3 rounded-xl bg-[#F0F3FF] hover:bg-[#EEF2FF] text-[#4B49AC] font-bold text-xs transition-colors flex items-center justify-center gap-2 border border-[#D5DCED] disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Copy for WhatsApp</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* 4. MOBILE STICKY BOTTOM BAR (md:hidden) */}
-          <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-[#ECEEF5] p-3.5 shadow-2xl pb-safe flex items-center justify-between gap-3">
+          {/* Mobile Sticky Bottom Floating Dock (lg:hidden) */}
+          <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-[#ECEEF5] p-3 shadow-2xl pb-[max(0.75rem,env(safe-area-inset-bottom))] flex items-center justify-between gap-3">
             <div className="min-w-0">
               <span className="text-[10px] uppercase font-bold text-[#6C7383] block truncate">
                 {orderedItems.length} SKUs • {totalPacksOrdered} Packs
               </span>
               <span className="font-mono text-base font-black text-[#4B49AC] block truncate">
-                ₹{grandTotalRounded.toFixed(2)}
+                ₹{formatINR(grandTotalRounded)}
               </span>
             </div>
-            <Button
-              variant="primary"
-              size="sm"
-              disabled={orderedItems.length === 0}
-              onClick={() => setIsProformaMode(true)}
-              className="shadow-lg shadow-[#4B49AC]/30 font-bold px-4 py-2 text-xs shrink-0 bg-[#4B49AC] hover:bg-[#3f3da0] text-white"
-              icon={<FileDown className="w-4 h-4" />}
-            >
-              Generate PO ({orderedItems.length})
-            </Button>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              {orderedItems.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleCopyWhatsApp}
+                  className="p-2.5 rounded-xl bg-[#F0F3FF] text-[#4B49AC] border border-[#D5DCED] active:scale-95"
+                  title="Copy for WhatsApp"
+                >
+                  <Copy className="w-4 h-4" />
+                </button>
+              )}
+
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={orderedItems.length === 0}
+                onClick={() => setIsProformaMode(true)}
+                className="shadow-lg shadow-[#4B49AC]/30 font-bold px-4 py-2 text-xs bg-[#4B49AC] hover:bg-[#3f3da0] text-white"
+                icon={<FileDown className="w-4 h-4" />}
+              >
+                Review PO ({orderedItems.length})
+              </Button>
+            </div>
           </div>
         </div>
       ) : (
@@ -948,10 +883,10 @@ export const OrderPlannerPage: React.FC = () => {
                         {item.quantity} Packs
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono text-black">
-                        ₹{item.purchase_rate.toFixed(2)}
+                        ₹{formatINR(item.purchase_rate)}
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono font-bold text-black">
-                        ₹{item.total.toFixed(2)}
+                        ₹{formatINR(item.total)}
                       </td>
                     </tr>
                   ))}
@@ -979,15 +914,15 @@ export const OrderPlannerPage: React.FC = () => {
                 </div>
                 <div className="flex justify-between text-zinc-700">
                   <span>Taxable Subtotal:</span>
-                  <span className="font-mono text-black">₹{totalTaxable.toFixed(2)}</span>
+                  <span className="font-mono text-black">₹{formatINR(totalTaxable)}</span>
                 </div>
                 <div className="flex justify-between text-zinc-700">
                   <span>GST Component (40%):</span>
-                  <span className="font-mono text-black">₹{totalGst.toFixed(2)}</span>
+                  <span className="font-mono text-black">₹{formatINR(totalGst)}</span>
                 </div>
                 <div className="flex justify-between text-sm font-black text-black pt-2 border-t-2 border-black">
                   <span>TOTAL AMOUNT NEEDED:</span>
-                  <span className="font-mono text-black text-base">₹{grandTotalRounded.toFixed(2)}</span>
+                  <span className="font-mono text-black text-base">₹{formatINR(grandTotalRounded)}</span>
                 </div>
               </div>
             </div>

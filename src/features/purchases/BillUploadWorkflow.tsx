@@ -24,7 +24,7 @@ import { InvoiceFormData, InvoiceFormItem, PurchaseInvoice, Supplier, Product } 
 import { createBlankInvoice, createBlankInvoiceItem } from '../../services/invoiceService';
 import { dbService } from '../../services/dbService';
 import { useToast } from '../../context/ToastContext';
-import { getTodayIST, generateISTInvoiceNumber, formatISTTimestamp, formatDisplayDate } from '../../utils/dateUtils';
+import { getTodayIST, generateISTInvoiceNumber, formatISTTimestamp, formatDisplayDate, formatINR } from '../../utils/dateUtils';
 
 export const INVOICE_NAME_OPTIONS = [
   'RAMACHANDRAN',
@@ -221,7 +221,7 @@ export const BillUploadWorkflow: React.FC = () => {
     if (!item.pack_qty || item.pack_qty <= 0) warnings.push('Pack quantity is required');
     if (!item.invoice_amount || item.invoice_amount <= 0) warnings.push('Invoice amount is required');
     if (item.mrp_rsp && item.each_pack_rate && item.each_pack_rate > item.mrp_rsp * 1.05) {
-      warnings.push(`Each pack rate (₹${item.each_pack_rate}) exceeds MRP (₹${item.mrp_rsp})`);
+      warnings.push(`Each pack rate (₹${formatINR(item.each_pack_rate)}) exceeds MRP (₹${formatINR(item.mrp_rsp)})`);
     }
     item.needs_review = warnings.length > 0;
     item.validation = { valid: warnings.length === 0, warnings };
@@ -299,7 +299,7 @@ export const BillUploadWorkflow: React.FC = () => {
     if (!item.pack_qty || item.pack_qty <= 0) warnings.push('Pack quantity is required');
     if (!item.invoice_amount || item.invoice_amount <= 0) warnings.push('Invoice amount is required');
     if (item.mrp_rsp && item.each_pack_rate && item.each_pack_rate > item.mrp_rsp * 1.05) {
-      warnings.push(`Each pack rate (₹${item.each_pack_rate}) exceeds MRP (₹${item.mrp_rsp})`);
+      warnings.push(`Each pack rate (₹${formatINR(item.each_pack_rate)}) exceeds MRP (₹${formatINR(item.mrp_rsp)})`);
     }
     item.needs_review = warnings.length > 0;
     item.validation = { valid: warnings.length === 0, warnings };
@@ -945,7 +945,7 @@ export const BillUploadWorkflow: React.FC = () => {
             <div className="p-4 rounded-xl bg-gradient-to-br from-[#4B49AC]/10 to-[#7978E9]/15 border-2 border-[#4B49AC]/30 flex flex-col justify-between">
               <span className="text-[#4B49AC] block text-xs font-bold uppercase tracking-wider">Grand Total (Invoice Amount)</span>
               <span className="font-mono text-2xl sm:text-3xl font-black text-[#4B49AC] mt-1.5 block truncate">
-                ₹{formData.grand_total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ₹{formatINR(formData.grand_total)}
               </span>
             </div>
           </div>
@@ -976,7 +976,7 @@ export const BillUploadWorkflow: React.FC = () => {
         <div className="min-w-0">
           <span className="text-[10px] uppercase font-bold text-[#6C7383] block">Invoice Total</span>
           <span className="font-mono text-base font-black text-[#4B49AC] block truncate">
-            ₹{formData.grand_total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            ₹{formatINR(formData.grand_total)}
           </span>
         </div>
         <Button
@@ -1012,7 +1012,7 @@ export const BillUploadWorkflow: React.FC = () => {
           {existingDuplicate && (
             <div className="p-3 bg-[#F5F7FF] rounded-xl text-xs space-y-1.5 font-mono">
               <div>Invoice Date: <strong>{formatDisplayDate(existingDuplicate.invoice_date)}</strong></div>
-              <div>Grand Total: <strong>₹{existingDuplicate.grand_total.toFixed(2)}</strong></div>
+              <div>Grand Total: <strong>₹{formatINR(existingDuplicate.grand_total)}</strong></div>
               <div>Created At: <strong>{formatISTTimestamp(existingDuplicate.created_at)}</strong></div>
             </div>
           )}
@@ -1092,7 +1092,7 @@ export const BillUploadWorkflow: React.FC = () => {
               </div>
               <div className="flex justify-between pt-1 text-sm">
                 <span className="font-bold text-[#1F1F2C]">Grand Total Paid:</span>
-                <span className="font-bold text-[#4B49AC] text-base">₹{savedInvoice.grand_total.toFixed(2)}</span>
+                <span className="font-bold text-[#4B49AC] text-base">₹{formatINR(savedInvoice.grand_total)}</span>
               </div>
             </div>
           )}

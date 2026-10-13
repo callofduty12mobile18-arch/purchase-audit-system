@@ -225,7 +225,7 @@ export const PurchasesPage: React.FC = () => {
       header: 'Invoice Total',
       className: 'text-right',
       cell: (row: PurchaseInvoice) => (
-        <span className="font-mono font-bold text-[#4B49AC] text-sm">₹{row.grand_total.toFixed(2)}</span>
+        <span className="font-mono font-bold text-[#4B49AC] text-sm">₹{formatINR(row.grand_total)}</span>
       )
     }
   ];
@@ -560,10 +560,10 @@ export const PurchasesPage: React.FC = () => {
                             {item.quantity} {item.uom_snapshot || 'PAC'}
                           </td>
                           <td className="px-3.5 py-2.5 text-right font-mono font-semibold text-[#4B49AC]">
-                            ₹{item.purchase_rate.toFixed(2)}
+                            ₹{formatINR(item.purchase_rate)}
                           </td>
                           <td className="px-3.5 py-2.5 text-right font-mono font-bold text-[#1F1F2C]">
-                            ₹{item.total.toFixed(2)}
+                            ₹{formatINR(item.total)}
                           </td>
                         </tr>
                       ))

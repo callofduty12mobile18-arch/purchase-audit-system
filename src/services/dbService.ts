@@ -1,5 +1,5 @@
 import { supabase } from '../integrations/supabase/client';
-import { getTodayIST, generateISTInvoiceNumber } from '../utils/dateUtils';
+import { getTodayIST, generateISTInvoiceNumber, formatINR } from '../utils/dateUtils';
 import {
   Supplier,
   Product,
@@ -963,7 +963,7 @@ export const dbService = {
           invoice_date: targetInvoice.invoice_date
         },
         null,
-        `Deleted purchase invoice #${targetInvoice.invoice_number} (₹${targetInvoice.grand_total.toFixed(2)})`
+        `Deleted purchase invoice #${targetInvoice.invoice_number} (₹${formatINR(targetInvoice.grand_total)})`
       );
     }
 

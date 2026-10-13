@@ -101,7 +101,7 @@ export const PurchaseDetailPage: React.FC = () => {
       header: 'Purchase Rate (₹)',
       cell: (row: PurchaseItem) => (
         <span className="font-mono text-xs text-[#4B49AC] font-bold">
-          ₹{row.purchase_rate.toFixed(2)}
+          ₹{formatINR(row.purchase_rate)}
         </span>
       )
     },
@@ -109,7 +109,7 @@ export const PurchaseDetailPage: React.FC = () => {
       header: 'Line Total (₹)',
       cell: (row: PurchaseItem) => (
         <span className="font-mono text-xs font-bold text-[#1F1F2C]">
-          ₹{row.total.toFixed(2)}
+          ₹{formatINR(row.total)}
         </span>
       )
     }

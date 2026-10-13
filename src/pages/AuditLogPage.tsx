@@ -25,7 +25,7 @@ import { Modal } from '../components/ui/Modal';
 import { AuditLog } from '../types';
 import { dbService } from '../services/dbService';
 import { useToast } from '../context/ToastContext';
-import { getTodayIST } from '../utils/dateUtils';
+import { getTodayIST, formatINR } from '../utils/dateUtils';
 
 type FilterCategory = 'ALL' | 'INVOICES' | 'PRODUCTS' | 'SUPPLIERS';
 
@@ -571,7 +571,7 @@ export const AuditLogPage: React.FC = () => {
                     Amount
                   </span>
                   <p className="text-xs sm:text-sm font-bold text-[#1F1F2C]">
-                    {details.amount !== undefined ? `₹${details.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+                    {details.amount !== undefined ? `₹${formatINR(details.amount)}` : '—'}
                   </p>
                 </div>
 
