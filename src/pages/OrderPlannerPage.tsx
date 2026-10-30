@@ -275,10 +275,7 @@ export const OrderPlannerPage: React.FC = () => {
         <div className="bg-white rounded-lg border border-slate-200 shadow-card p-6 space-y-5">
           <div className="flex items-start justify-between gap-4 pb-4 border-b border-slate-200">
             <div>
-              <h1 className="text-lg font-bold text-slate-900">Wholesale Order Estimate</h1>
-              <p className="text-sm text-slate-500 mt-0.5">
-                {selectedSupplier?.name || 'DISTRIBUTOR AGENCY'}{selectedSupplier?.gstin ? ` · ${selectedSupplier.gstin}` : ''}
-              </p>
+              <h1 className="text-lg font-bold text-slate-900">Order — RAMACHANDRAN</h1>
             </div>
             <div className="text-right">
               <p className="text-xs text-slate-500">Date</p>
@@ -316,7 +313,6 @@ export const OrderPlannerPage: React.FC = () => {
                   {orderedItems.length} SKUs · {totalPacksOrdered} packs
                 </td>
                 <td colSpan={3} className="py-3 text-right">
-                  <p className="text-xs text-slate-500">Taxable: ₹{formatINR(totalTaxable)} · GST 40%: ₹{formatINR(totalGst)}</p>
                   <p className="text-lg font-bold font-mono tabular-nums text-brand-700">₹{formatINR(grandTotalRounded)}</p>
                 </td>
               </tr>
