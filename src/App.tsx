@@ -24,11 +24,11 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F5F7FF] flex flex-col items-center justify-center gap-3">
-        <div className="p-4 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash flex flex-col items-center gap-3">
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-3">
+        <div className="p-6 rounded-xl bg-white border border-slate-200 shadow-card flex flex-col items-center gap-3">
           <Spinner size="lg" />
-          <span className="text-xs text-[#4B49AC] font-bold uppercase tracking-wider">
-            Authenticating System Session...
+          <span className="text-xs text-slate-500 font-medium">
+            Authenticating...
           </span>
         </div>
       </div>

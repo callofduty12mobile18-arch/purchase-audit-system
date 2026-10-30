@@ -1,99 +1,74 @@
 import React from 'react';
-import { clsx } from 'clsx';
+
+type StatCardColor = 'blue' | 'green' | 'amber' | 'red' | 'violet' | 'coral' | 'purple';
 
 interface StatCardProps {
   title: string;
   value: string | number;
+  subtitle?: string;
   change?: string;
   changeType?: 'positive' | 'negative' | 'neutral';
-  icon: React.ReactNode;
-  subtitle?: string;
-  color?: 'blue' | 'indigo' | 'purple' | 'coral' | 'white';
-  className?: string;
+  icon?: React.ReactNode;
+  color?: StatCardColor;
 }
+
+const colorMap: Record<StatCardColor, { icon: string; value: string }> = {
+  blue:   { icon: 'bg-brand-50 text-brand-700',   value: 'text-slate-900' },
+  green:  { icon: 'bg-green-50 text-green-700',   value: 'text-slate-900' },
+  amber:  { icon: 'bg-amber-50 text-amber-700',   value: 'text-slate-900' },
+  red:    { icon: 'bg-red-50 text-red-700',       value: 'text-slate-900' },
+  violet: { icon: 'bg-violet-50 text-violet-700', value: 'text-slate-900' },
+  coral:  { icon: 'bg-rose-50 text-rose-700',     value: 'text-slate-900' },
+  purple: { icon: 'bg-violet-50 text-violet-700', value: 'text-slate-900' },
+};
+
+const changeClasses = {
+  positive: 'text-green-600 bg-green-50',
+  negative: 'text-red-600 bg-red-50',
+  neutral: 'text-slate-500 bg-slate-50',
+};
 
 export const StatCard: React.FC<StatCardProps> = ({
   title,
   value,
+  subtitle,
   change,
   changeType = 'neutral',
   icon,
-  subtitle,
-  color = 'white',
-  className,
+  color = 'blue',
 }) => {
-  const colorStyles = {
-    blue: 'bg-[#7DA0FA] text-white shadow-skydash-blue border-transparent',
-    indigo: 'bg-[#4B49AC] text-white shadow-skydash-primary border-transparent',
-    purple: 'bg-[#7978E9] text-white shadow-skydash-purple border-transparent',
-    coral: 'bg-[#F3797E] text-white shadow-skydash-coral border-transparent',
-    white: 'bg-white text-[#1F1F2C] border-[#ECEEF5] shadow-skydash',
-  };
-
-  const isColored = color !== 'white';
+  const colors = colorMap[color];
 
   return (
-    <div
-      className={clsx(
-        'group relative overflow-hidden p-4 sm:p-5 lg:p-6 rounded-2xl border transition-all duration-300 hover:-translate-y-1',
-        colorStyles[color],
-        className
-      )}
-    >
-      <div className="flex items-center justify-between gap-2">
-        <span
-          className={clsx(
-            'text-[11px] sm:text-xs font-semibold uppercase tracking-wider truncate',
-            isColored ? 'text-white/80' : 'text-[#6C7383]'
+    <div className="bg-white rounded-lg border border-slate-200 shadow-card p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+            {title}
+          </p>
+          <p
+            className={`mt-2 text-2xl font-bold font-mono tabular-nums tracking-tight ${colors.value}`}
+          >
+            {value}
+          </p>
+          {subtitle && (
+            <p className="mt-1 text-xs text-slate-500">{subtitle}</p>
           )}
-        >
-          {title}
-        </span>
-        <div
-          className={clsx(
-            'p-2 sm:p-2.5 rounded-xl transition-all duration-300 shadow-sm shrink-0',
-            isColored
-              ? 'bg-white/15 text-white group-hover:bg-white group-hover:text-[#4B49AC]'
-              : 'bg-[#F5F7FF] text-[#4B49AC] border border-[#ECEEF5] group-hover:bg-[#4B49AC] group-hover:text-white'
+          {change && (
+            <span
+              className={`mt-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${changeClasses[changeType]}`}
+            >
+              {change}
+            </span>
           )}
-        >
-          {icon}
-        </div>
-      </div>
-
-      <div className="mt-3 sm:mt-4">
-        <div
-          className={clsx(
-            'text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight font-mono truncate',
-            isColored ? 'text-white' : 'text-[#1F1F2C]'
-          )}
-        >
-          {value}
         </div>
 
-        {(change || subtitle) && (
-          <div className="mt-2.5 flex items-center flex-wrap text-xs gap-2">
-            {change && (
-              <span
-                className={clsx(
-                  'font-semibold px-2 py-0.5 rounded-full text-[11px] shadow-sm',
-                  isColored
-                    ? 'bg-white/20 text-white border border-white/30'
-                    : changeType === 'positive'
-                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                    : changeType === 'negative'
-                    ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                    : 'bg-[#F5F7FF] text-[#4B49AC] border border-[#ECEEF5]'
-                )}
-              >
-                {change}
-              </span>
-            )}
-            {subtitle && (
-              <span className={clsx('font-medium text-xs', isColored ? 'text-white/80' : 'text-[#8F93A0]')}>
-                {subtitle}
-              </span>
-            )}
+        {icon && (
+          <div
+            className={`shrink-0 w-10 h-10 rounded-lg flex items-center justify-center ${colors.icon}`}
+            aria-hidden="true"
+          >
+            {icon}
           </div>
         )}
       </div>

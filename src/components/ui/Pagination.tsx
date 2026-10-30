@@ -1,60 +1,88 @@
 import React from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { Button } from './Button';
 
 interface PaginationProps {
   currentPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
-  totalItems?: number;
-  pageSize?: number;
 }
 
 export const Pagination: React.FC<PaginationProps> = ({
   currentPage,
   totalPages,
   onPageChange,
-  totalItems,
-  pageSize = 10,
 }) => {
   if (totalPages <= 1) return null;
 
-  const startItem = (currentPage - 1) * pageSize + 1;
-  const endItem = totalItems ? Math.min(currentPage * pageSize, totalItems) : currentPage * pageSize;
+  const pages: (number | '...')[] = [];
+
+  if (totalPages <= 7) {
+    for (let i = 1; i <= totalPages; i++) pages.push(i);
+  } else {
+    pages.push(1);
+    if (currentPage > 3) pages.push('...');
+    for (
+      let i = Math.max(2, currentPage - 1);
+      i <= Math.min(totalPages - 1, currentPage + 1);
+      i++
+    ) {
+      pages.push(i);
+    }
+    if (currentPage < totalPages - 2) pages.push('...');
+    pages.push(totalPages);
+  }
 
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-3.5 rounded-2xl border border-[#ECEEF5] bg-white text-xs text-[#6C7383] shadow-skydash">
-      <div>
-        {totalItems ? (
-          <span>Showing <strong className="text-[#1F1F2C] font-bold">{startItem}</strong> to <strong className="text-[#1F1F2C] font-bold">{endItem}</strong> of <strong className="text-[#1F1F2C] font-bold">{totalItems}</strong></span>
-        ) : (
-          <span>Page <strong className="text-[#1F1F2C] font-bold">{currentPage}</strong> of <strong className="text-[#1F1F2C] font-bold">{totalPages}</strong></span>
-        )}
-      </div>
+    <nav aria-label="Pagination" className="flex items-center justify-between gap-2">
+      <p className="text-xs text-slate-500 hidden sm:block">
+        Page {currentPage} of {totalPages}
+      </p>
 
-      <div className="flex items-center justify-between sm:justify-end gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={currentPage === 1}
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
           onClick={() => onPageChange(currentPage - 1)}
-          icon={<ChevronLeft className="w-4 h-4" />}
+          disabled={currentPage === 1}
+          aria-label="Previous page"
+          className="h-8 w-8 flex items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
-          Prev
-        </Button>
-        <span className="px-3 py-1 bg-[#F5F7FF] text-[#4B49AC] font-bold rounded-lg border border-[#D5DCED]">
-          {currentPage} / {totalPages}
-        </span>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={currentPage >= totalPages}
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+
+        {pages.map((page, i) =>
+          page === '...' ? (
+            <span key={`dots-${i}`} className="h-8 w-8 flex items-center justify-center text-sm text-slate-400">
+              …
+            </span>
+          ) : (
+            <button
+              key={page}
+              type="button"
+              onClick={() => onPageChange(page as number)}
+              aria-label={`Page ${page}`}
+              aria-current={page === currentPage ? 'page' : undefined}
+              className={[
+                'h-8 w-8 flex items-center justify-center rounded-md text-sm font-medium transition-colors',
+                page === currentPage
+                  ? 'bg-brand-700 text-white border border-brand-700'
+                  : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50',
+              ].join(' ')}
+            >
+              {page}
+            </button>
+          )
+        )}
+
+        <button
+          type="button"
           onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          aria-label="Next page"
+          className="h-8 w-8 flex items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
-          Next
-          <ChevronRight className="w-4 h-4 ml-1" />
-        </Button>
+          <ChevronRight className="h-4 w-4" />
+        </button>
       </div>
-    </div>
+    </nav>
   );
 };

@@ -1,6 +1,7 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
-import { Button } from './Button';
+
+type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl';
 
 interface ModalProps {
   isOpen: boolean;
@@ -9,8 +10,16 @@ interface ModalProps {
   subtitle?: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
-  size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
+  size?: ModalSize;
 }
+
+const sizeClasses: Record<ModalSize, string> = {
+  sm: 'max-w-sm',
+  md: 'max-w-lg',
+  lg: 'max-w-2xl',
+  xl: 'max-w-3xl',
+  '2xl': 'max-w-4xl',
+};
 
 export const Modal: React.FC<ModalProps> = ({
   isOpen,
@@ -21,50 +30,110 @@ export const Modal: React.FC<ModalProps> = ({
   footer,
   size = 'md',
 }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const titleId = `modal-title-${title.replace(/\s+/g, '-').toLowerCase()}`;
+
+  // Lock body scroll and handle ESC
   useEffect(() => {
+    if (!isOpen) return;
+
+    const previouslyFocused = document.activeElement as HTMLElement;
+    document.body.style.overflow = 'hidden';
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
+
+      // Focus trap
+      if (e.key === 'Tab' && dialogRef.current) {
+        const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey) {
+          if (document.activeElement === first) {
+            e.preventDefault();
+            last?.focus();
+          }
+        } else {
+          if (document.activeElement === last) {
+            e.preventDefault();
+            first?.focus();
+          }
+        }
+      }
     };
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-      window.addEventListener('keydown', handleKeyDown);
-    }
+
+    document.addEventListener('keydown', handleKeyDown);
+
+    // Move focus into dialog
+    setTimeout(() => {
+      const firstFocusable = dialogRef.current?.querySelector<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      firstFocusable?.focus();
+    }, 50);
+
     return () => {
-      document.body.style.overflow = 'unset';
-      window.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = '';
+      document.removeEventListener('keydown', handleKeyDown);
+      previouslyFocused?.focus();
     };
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
-  const sizeClasses = {
-    sm: 'max-w-md',
-    md: 'max-w-lg',
-    lg: 'max-w-2xl',
-    xl: 'max-w-4xl',
-    full: 'max-w-7xl h-[90vh]',
-  };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
-      <button type="button" className="absolute inset-0" aria-label="Close dialog" onClick={onClose} />
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+    >
+      {/* Backdrop */}
       <div
-        className={`relative w-full bg-white border border-[#ECEEF5] rounded-t-3xl sm:rounded-2xl shadow-skydash-lg overflow-hidden flex flex-col max-h-[92dvh] sm:max-h-[90vh] ${sizeClasses[size]}`}
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-fade-in"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+
+      {/* Dialog panel */}
+      <div
+        ref={dialogRef}
+        className={[
+          'relative bg-white rounded-xl shadow-modal w-full',
+          'flex flex-col max-h-[90vh] animate-slide-in-top',
+          sizeClasses[size],
+        ].join(' ')}
       >
-        <div className="flex items-start justify-between gap-3 px-6 py-5 border-b border-[#ECEEF5] bg-[#F5F7FF]/50">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3 px-6 py-4 border-b border-slate-100 shrink-0">
           <div className="min-w-0">
-            <h3 className="text-base sm:text-lg font-bold text-[#1F1F2C] tracking-tight leading-snug">{title}</h3>
-            {subtitle && <p className="text-xs text-[#6C7383] mt-0.5">{subtitle}</p>}
+            <h2 id={titleId} className="text-base font-semibold text-slate-900">
+              {title}
+            </h2>
+            {subtitle && (
+              <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>
+            )}
           </div>
-          <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close modal" className="shrink-0 text-[#8F93A0] hover:text-[#4B49AC] rounded-full p-1.5">
-            <X className="w-4 h-4" />
-          </Button>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close dialog"
+            className="shrink-0 rounded-md p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors focus-visible:outline-2 focus-visible:outline-brand-600 min-w-[44px] min-h-[44px] flex items-center justify-center"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
 
-        <div className="p-6 flex-1 overflow-y-auto">{children}</div>
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 min-h-0">
+          {children}
+        </div>
 
+        {/* Footer */}
         {footer && (
-          <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 sm:gap-3 px-6 py-4 border-t border-[#ECEEF5] bg-[#F5F7FF]/50">
+          <div className="shrink-0 px-6 py-4 border-t border-slate-100 bg-slate-50 rounded-b-xl">
             {footer}
           </div>
         )}

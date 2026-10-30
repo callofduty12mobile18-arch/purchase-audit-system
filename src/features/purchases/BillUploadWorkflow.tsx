@@ -1,21 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  CheckCircle2,
-  Trash2,
-  Plus,
-  ShieldAlert,
-  ArrowLeft,
-  Building2,
-  DollarSign,
-  Package,
-  Receipt,
-  Calendar,
-  Eye,
-  AlertTriangle,
-  WifiOff,
-  Edit3,
-  Save
+  CheckCircle2, Trash2, Plus, AlertTriangle, ArrowLeft, Building2,
+  Package, Receipt, Calendar, Eye, WifiOff, Edit3, Save, ShieldAlert,
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
@@ -30,16 +17,22 @@ export const INVOICE_NAME_OPTIONS = [
   'RAMACHANDRAN',
   'ASHWIN KARTHIK',
   'BERRY QUEQ',
-  'SUBIKSHA STORE'
+  'SUBIKSHA STORE',
 ] as const;
 
 export const MEMO_NAME_OPTIONS = INVOICE_NAME_OPTIONS;
+
+// ─── Shared input class ──────────────────────────────────────────────────────
+const inputCls =
+  'h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-900 font-mono ' +
+  'placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600 transition-colors';
 
 export const BillUploadWorkflow: React.FC = () => {
   const { id } = useParams<{ id?: string }>();
   const isEditMode = Boolean(id);
   const navigate = useNavigate();
   const { success: toastSuccess, error: toastError, warning: toastWarning } = useToast();
+
   const [formData, setFormData] = useState<InvoiceFormData>(createBlankInvoice());
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -51,16 +44,15 @@ export const BillUploadWorkflow: React.FC = () => {
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [formValidationErrors, setFormValidationErrors] = useState<string[]>([]);
 
-  useEffect(() => {
-    loadMetadata();
-  }, [id]);
+  useEffect(() => { loadMetadata(); }, [id]);
 
+  // ── Data loading ────────────────────────────────────────────────────────────
   const loadMetadata = async () => {
     try {
       setLoadingInitial(true);
       const [fetchedSuppliers, fetchedProducts] = await Promise.all([
         dbService.getSuppliers(),
-        dbService.getProducts()
+        dbService.getProducts(),
       ]);
       setSuppliers(fetchedSuppliers);
       setProducts(fetchedProducts);
@@ -68,7 +60,7 @@ export const BillUploadWorkflow: React.FC = () => {
       if (id) {
         const existingInv = await dbService.getInvoiceById(id);
         if (existingInv) {
-          const mappedItems: InvoiceFormItem[] = (existingInv.items || []).map(item => ({
+          const mappedItems: InvoiceFormItem[] = (existingInv.items || []).map((item) => ({
             supplier_item_name: item.supplier_item_name_snapshot,
             item_name: item.product?.nickname || item.supplier_item_name_snapshot,
             product_id: item.product_id,
@@ -87,10 +79,10 @@ export const BillUploadWorkflow: React.FC = () => {
             cgst: Number(item.cgst) || 0,
             sgst: Number(item.sgst) || 0,
             igst: Number(item.igst) || 0,
-            validation: { valid: true, warnings: [] }
+            validation: { valid: true, warnings: [] },
           }));
 
-          const baseFormData: InvoiceFormData = {
+          setFormData({
             supplier_name: existingInv.supplier?.name || 'AYYAPPA ENTERPRISES',
             supplier_gstin: existingInv.supplier?.gstin || '33AABFA2949R1Z5',
             invoice_name: existingInv.invoice_name || 'RAMACHANDRAN',
@@ -108,19 +100,17 @@ export const BillUploadWorkflow: React.FC = () => {
             total_tax: existingInv.total_tax,
             round_off: existingInv.round_off,
             grand_total: existingInv.grand_total,
-          };
-
-          setFormData(baseFormData);
+          });
           setLoadingInitial(false);
           return;
         } else {
-          toastError('Invoice Not Found', `Invoice record with ID "${id}" could not be found.`);
+          toastError('Invoice not found', `Invoice "${id}" could not be found.`);
           navigate('/purchases');
           return;
         }
       }
 
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
         supplier_name: 'AYYAPPA ENTERPRISES',
         supplier_gstin: '33AABFA2949R1Z5',
@@ -129,24 +119,22 @@ export const BillUploadWorkflow: React.FC = () => {
         invoice_number: prev.invoice_number || generateISTInvoiceNumber(),
         payment_mode: prev.payment_mode === 'CHEQUE' ? 'CHEQUE' : 'CASH',
         payment_status: prev.payment_status === 'CHEQUE' ? 'CHEQUE' : 'PAID',
-        cheque_date: prev.cheque_date || prev.invoice_date || getTodayIST()
+        cheque_date: prev.cheque_date || prev.invoice_date || getTodayIST(),
       }));
-    } catch (err: any) {
-      console.error('Failed to load suppliers/products:', err);
-      toastError('Failed to load catalog', err.message || 'Check database connection.');
+    } catch (err: unknown) {
+      toastError('Load failed', err instanceof Error ? err.message : 'Check database connection.');
     } finally {
       setLoadingInitial(false);
     }
   };
 
-  // Mathematical Recalculations
+  // ── Calculation (identical business logic) ──────────────────────────────────
   const recalcFromItems = (items: InvoiceFormItem[]) => {
     const itemsTotal = items.reduce((sum, i) => sum + (Number(i.invoice_amount ?? i.total) || 0), 0);
     const totalPacks = items.reduce((sum, i) => sum + (Number(i.pack_qty) || 0), 0);
     const subtotal = Number((itemsTotal / 1.4).toFixed(2));
     const totalTax = Number((itemsTotal - subtotal).toFixed(2));
     const halfTax = Number((totalTax / 2).toFixed(2));
-
     return {
       items,
       total_items: items.length,
@@ -162,15 +150,10 @@ export const BillUploadWorkflow: React.FC = () => {
     };
   };
 
-  // Header change updates
   const handleHeaderChange = (field: keyof InvoiceFormData, value: string | number) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  // Product Selector Handler for Line Items
   const handleProductSelect = (index: number, selectedValue: string) => {
     const items = [...formData.items];
     const item = { ...items[index] };
@@ -183,29 +166,25 @@ export const BillUploadWorkflow: React.FC = () => {
       item.invoice_amount = 0;
       item.total = 0;
     } else {
-      const matchedProd = products.find(p =>
-        p.supplier_item_name === selectedValue ||
-        p.nickname === selectedValue ||
-        p.id === selectedValue
+      const matchedProd = products.find(
+        (p) =>
+          p.supplier_item_name === selectedValue ||
+          p.nickname === selectedValue ||
+          p.id === selectedValue
       );
-
       if (matchedProd) {
         item.supplier_item_name = matchedProd.supplier_item_name;
         item.item_name = matchedProd.nickname || matchedProd.supplier_item_name;
         item.hsn = matchedProd.hsn || '24022090';
         item.uom = matchedProd.uom || 'PAC';
         item.mrp_rsp = matchedProd.current_selling_price || 0;
-        
         const packQty = item.pack_qty && item.pack_qty > 0 ? item.pack_qty : 100;
         item.pack_qty = packQty;
         item.qty = packQty;
         item.quantity = packQty;
-
         const refRate = matchedProd.current_purchase_ref_price || 0;
         item.purchase_rate = refRate;
         item.each_pack_rate = refRate;
-
-        // Compute default bill total amount
         const billAmt = Number((refRate * packQty).toFixed(2));
         item.invoice_amount = billAmt;
         item.total = billAmt;
@@ -215,22 +194,17 @@ export const BillUploadWorkflow: React.FC = () => {
       }
     }
 
-    // Validation
     const warnings: string[] = [];
     if (!item.supplier_item_name?.trim()) warnings.push('Product selection is required');
     if (!item.pack_qty || item.pack_qty <= 0) warnings.push('Pack quantity is required');
     if (!item.invoice_amount || item.invoice_amount <= 0) warnings.push('Invoice amount is required');
-    if (item.mrp_rsp && item.each_pack_rate && item.each_pack_rate > item.mrp_rsp * 1.05) {
-      warnings.push(`Each pack rate (₹${formatINR(item.each_pack_rate)}) exceeds MRP (₹${formatINR(item.mrp_rsp)})`);
-    }
+    if (item.mrp_rsp && item.each_pack_rate && item.each_pack_rate > item.mrp_rsp * 1.05)
+      warnings.push(`Rate (₹${formatINR(item.each_pack_rate)}) exceeds MRP (₹${formatINR(item.mrp_rsp)})`);
     item.needs_review = warnings.length > 0;
     item.validation = { valid: warnings.length === 0, warnings };
 
     items[index] = item;
-    setFormData(prev => ({
-      ...prev,
-      ...recalcFromItems(items),
-    }));
+    setFormData((prev) => ({ ...prev, ...recalcFromItems(items) }));
   };
 
   const handleItemChange = (index: number, field: keyof InvoiceFormItem, value: string | number) => {
@@ -240,896 +214,677 @@ export const BillUploadWorkflow: React.FC = () => {
     if (field === 'supplier_item_name' || field === 'item_name') {
       item.item_name = String(value);
       item.supplier_item_name = String(value);
-      
-      const matchedProd = products.find(p =>
-        p.supplier_item_name.toLowerCase() === String(value).toLowerCase() ||
-        p.nickname.toLowerCase() === String(value).toLowerCase()
+      const matched = products.find(
+        (p) =>
+          p.supplier_item_name.toLowerCase() === String(value).toLowerCase() ||
+          p.nickname.toLowerCase() === String(value).toLowerCase()
       );
-      if (matchedProd) {
-        item.hsn = matchedProd.hsn || item.hsn || '24022090';
-        item.uom = matchedProd.uom || 'PAC';
-        if (matchedProd.current_purchase_ref_price && !item.each_pack_rate) {
-          item.each_pack_rate = matchedProd.current_purchase_ref_price;
-        }
-        if (matchedProd.current_selling_price && !item.mrp_rsp) {
-          item.mrp_rsp = matchedProd.current_selling_price;
-        }
+      if (matched) {
+        item.hsn = matched.hsn || item.hsn || '24022090';
+        item.uom = matched.uom || 'PAC';
+        if (matched.current_purchase_ref_price && !item.each_pack_rate)
+          item.each_pack_rate = matched.current_purchase_ref_price;
+        if (matched.current_selling_price && !item.mrp_rsp)
+          item.mrp_rsp = matched.current_selling_price;
       }
     } else if (field === 'pack_qty' || field === 'qty' || field === 'quantity') {
       const pQty = Number(value) || 0;
-      item.pack_qty = pQty;
-      item.qty = pQty;
-      item.quantity = pQty;
-
+      item.pack_qty = pQty; item.qty = pQty; item.quantity = pQty;
       const rate = Number(item.each_pack_rate || item.purchase_rate) || 0;
-      if (pQty > 0 && rate > 0) {
-        item.invoice_amount = Number((rate * pQty).toFixed(2));
-        item.total = item.invoice_amount;
-      } else if (pQty > 0 && item.invoice_amount && item.invoice_amount > 0) {
-        item.each_pack_rate = Number((item.invoice_amount / pQty).toFixed(2));
-        item.purchase_rate = item.each_pack_rate;
-      }
+      if (pQty > 0 && rate > 0) { item.invoice_amount = Number((rate * pQty).toFixed(2)); item.total = item.invoice_amount; }
+      else if (pQty > 0 && item.invoice_amount && item.invoice_amount > 0) { item.each_pack_rate = Number((item.invoice_amount / pQty).toFixed(2)); item.purchase_rate = item.each_pack_rate; }
     } else if (field === 'each_pack_rate' || field === 'purchase_rate') {
       const rate = Number(value) || 0;
-      item.each_pack_rate = rate;
-      item.purchase_rate = rate;
-
+      item.each_pack_rate = rate; item.purchase_rate = rate;
       const pQty = Number(item.pack_qty) || 0;
-      if (pQty > 0) {
-        item.invoice_amount = Number((rate * pQty).toFixed(2));
-        item.total = item.invoice_amount;
-      }
+      if (pQty > 0) { item.invoice_amount = Number((rate * pQty).toFixed(2)); item.total = item.invoice_amount; }
     } else if (field === 'mrp_rsp') {
       item.mrp_rsp = Number(value) || 0;
     } else if (field === 'invoice_amount' || field === 'total') {
       const invAmt = Number(value) || 0;
-      item.invoice_amount = invAmt;
-      item.total = invAmt;
-
+      item.invoice_amount = invAmt; item.total = invAmt;
       const packQty = Number(item.pack_qty) || 0;
-      if (packQty > 0) {
-        item.each_pack_rate = Number((invAmt / packQty).toFixed(2));
-        item.purchase_rate = item.each_pack_rate;
-      }
+      if (packQty > 0) { item.each_pack_rate = Number((invAmt / packQty).toFixed(2)); item.purchase_rate = item.each_pack_rate; }
     }
 
-    // Validation checks
     const warnings: string[] = [];
     if (!item.supplier_item_name?.trim()) warnings.push('Product selection is required');
     if (!item.pack_qty || item.pack_qty <= 0) warnings.push('Pack quantity is required');
     if (!item.invoice_amount || item.invoice_amount <= 0) warnings.push('Invoice amount is required');
-    if (item.mrp_rsp && item.each_pack_rate && item.each_pack_rate > item.mrp_rsp * 1.05) {
-      warnings.push(`Each pack rate (₹${formatINR(item.each_pack_rate)}) exceeds MRP (₹${formatINR(item.mrp_rsp)})`);
-    }
+    if (item.mrp_rsp && item.each_pack_rate && item.each_pack_rate > item.mrp_rsp * 1.05)
+      warnings.push(`Rate (₹${formatINR(item.each_pack_rate)}) exceeds MRP (₹${formatINR(item.mrp_rsp)})`);
     item.needs_review = warnings.length > 0;
     item.validation = { valid: warnings.length === 0, warnings };
 
     items[index] = item;
-    setFormData(prev => ({
-      ...prev,
-      ...recalcFromItems(items),
-    }));
+    setFormData((prev) => ({ ...prev, ...recalcFromItems(items) }));
   };
 
   const handleAddItem = () => {
-    const newItem = createBlankInvoiceItem();
-    const items = [...formData.items, newItem];
-    setFormData(prev => ({
-      ...prev,
-      ...recalcFromItems(items),
-    }));
+    const items = [...formData.items, createBlankInvoiceItem()];
+    setFormData((prev) => ({ ...prev, ...recalcFromItems(items) }));
   };
 
   const handleRemoveItem = (index: number) => {
     if (formData.items.length <= 1) return;
     const items = formData.items.filter((_, i) => i !== index);
-    setFormData(prev => ({
-      ...prev,
-      ...recalcFromItems(items)
-    }));
+    setFormData((prev) => ({ ...prev, ...recalcFromItems(items) }));
   };
 
-  // Form Validation & Confirmation
-  const validateForm = () => {
+  // ── Validation & submission ─────────────────────────────────────────────────
+  const validateForm = (): boolean => {
     const errors: string[] = [];
-
-    if (!navigator.onLine) {
-      errors.push('No internet connection. Please reconnect to save to database.');
-    }
-
-    if (!formData.invoice_date) {
-      errors.push('Invoice date is required');
-    }
-
-    if (formData.items.length === 0) {
-      errors.push('Please enter at least one line item.');
-    }
-
-    const unselected = formData.items.some(it => !it.supplier_item_name?.trim());
-    if (unselected) {
-      errors.push('Please choose a product for all line items.');
-    }
-
-    const invalidQuantities = formData.items.some(it => !it.pack_qty || it.pack_qty <= 0);
-    if (invalidQuantities) {
-      errors.push('All line items must have a pack quantity > 0.');
-    }
-
-    const invalidTotals = formData.items.some(it => !it.invoice_amount || it.invoice_amount <= 0);
-    if (invalidTotals) {
-      errors.push('All line items must have a bill amount > 0.');
-    }
-
+    if (!navigator.onLine) errors.push('No internet connection. Please reconnect to save.');
+    if (!formData.invoice_date) errors.push('Invoice date is required.');
+    if (formData.items.length === 0) errors.push('At least one line item is required.');
+    if (formData.items.some((it) => !it.supplier_item_name?.trim())) errors.push('All line items must have a product selected.');
+    if (formData.items.some((it) => !it.pack_qty || it.pack_qty <= 0)) errors.push('All line items must have pack quantity > 0.');
+    if (formData.items.some((it) => !it.invoice_amount || it.invoice_amount <= 0)) errors.push('All line items must have a bill amount > 0.');
     setFormValidationErrors(errors);
     return errors.length === 0;
   };
 
   const handleInitiateConfirm = async () => {
-    if (!validateForm()) {
-      toastWarning('Form Incomplete', 'Please check highlighted fields and line items before saving.');
-      return;
-    }
-
-    const finalInvoiceNumber = formData.invoice_number?.trim() || generateISTInvoiceNumber();
-
-    const submissionData: InvoiceFormData = {
-      ...formData,
-      supplier_name: 'AYYAPPA ENTERPRISES',
-      supplier_gstin: '33AABFA2949R1Z5',
-      invoice_number: finalInvoiceNumber,
-    };
-
+    if (!validateForm()) { toastWarning('Incomplete form', 'Check the highlighted fields.'); return; }
+    const finalNumber = formData.invoice_number?.trim() || generateISTInvoiceNumber();
+    const submissionData: InvoiceFormData = { ...formData, supplier_name: 'AYYAPPA ENTERPRISES', supplier_gstin: '33AABFA2949R1Z5', invoice_number: finalNumber };
     setIsSubmitting(true);
-
     try {
-      const matchedSupplier = suppliers.find(
-        s => s.name.trim().toLowerCase() === 'ayyappa enterprises'
-      );
-
+      const matchedSupplier = suppliers.find((s) => s.name.trim().toLowerCase() === 'ayyappa enterprises');
       if (matchedSupplier) {
-        const duplicate = await dbService.checkDuplicateInvoice(
-          matchedSupplier.id,
-          finalInvoiceNumber,
-          submissionData.invoice_date,
-          id
-        );
-        if (duplicate) {
-          setExistingDuplicate(duplicate);
-          setShowDuplicateModal(true);
-          setIsSubmitting(false);
-          return;
-        }
+        const dup = await dbService.checkDuplicateInvoice(matchedSupplier.id, finalNumber, submissionData.invoice_date, id);
+        if (dup) { setExistingDuplicate(dup); setShowDuplicateModal(true); setIsSubmitting(false); return; }
       }
-
       await executeSave(submissionData);
-    } catch (err: any) {
-      console.error('Save error:', err);
-      toastError(isEditMode ? 'Update Failed' : 'Save Failed', err.message || 'Failed to save purchase invoice');
+    } catch (err: unknown) {
+      toastError(isEditMode ? 'Update failed' : 'Save failed', err instanceof Error ? err.message : 'Error saving invoice.');
       setIsSubmitting(false);
     }
   };
 
   const executeSave = async (overrideData?: InvoiceFormData) => {
-    setIsSubmitting(true);
-    setShowDuplicateModal(false);
+    setIsSubmitting(true); setShowDuplicateModal(false);
     try {
       const saved = await dbService.confirmAndSaveInvoice(overrideData || formData, undefined, id);
-      setSavedInvoice(saved);
-      setShowSuccessModal(true);
-      toastSuccess(
-        isEditMode ? 'Invoice Updated' : 'Invoice Saved',
-        `Invoice #${saved.invoice_number} successfully ${isEditMode ? 'updated' : 'recorded'}.`
-      );
-    } catch (err: any) {
-      toastError(isEditMode ? 'Update Error' : 'Save Error', err.message || 'Error saving invoice to database');
-    } finally {
-      setIsSubmitting(false);
-    }
+      setSavedInvoice(saved); setShowSuccessModal(true);
+      toastSuccess(isEditMode ? 'Invoice updated' : 'Invoice saved', `#${saved.invoice_number} recorded.`);
+    } catch (err: unknown) {
+      toastError(isEditMode ? 'Update error' : 'Save error', err instanceof Error ? err.message : 'Error saving.');
+    } finally { setIsSubmitting(false); }
   };
 
+  // ── Loading state ───────────────────────────────────────────────────────────
   if (loadingInitial) {
     return (
-      <div className="space-y-6 max-w-6xl mx-auto pb-16">
-        <div className="flex items-center justify-between">
-          <div className="space-y-2">
-            <div className="h-6 w-60 bg-[#ECEEF5] rounded-xl animate-pulse" />
-            <div className="h-4 w-96 bg-[#ECEEF5] rounded-xl animate-pulse" />
-          </div>
-        </div>
-        <CardSkeleton />
-        <CardSkeleton />
+      <div className="space-y-6 max-w-5xl mx-auto">
+        <div className="skeleton h-8 w-56 rounded-md" />
+        <CardSkeleton /><CardSkeleton />
       </div>
     );
   }
 
+  const chequeMode = formData.payment_status === 'CHEQUE' || formData.payment_mode === 'CHEQUE';
+
   return (
-    <div className="space-y-5 sm:space-y-6 max-w-6xl mx-auto pb-24 md:pb-16">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
+    <div className="space-y-6 max-w-5xl mx-auto pb-24 lg:pb-8">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <Button
             variant="ghost"
             size="sm"
             onClick={() => navigate('/purchases')}
-            icon={<ArrowLeft className="w-4 h-4" />}
-            className="mb-1 text-[#6C7383] hover:text-[#4B49AC] -ml-2"
+            icon={<ArrowLeft className="h-4 w-4" />}
+            className="-ml-2 mb-1"
           >
-            Back to Invoices Ledger
+            Back to invoices
           </Button>
-          <h1 className="page-title flex items-center gap-2.5">
+          <h1 className="page-title">
             {isEditMode ? (
-              <Edit3 className="w-5.5 h-5.5 text-[#4B49AC]" />
+              <><Edit3 className="h-5 w-5 text-brand-600" aria-hidden="true" /> Edit invoice #{formData.invoice_number}</>
             ) : (
-              <Receipt className="w-5.5 h-5.5 text-[#4B49AC]" />
+              <><Receipt className="h-5 w-5 text-brand-600" aria-hidden="true" /> New purchase invoice</>
             )}
-            {isEditMode ? `Edit Purchase Invoice #${formData.invoice_number}` : 'New Purchase Invoice Entry'}
           </h1>
           <p className="page-subtitle">
             {isEditMode
-              ? 'Update bill line items, quantities, purchase rates, memo name, or payment details.'
-              : 'Record supplier purchase bills, select items from catalog, and maintain inventory purchase history.'}
+              ? 'Update line items, quantities, rates, memo name, or payment details.'
+              : 'Record supplier purchase bills, select items from catalog, maintain purchase history.'}
           </p>
         </div>
+        <div className="hidden sm:flex items-center gap-2">
+          <Button variant="outline" onClick={() => navigate('/purchases')}>Cancel</Button>
+          <Button
+            variant="primary"
+            onClick={handleInitiateConfirm}
+            isLoading={isSubmitting}
+            icon={isEditMode ? <Save className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+          >
+            {isEditMode ? 'Update invoice' : 'Save invoice'}
+          </Button>
+        </div>
+      </div>
 
-        <div className="flex items-center gap-2.5 self-stretch sm:self-auto">
+      {/* Offline warning */}
+      {!navigator.onLine && (
+        <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+          <WifiOff className="h-4 w-4 shrink-0" aria-hidden="true" />
+          No internet connection. Data may not save to the remote database.
+        </div>
+      )}
+
+      {/* Validation errors */}
+      {formValidationErrors.length > 0 && (
+        <div role="alert" className="p-4 bg-red-50 border border-red-200 rounded-lg space-y-1.5">
+          <p className="text-sm font-semibold text-red-900 flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-red-600" aria-hidden="true" />
+            Please fix the following before saving:
+          </p>
+          <ul className="list-disc list-inside space-y-0.5 pl-2">
+            {formValidationErrors.map((err, i) => (
+              <li key={i} className="text-sm text-red-700">{err}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* ─── Header metadata card ─────────────────────────────────────────────── */}
+      <div className="bg-white rounded-lg border border-slate-200 shadow-card p-5 space-y-4">
+        <div className="flex items-center gap-2 pb-4 border-b border-slate-100">
+          <Building2 className="h-4 w-4 text-brand-600" aria-hidden="true" />
+          <h2 className="text-sm font-semibold text-slate-900">Invoice header</h2>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          {/* Invoice number */}
+          <div>
+            <label htmlFor="invoice_number" className="block text-sm font-medium text-slate-700 mb-1.5">
+              Invoice # <span className="text-red-500" aria-hidden="true">*</span>
+            </label>
+            <input
+              id="invoice_number"
+              type="text"
+              required
+              placeholder="INV-08102026-0001"
+              value={formData.invoice_number}
+              onChange={(e) => { handleHeaderChange('invoice_number', e.target.value); if (formValidationErrors.length) setFormValidationErrors([]); }}
+              className={inputCls}
+            />
+          </div>
+
+          {/* Invoice name */}
+          <div>
+            <label htmlFor="invoice_name" className="block text-sm font-medium text-slate-700 mb-1.5">
+              Invoice name <span className="text-red-500" aria-hidden="true">*</span>
+            </label>
+            <div className="relative">
+              <select
+                id="invoice_name"
+                value={formData.invoice_name || 'RAMACHANDRAN'}
+                onChange={(e) => handleHeaderChange('invoice_name', e.target.value)}
+                className={inputCls + ' appearance-none pr-8 cursor-pointer'}
+              >
+                {INVOICE_NAME_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                {formData.invoice_name && !INVOICE_NAME_OPTIONS.includes(formData.invoice_name as never) && (
+                  <option value={formData.invoice_name}>{formData.invoice_name}</option>
+                )}
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400" aria-hidden="true">
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              </div>
+            </div>
+          </div>
+
+          {/* Invoice date */}
+          <div>
+            <label htmlFor="invoice_date" className="block text-sm font-medium text-slate-700 mb-1.5">
+              Invoice date <span className="text-red-500" aria-hidden="true">*</span>
+            </label>
+            <input
+              id="invoice_date"
+              type="date"
+              required
+              value={formData.invoice_date}
+              onChange={(e) => { handleHeaderChange('invoice_date', e.target.value); if (formValidationErrors.length) setFormValidationErrors([]); }}
+              className={inputCls}
+            />
+          </div>
+
+          {/* Payment mode */}
+          <div>
+            <label htmlFor="payment_mode" className="block text-sm font-medium text-slate-700 mb-1.5">Payment mode</label>
+            <div className="relative">
+              <select
+                id="payment_mode"
+                value={formData.payment_mode === 'CHEQUE' ? 'CHEQUE' : 'CASH'}
+                onChange={(e) => {
+                  handleHeaderChange('payment_mode', e.target.value);
+                  if (e.target.value === 'CHEQUE' && formData.payment_status !== 'CHEQUE') handleHeaderChange('payment_status', 'CHEQUE');
+                }}
+                className={inputCls + ' appearance-none pr-8 cursor-pointer'}
+              >
+                <option value="CASH">Cash</option>
+                <option value="CHEQUE">Cheque</option>
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400" aria-hidden="true">
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              </div>
+            </div>
+          </div>
+
+          {/* Payment status */}
+          <div>
+            <label htmlFor="payment_status" className="block text-sm font-medium text-slate-700 mb-1.5">Payment status</label>
+            <div className="relative">
+              <select
+                id="payment_status"
+                value={formData.payment_status === 'CHEQUE' ? 'CHEQUE' : 'PAID'}
+                onChange={(e) => {
+                  handleHeaderChange('payment_status', e.target.value);
+                  if (e.target.value === 'CHEQUE' && formData.payment_mode !== 'CHEQUE') handleHeaderChange('payment_mode', 'CHEQUE');
+                }}
+                className={inputCls + ' appearance-none pr-8 cursor-pointer'}
+              >
+                <option value="PAID">Paid</option>
+                <option value="CHEQUE">Cheque</option>
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400" aria-hidden="true">
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Cheque date row */}
+        {chequeMode && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-slate-100">
+            <div>
+              <label htmlFor="cheque_date" className="block text-sm font-medium text-slate-700 mb-1.5 flex items-center gap-1.5">
+                <Calendar className="h-3.5 w-3.5 text-brand-600" aria-hidden="true" />
+                Cheque clearance date <span className="text-red-500" aria-hidden="true">*</span>
+              </label>
+              <input
+                id="cheque_date"
+                type="date"
+                required
+                value={formData.cheque_date || formData.invoice_date}
+                onChange={(e) => handleHeaderChange('cheque_date', e.target.value)}
+                className={inputCls}
+              />
+              <p className="text-xs text-slate-500 mt-1">
+                Date the cheque amount will be credited ({formatDisplayDate(formData.cheque_date || formData.invoice_date)})
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ─── Line items card ──────────────────────────────────────────────────── */}
+      <div className="bg-white rounded-lg border border-slate-200 shadow-card p-5 space-y-4">
+        <div className="flex items-center justify-between gap-3 pb-4 border-b border-slate-100">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+              <Package className="h-4 w-4 text-brand-600" aria-hidden="true" />
+              Line items ({formData.items.length})
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Bill Total = Packs × Purchase Rate (auto-calculated)
+            </p>
+          </div>
           <Button
             variant="outline"
-            onClick={() => navigate('/purchases')}
-            className="flex-1 sm:flex-none justify-center"
+            size="sm"
+            onClick={handleAddItem}
+            icon={<Plus className="h-3.5 w-3.5" />}
           >
+            Add item
+          </Button>
+        </div>
+
+        {/* Mobile cards */}
+        <div className="lg:hidden space-y-3">
+          {formData.items.map((item, idx) => {
+            const isCustom = item.supplier_item_name && !products.some((p) => p.supplier_item_name === item.supplier_item_name);
+            const hasError = !item.supplier_item_name || (item.pack_qty || 0) <= 0;
+            return (
+              <div key={idx} className={`p-4 rounded-lg border space-y-3 ${hasError ? 'border-red-200 bg-red-50/30' : 'border-slate-200 bg-slate-50'}`}>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-600">Item {idx + 1}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveItem(idx)}
+                    disabled={formData.items.length <= 1}
+                    aria-label={`Remove item ${idx + 1}`}
+                    className="p-1.5 text-slate-400 hover:text-red-600 disabled:opacity-30 rounded-md hover:bg-red-50 min-w-[32px] min-h-[32px] flex items-center justify-center"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Product <span className="text-red-500" aria-hidden="true">*</span>
+                  </label>
+                  <select
+                    value={isCustom ? '__custom__' : (item.supplier_item_name || '')}
+                    onChange={(e) => e.target.value === '__custom__' ? handleItemChange(idx, 'supplier_item_name', 'Custom Item') : handleProductSelect(idx, e.target.value)}
+                    className={`${inputCls} ${!item.supplier_item_name ? 'border-red-400' : ''} appearance-none`}
+                  >
+                    <option value="">— Select product —</option>
+                    {products.map((p) => <option key={p.id} value={p.supplier_item_name}>{p.nickname}</option>)}
+                    <option value="__custom__">+ Custom item</option>
+                  </select>
+                  {isCustom && (
+                    <input
+                      type="text"
+                      placeholder="Enter custom item name..."
+                      value={item.supplier_item_name || ''}
+                      onChange={(e) => handleItemChange(idx, 'supplier_item_name', e.target.value)}
+                      className={`${inputCls} mt-2`}
+                    />
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">Packs</label>
+                    <input type="number" min="1" placeholder="100" value={item.pack_qty || ''} onChange={(e) => handleItemChange(idx, 'pack_qty', e.target.value)} className={`${inputCls} text-right`} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">MRP (₹)</label>
+                    <input type="number" min="0" step="0.01" placeholder="0.00" value={item.mrp_rsp || ''} onChange={(e) => handleItemChange(idx, 'mrp_rsp', e.target.value)} className={`${inputCls} text-right`} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">Rate (₹)</label>
+                    <input type="number" min="0" step="0.01" placeholder="0.00" value={item.each_pack_rate || item.purchase_rate || ''} onChange={(e) => handleItemChange(idx, 'each_pack_rate', e.target.value)} className={`${inputCls} text-right font-semibold text-brand-700`} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">Total (₹)</label>
+                    <input type="number" min="0" step="0.01" placeholder="0.00" value={item.invoice_amount || item.total || ''} onChange={(e) => handleItemChange(idx, 'invoice_amount', e.target.value)} className={`${inputCls} text-right font-semibold`} />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Desktop table */}
+        <div className="hidden lg:block overflow-x-auto rounded-lg border border-slate-200">
+          <table className="w-full text-sm min-w-[700px]">
+            <thead className="bg-slate-50 border-b border-slate-200">
+              <tr>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-10">#</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider min-w-[240px]">Product</th>
+                <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider w-24">Packs</th>
+                <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider w-28">MRP (₹)</th>
+                <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider w-32">Rate (₹)</th>
+                <th scope="col" className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider w-32">Total (₹)</th>
+                <th scope="col" className="px-4 py-3 w-12" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 bg-white">
+              {formData.items.map((item, idx) => {
+                const isCustom = item.supplier_item_name && !products.some((p) => p.supplier_item_name === item.supplier_item_name);
+                const hasError = !item.supplier_item_name;
+                return (
+                  <tr key={idx} className={hasError ? 'bg-red-50/20' : 'hover:bg-slate-50 transition-colors'}>
+                    <td className="px-4 py-2.5 text-xs font-mono text-slate-400 text-center">{idx + 1}</td>
+                    <td className="px-4 py-2.5">
+                      <select
+                        value={isCustom ? '__custom__' : (item.supplier_item_name || '')}
+                        onChange={(e) => e.target.value === '__custom__' ? handleItemChange(idx, 'supplier_item_name', 'Custom Item') : handleProductSelect(idx, e.target.value)}
+                        className={[
+                          'w-full h-8 rounded-md border bg-white px-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600 appearance-none cursor-pointer',
+                          !item.supplier_item_name ? 'border-red-400' : 'border-slate-200',
+                        ].join(' ')}
+                        aria-label={`Product for item ${idx + 1}`}
+                      >
+                        <option value="">— Select product —</option>
+                        {products.map((p) => <option key={p.id} value={p.supplier_item_name}>{p.nickname}</option>)}
+                        <option value="__custom__">+ Custom item</option>
+                      </select>
+                      {isCustom && (
+                        <input
+                          type="text"
+                          placeholder="Custom item name..."
+                          value={item.supplier_item_name || ''}
+                          onChange={(e) => handleItemChange(idx, 'supplier_item_name', e.target.value)}
+                          className="mt-1 h-8 w-full rounded-md border border-brand-300 bg-white px-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-600/20"
+                        />
+                      )}
+                    </td>
+                    {/* Packs */}
+                    <td className="px-4 py-2.5">
+                      <input type="number" min="1" step="1" placeholder="100" value={item.pack_qty || ''} onChange={(e) => handleItemChange(idx, 'pack_qty', e.target.value)}
+                        className="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-right text-sm font-mono font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600" />
+                    </td>
+                    {/* MRP */}
+                    <td className="px-4 py-2.5">
+                      <input type="number" min="0" step="0.01" placeholder="0.00" value={item.mrp_rsp || ''} onChange={(e) => handleItemChange(idx, 'mrp_rsp', e.target.value)}
+                        className="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-right text-sm font-mono text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600" />
+                    </td>
+                    {/* Rate */}
+                    <td className="px-4 py-2.5">
+                      <input type="number" min="0" step="0.01" placeholder="0.00" value={item.each_pack_rate || item.purchase_rate || ''} onChange={(e) => handleItemChange(idx, 'each_pack_rate', e.target.value)}
+                        className="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-right text-sm font-mono font-semibold text-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600" />
+                    </td>
+                    {/* Total */}
+                    <td className="px-4 py-2.5">
+                      <input type="number" min="0" step="0.01" placeholder="0.00" value={item.invoice_amount || item.total || ''} onChange={(e) => handleItemChange(idx, 'invoice_amount', e.target.value)}
+                        className="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-right text-sm font-mono font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600" />
+                    </td>
+                    <td className="px-4 py-2.5 text-center">
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveItem(idx)}
+                        disabled={formData.items.length <= 1}
+                        aria-label={`Remove item ${idx + 1}`}
+                        className="p-1.5 text-slate-400 hover:text-red-600 disabled:opacity-30 rounded-md hover:bg-red-50 min-w-[32px] min-h-[32px] flex items-center justify-center mx-auto"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleAddItem}
+          icon={<Plus className="h-3.5 w-3.5" />}
+          className="w-full justify-center"
+        >
+          Add line item
+        </Button>
+      </div>
+
+      {/* ─── Totals summary card ───────────────────────────────────────────────── */}
+      <div className="bg-white rounded-lg border border-slate-200 shadow-card p-5 space-y-4">
+        <h2 className="text-sm font-semibold text-slate-900 pb-4 border-b border-slate-100">
+          Invoice totals
+        </h2>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Line items</p>
+            <p className="text-2xl font-bold font-mono tabular-nums text-slate-900 mt-1.5">
+              {formData.items.length}
+            </p>
+          </div>
+          <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Total packs</p>
+            <p className="text-2xl font-bold font-mono tabular-nums text-violet-700 mt-1.5">
+              {(formData.total_packs || 0).toLocaleString('en-IN')}
+            </p>
+          </div>
+          <div className="p-4 bg-brand-50 rounded-lg border border-brand-200">
+            <p className="text-xs font-medium text-brand-700 uppercase tracking-wide">Grand total</p>
+            <p className="text-2xl font-bold font-mono tabular-nums text-brand-800 mt-1.5">
+              ₹{formatINR(formData.grand_total)}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-slate-100">
+          <Button variant="outline" onClick={() => navigate('/purchases')} className="sm:w-auto justify-center">
             Cancel
           </Button>
           <Button
             variant="primary"
             onClick={handleInitiateConfirm}
             isLoading={isSubmitting}
-            icon={isEditMode ? <Save className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
-            className="flex-1 sm:flex-none justify-center shadow-md shadow-[#4B49AC]/25 font-bold"
+            icon={isEditMode ? <Save className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+            className="sm:w-auto justify-center"
           >
-            {isEditMode ? 'Update Invoice' : 'Save this Invoice'}
+            {isEditMode ? 'Update invoice' : 'Save invoice'}
           </Button>
         </div>
       </div>
 
-      {/* Validation Errors Notice */}
-      {formValidationErrors.length > 0 && (
-        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-800 space-y-1.5 animate-in slide-in-from-top-2 duration-200 shadow-sm">
-          <div className="flex items-center gap-2 font-bold text-rose-900 text-sm">
-            <AlertTriangle className="w-4 h-4 text-rose-600" />
-            <span>Please complete all required invoice fields:</span>
-          </div>
-          <ul className="list-disc list-inside space-y-1 pl-2 text-rose-700">
-            {formValidationErrors.map((err, i) => (
-              <li key={i}>{err}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* Main Invoice Form */}
-      <div className="space-y-5 sm:space-y-6">
-        
-        {/* Header Metadata Card */}
-        <div className="p-4 sm:p-5 md:p-6 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-[#ECEEF5]">
-            <div className="flex items-center gap-2">
-              <Building2 className="w-4.5 h-4.5 text-[#4B49AC]" />
-              <h2 className="text-xs sm:text-sm font-bold text-[#1F1F2C] uppercase tracking-wider">Invoice Header Information</h2>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5 sm:gap-4">
-            {/* Invoice Number */}
-            <div>
-              <label className="block text-xs font-semibold text-[#1F1F2C] mb-1">
-                Invoice Number <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="e.g. INV-08102026-0001"
-                value={formData.invoice_number}
-                onChange={(e) => {
-                  handleHeaderChange('invoice_number', e.target.value);
-                  if (formValidationErrors.length > 0) setFormValidationErrors([]);
-                }}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#ECEEF5] text-xs sm:text-sm font-mono font-bold text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC] shadow-xs"
-              />
-            </div>
-
-            {/* Invoice Name Dropdown */}
-            <div>
-              <label className="block text-xs font-semibold text-[#1F1F2C] mb-1">
-                Invoice Name <span className="text-rose-500">*</span>
-              </label>
-              <select
-                value={formData.invoice_name || 'RAMACHANDRAN'}
-                onChange={(e) => handleHeaderChange('invoice_name', e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#ECEEF5] text-xs sm:text-sm font-bold text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC] shadow-xs"
-              >
-                {INVOICE_NAME_OPTIONS.map(opt => (
-                  <option key={opt} value={opt}>
-                    {opt}
-                  </option>
-                ))}
-                {formData.invoice_name && !INVOICE_NAME_OPTIONS.includes(formData.invoice_name as any) && (
-                  <option value={formData.invoice_name}>
-                    {formData.invoice_name}
-                  </option>
-                )}
-              </select>
-            </div>
-
-            {/* Invoice Date */}
-            <div>
-              <label className="block text-xs font-semibold text-[#1F1F2C] mb-1">
-                Invoice Date <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="date"
-                required
-                value={formData.invoice_date}
-                onChange={(e) => {
-                  handleHeaderChange('invoice_date', e.target.value);
-                  if (formValidationErrors.length > 0) setFormValidationErrors([]);
-                }}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#ECEEF5] text-xs sm:text-sm font-mono text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC] shadow-xs"
-              />
-            </div>
-
-            {/* Payment Mode (Cash & Cheque only) */}
-            <div>
-              <label className="block text-xs font-semibold text-[#1F1F2C] mb-1">Payment Mode</label>
-              <select
-                value={formData.payment_mode === 'CHEQUE' ? 'CHEQUE' : 'CASH'}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  handleHeaderChange('payment_mode', val);
-                  if (val === 'CHEQUE' && formData.payment_status !== 'CHEQUE') {
-                    handleHeaderChange('payment_status', 'CHEQUE');
-                  }
-                }}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#ECEEF5] text-xs sm:text-sm font-semibold text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC] shadow-xs"
-              >
-                <option value="CASH">Cash</option>
-                <option value="CHEQUE">Cheque</option>
-              </select>
-            </div>
-
-            {/* Payment Status (Paid & Cheque only) */}
-            <div>
-              <label className="block text-xs font-semibold text-[#1F1F2C] mb-1">Payment Status</label>
-              <select
-                value={formData.payment_status === 'CHEQUE' ? 'CHEQUE' : 'PAID'}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  handleHeaderChange('payment_status', val);
-                  if (val === 'CHEQUE' && formData.payment_mode !== 'CHEQUE') {
-                    handleHeaderChange('payment_mode', 'CHEQUE');
-                  }
-                }}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-[#ECEEF5] text-xs sm:text-sm font-semibold text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC] shadow-xs"
-              >
-                <option value="PAID">Paid</option>
-                <option value="CHEQUE">Cheque</option>
-              </select>
-            </div>
-
-            {/* Cheque Date Calendar Picker if Cheque is selected */}
-            {(formData.payment_status === 'CHEQUE' || formData.payment_mode === 'CHEQUE') && (
-              <div className="sm:col-span-2 md:col-span-3 lg:col-span-5 p-3.5 rounded-xl bg-[#F5F7FF] border-2 border-[#7978E9]/40 space-y-1.5 animate-in fade-in duration-200">
-                <label className="block text-xs font-bold text-[#4B49AC] flex items-center gap-1.5">
-                  <Calendar className="w-4 h-4 text-[#7978E9]" />
-                  Cheque Clearance Date (Date Amount Will Pass) <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  required
-                  value={formData.cheque_date || formData.invoice_date}
-                  onChange={(e) => handleHeaderChange('cheque_date', e.target.value)}
-                  className="w-full sm:w-64 px-3.5 py-2 rounded-xl bg-white border border-[#7978E9]/50 text-xs sm:text-sm font-mono text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/30 focus:border-[#4B49AC] shadow-sm"
-                />
-                <p className="text-[11px] text-[#6C7383]">
-                  Scheduled clearance date ({formatDisplayDate(formData.cheque_date || formData.invoice_date)}) for the bank to process and pass this cheque amount.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Line Items Card */}
-        <div className="p-4 sm:p-5 md:p-6 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3 border-b border-[#ECEEF5]">
-            <div>
-              <h3 className="text-xs sm:text-sm font-bold text-[#1F1F2C] uppercase tracking-wider flex items-center gap-2">
-                <Package className="w-4 h-4 text-[#4B49AC]" />
-                Line Items ({formData.items.length})
-              </h3>
-              <p className="text-[11px] text-[#6C7383] mt-0.5">
-                Select products from catalog. Bill Total is automatically calculated as <code>Packs × Purchase Rate</code>.
-              </p>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleAddItem}
-              icon={<Plus className="w-3.5 h-3.5" />}
-              className="self-start sm:self-auto font-medium"
-            >
-              Add Line Item
-            </Button>
-          </div>
-
-          {/* MOBILE CARDS VIEW (< 768px) */}
-          <div className="md:hidden space-y-3.5">
-            {formData.items.map((item, idx) => {
-              const isCustom = item.supplier_item_name && !products.some(p => p.supplier_item_name === item.supplier_item_name);
-              const hasError = !item.supplier_item_name || (item.pack_qty || 0) <= 0;
-              return (
-                <div
-                  key={idx}
-                  className={`p-4 rounded-xl border space-y-3 transition-colors ${
-                    hasError ? 'bg-rose-50/20 border-rose-200' : 'bg-[#F8F9FE] border-[#ECEEF5]'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="w-6 h-6 rounded-full bg-[#4B49AC] text-white font-mono font-bold text-xs flex items-center justify-center">
-                        {idx + 1}
-                      </span>
-                      <span className="text-xs font-bold text-[#1F1F2C]">Item #{idx + 1}</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveItem(idx)}
-                      disabled={formData.items.length <= 1}
-                      className="p-1.5 text-[#8F93A0] hover:text-rose-600 disabled:opacity-30 rounded-lg hover:bg-rose-50"
-                      title="Delete item"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-semibold text-[#1F1F2C] mb-1">Select Product *</label>
-                    <select
-                      value={isCustom ? '__custom__' : (item.supplier_item_name || '')}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val === '__custom__') {
-                          handleItemChange(idx, 'supplier_item_name', 'Custom Item');
-                        } else {
-                          handleProductSelect(idx, val);
-                        }
-                      }}
-                      className={`w-full px-3 py-2 rounded-lg bg-white border text-xs font-semibold text-[#1F1F2C] focus:outline-none focus:ring-1 focus:ring-[#4B49AC] ${
-                        !item.supplier_item_name ? 'border-rose-300' : 'border-[#ECEEF5]'
-                      }`}
-                    >
-                      <option value="">-- Choose Product / Cigarette --</option>
-                      {products.map((p) => (
-                        <option key={p.id} value={p.supplier_item_name}>
-                          {p.nickname}
-                        </option>
-                      ))}
-                      <option value="__custom__">+ Other / Custom Item</option>
-                    </select>
-                    {isCustom && (
-                      <input
-                        type="text"
-                        placeholder="Enter custom item name..."
-                        value={item.supplier_item_name || ''}
-                        onChange={(e) => handleItemChange(idx, 'supplier_item_name', e.target.value)}
-                        className="w-full mt-2 px-3 py-1.5 rounded-lg bg-white border border-[#4B49AC]/40 text-xs font-medium text-[#1F1F2C] focus:outline-none focus:ring-1 focus:ring-[#4B49AC]"
-                        autoFocus
-                      />
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <div>
-                      <label className="block text-[10px] font-semibold text-[#6C7383] uppercase mb-1">Packs *</label>
-                      <input
-                        type="number"
-                        min="1"
-                        placeholder="100"
-                        value={item.pack_qty || ''}
-                        onChange={(e) => handleItemChange(idx, 'pack_qty', e.target.value)}
-                        className="w-full px-2.5 py-1.5 text-right rounded-lg bg-white border border-[#ECEEF5] text-xs font-mono font-bold text-[#1F1F2C] focus:outline-none focus:ring-1 focus:ring-[#4B49AC]"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-semibold text-[#6C7383] uppercase mb-1">MRP (₹)</label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        placeholder="0.00"
-                        value={item.mrp_rsp || ''}
-                        onChange={(e) => handleItemChange(idx, 'mrp_rsp', e.target.value)}
-                        className="w-full px-2.5 py-1.5 text-right rounded-lg bg-white border border-[#ECEEF5] text-xs font-mono text-[#1F1F2C] focus:outline-none focus:ring-1 focus:ring-[#4B49AC]"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-semibold text-[#6C7383] uppercase mb-1">Purchase Rate (₹) *</label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        placeholder="0.00"
-                        value={item.each_pack_rate || item.purchase_rate || ''}
-                        onChange={(e) => handleItemChange(idx, 'each_pack_rate', e.target.value)}
-                        className="w-full px-2.5 py-1.5 text-right rounded-lg bg-white border border-[#ECEEF5] text-xs font-mono font-bold text-[#4B49AC] focus:outline-none focus:ring-1 focus:ring-[#4B49AC]"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-semibold text-[#6C7383] uppercase mb-1">Bill Total (₹) *</label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        placeholder="0.00"
-                        value={item.invoice_amount || item.total || ''}
-                        onChange={(e) => handleItemChange(idx, 'invoice_amount', e.target.value)}
-                        className="w-full px-2.5 py-1.5 text-right rounded-lg bg-white border border-[#ECEEF5] text-xs font-mono font-bold text-[#1F1F2C] focus:outline-none focus:ring-1 focus:ring-[#4B49AC]"
-                      />
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* DESKTOP / TABLET TABLE VIEW (>= 768px) */}
-          <div className="hidden md:block overflow-x-auto rounded-xl border border-[#ECEEF5]">
-            <table className="w-full text-left text-xs border-collapse min-w-[700px]">
-              <thead>
-                <tr className="bg-[#F5F7FF] text-[#6C7383] uppercase text-[10px] font-bold border-b border-[#ECEEF5]">
-                  <th className="py-3 px-3.5 w-10 text-center">#</th>
-                  <th className="py-3 px-3.5 min-w-[260px]">Select Product</th>
-                  <th className="py-3 px-3.5 w-24 text-right">Packs</th>
-                  <th className="py-3 px-3.5 w-28 text-right">MRP (₹)</th>
-                  <th className="py-3 px-3.5 w-32 text-right">Purchase Rate (₹)</th>
-                  <th className="py-3 px-3.5 w-36 text-right">Bill Total (₹)</th>
-                  <th className="py-3 px-3.5 w-12 text-center"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#ECEEF5]">
-                {formData.items.map((item, idx) => {
-                  const isCustom = item.supplier_item_name && !products.some(p => p.supplier_item_name === item.supplier_item_name);
-                  const hasError = !item.supplier_item_name;
-                  return (
-                    <tr
-                      key={idx}
-                      className={`hover:bg-[#F8F9FE] transition-colors ${
-                        hasError ? 'bg-rose-50/10' : ''
-                      }`}
-                    >
-                      <td className="py-2.5 px-3.5 font-mono text-[#6C7383] text-center font-bold">
-                        {idx + 1}
-                      </td>
-                      <td className="py-2.5 px-3.5">
-                        <div className="space-y-1.5">
-                          <select
-                            value={isCustom ? '__custom__' : (item.supplier_item_name || '')}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              if (val === '__custom__') {
-                                handleItemChange(idx, 'supplier_item_name', 'Custom Item');
-                              } else {
-                                handleProductSelect(idx, val);
-                              }
-                            }}
-                            className={`w-full px-3 py-2 rounded-xl bg-[#F5F7FF] border text-xs font-semibold text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC] shadow-xs cursor-pointer ${
-                              !item.supplier_item_name ? 'border-rose-300' : 'border-[#ECEEF5]'
-                            }`}
-                          >
-                            <option value="">-- Choose Product / Cigarette --</option>
-                            {products.map((p) => (
-                              <option key={p.id} value={p.supplier_item_name}>
-                                {p.nickname}
-                              </option>
-                            ))}
-                            <option value="__custom__">+ Other / Custom Item</option>
-                          </select>
-                          {isCustom && (
-                            <input
-                              type="text"
-                              placeholder="Enter custom item name..."
-                              value={item.supplier_item_name || ''}
-                              onChange={(e) => handleItemChange(idx, 'supplier_item_name', e.target.value)}
-                              className="w-full px-2.5 py-1.5 rounded-lg bg-white border border-[#4B49AC]/40 text-xs font-medium text-[#1F1F2C] focus:outline-none focus:ring-1 focus:ring-[#4B49AC]"
-                              autoFocus
-                            />
-                          )}
-                        </div>
-                      </td>
-                      <td className="py-2.5 px-3.5 text-right">
-                        <input
-                          type="number"
-                          min="1"
-                          step="1"
-                          placeholder="100"
-                          value={item.pack_qty || ''}
-                          onChange={(e) => handleItemChange(idx, 'pack_qty', e.target.value)}
-                          className="w-full px-3 py-2 text-right rounded-xl bg-[#F5F7FF] border border-[#ECEEF5] text-xs font-mono font-bold text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC]"
-                        />
-                      </td>
-                      <td className="py-2.5 px-3.5 text-right">
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          placeholder="0.00"
-                          value={item.mrp_rsp || ''}
-                          onChange={(e) => handleItemChange(idx, 'mrp_rsp', e.target.value)}
-                          className="w-full px-3 py-2 text-right rounded-xl bg-[#F5F7FF] border border-[#ECEEF5] text-xs font-mono font-semibold text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC]"
-                        />
-                      </td>
-                      <td className="py-2.5 px-3.5 text-right">
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          placeholder="0.00"
-                          value={item.each_pack_rate || item.purchase_rate || ''}
-                          onChange={(e) => handleItemChange(idx, 'each_pack_rate', e.target.value)}
-                          className="w-full px-3 py-2 text-right rounded-xl bg-[#F5F7FF] border border-[#ECEEF5] text-xs font-mono font-bold text-[#4B49AC] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC]"
-                        />
-                      </td>
-                      <td className="py-2.5 px-3.5 text-right">
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          placeholder="0.00"
-                          value={item.invoice_amount || item.total || ''}
-                          onChange={(e) => handleItemChange(idx, 'invoice_amount', e.target.value)}
-                          className="w-full px-3 py-2 text-right rounded-xl bg-[#F5F7FF] border border-[#7978E9]/30 text-xs font-mono font-bold text-[#1F1F2C] focus:outline-none focus:ring-2 focus:ring-[#4B49AC]/20 focus:border-[#4B49AC]"
-                        />
-                      </td>
-                      <td className="py-2.5 px-3.5 text-center">
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveItem(idx)}
-                          disabled={formData.items.length <= 1}
-                          className="p-1.5 text-[#8F93A0] hover:text-rose-600 disabled:opacity-25 transition-colors rounded-lg hover:bg-rose-50"
-                          title="Delete line item"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleAddItem}
-            icon={<Plus className="w-3.5 h-3.5" />}
-            className="w-full justify-center py-2 text-xs font-semibold"
-          >
-            Add Another Line Item
-          </Button>
-        </div>
-
-        {/* Invoice Grand Total Summary Card */}
-        <div className="p-4 sm:p-5 md:p-6 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash space-y-4">
-          <h3 className="text-xs sm:text-sm font-bold text-[#1F1F2C] uppercase tracking-wider pb-3 border-b border-[#ECEEF5] flex items-center gap-2">
-            <DollarSign className="w-4 h-4 text-[#4B49AC]" />
-            Invoice Total Summary
-          </h3>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-4 text-xs">
-            <div className="p-4 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5] flex flex-col justify-between">
-              <span className="text-[#6C7383] block text-xs font-semibold uppercase tracking-wider">Total Line Items</span>
-              <span className="font-mono text-xl sm:text-2xl font-bold text-[#1F1F2C] mt-2 block">
-                {formData.items.length} {formData.items.length === 1 ? 'Item' : 'Items'}
-              </span>
-            </div>
-
-            <div className="p-4 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5] flex flex-col justify-between">
-              <span className="text-[#6C7383] block text-xs font-semibold uppercase tracking-wider">Total Quantity (Packs)</span>
-              <span className="font-mono text-xl sm:text-2xl font-bold text-[#7978E9] mt-2 block">
-                {(formData.total_packs || 0).toLocaleString()} Packs
-              </span>
-            </div>
-
-            <div className="p-4 rounded-xl bg-gradient-to-br from-[#4B49AC]/10 to-[#7978E9]/15 border-2 border-[#4B49AC]/30 flex flex-col justify-between">
-              <span className="text-[#4B49AC] block text-xs font-bold uppercase tracking-wider">Grand Total (Invoice Amount)</span>
-              <span className="font-mono text-2xl sm:text-3xl font-black text-[#4B49AC] mt-1.5 block truncate">
-                ₹{formatINR(formData.grand_total)}
-              </span>
-            </div>
-          </div>
-
-          <div className="pt-3 flex flex-col sm:flex-row justify-end gap-2.5 sm:gap-3 border-t border-[#ECEEF5]">
-            <Button
-              variant="outline"
-              onClick={() => navigate('/purchases')}
-              className="w-full sm:w-auto justify-center"
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleInitiateConfirm}
-              isLoading={isSubmitting}
-              icon={isEditMode ? <Save className="w-5 h-5" /> : <CheckCircle2 className="w-5 h-5" />}
-              className="w-full sm:w-auto justify-center px-8 py-3 text-sm font-bold shadow-lg shadow-[#4B49AC]/30 bg-[#4B49AC] hover:bg-[#3f3da0] text-white"
-            >
-              {isEditMode ? 'Update Invoice' : 'Save this Invoice'}
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* Mobile Sticky Bottom Bar */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 p-3.5 bg-white/95 backdrop-blur-md border-t border-[#ECEEF5] shadow-2xl z-30 flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <span className="text-[10px] uppercase font-bold text-[#6C7383] block">Invoice Total</span>
-          <span className="font-mono text-base font-black text-[#4B49AC] block truncate">
-            ₹{formatINR(formData.grand_total)}
-          </span>
+      {/* ─── Mobile sticky footer ──────────────────────────────────────────────── */}
+      <div className="lg:hidden no-print fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur border-t border-slate-200 shadow-xl p-3 pb-safe z-30 flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs text-slate-500">Total</p>
+          <p className="text-base font-bold font-mono tabular-nums text-brand-700">₹{formatINR(formData.grand_total)}</p>
         </div>
         <Button
           variant="primary"
           size="sm"
           onClick={handleInitiateConfirm}
           isLoading={isSubmitting}
-          icon={isEditMode ? <Save className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
-          className="shadow-lg shadow-[#4B49AC]/30 font-bold px-5"
+          icon={isEditMode ? <Save className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
         >
-          {isEditMode ? 'Update Invoice' : 'Save this Invoice'}
+          {isEditMode ? 'Update' : 'Save invoice'}
         </Button>
       </div>
 
-      {/* Duplicate Invoice Warning Modal */}
+      {/* ─── Duplicate warning modal ───────────────────────────────────────────── */}
       <Modal
         isOpen={showDuplicateModal}
         onClose={() => setShowDuplicateModal(false)}
-        title="Potential Duplicate Purchase Invoice"
-        size="md"
+        title="Possible duplicate invoice"
+        size="sm"
+        footer={
+          <div className="flex items-center justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => setShowDuplicateModal(false)}>
+              Cancel & review
+            </Button>
+            <Button variant="danger" size="sm" onClick={() => executeSave()} isLoading={isSubmitting}>
+              Save anyway
+            </Button>
+          </div>
+        }
       >
-        <div className="space-y-4 text-sm">
-          <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
-            <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+        <div className="space-y-3">
+          <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <ShieldAlert className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" aria-hidden="true" />
             <div>
-              <h4 className="font-bold text-amber-900">Invoice #{formData.invoice_number} Already Exists</h4>
-              <p className="text-xs text-amber-800 mt-1">
-                A purchase invoice with this exact invoice number and supplier was already recorded in the database.
+              <p className="text-sm font-semibold text-amber-900">
+                Invoice #{formData.invoice_number} already exists
+              </p>
+              <p className="text-xs text-amber-700 mt-0.5">
+                An invoice with this number and supplier was already recorded.
               </p>
             </div>
           </div>
-
           {existingDuplicate && (
-            <div className="p-3 bg-[#F5F7FF] rounded-xl text-xs space-y-1.5 font-mono">
-              <div>Invoice Date: <strong>{formatDisplayDate(existingDuplicate.invoice_date)}</strong></div>
-              <div>Grand Total: <strong>₹{formatINR(existingDuplicate.grand_total)}</strong></div>
-              <div>Created At: <strong>{formatISTTimestamp(existingDuplicate.created_at)}</strong></div>
+            <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs font-mono space-y-1">
+              <div className="flex justify-between gap-2">
+                <span className="text-slate-500">Date:</span>
+                <span className="font-semibold">{formatDisplayDate(existingDuplicate.invoice_date)}</span>
+              </div>
+              <div className="flex justify-between gap-2">
+                <span className="text-slate-500">Total:</span>
+                <span className="font-semibold">₹{formatINR(existingDuplicate.grand_total)}</span>
+              </div>
+              <div className="flex justify-between gap-2">
+                <span className="text-slate-500">Recorded:</span>
+                <span className="font-semibold">{formatISTTimestamp(existingDuplicate.created_at)}</span>
+              </div>
             </div>
           )}
-
-          <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 pt-3">
-            <Button variant="outline" size="sm" onClick={() => setShowDuplicateModal(false)} className="w-full sm:w-auto justify-center">
-              Cancel & Review
-            </Button>
-            <Button
-              variant="danger"
-              size="sm"
-              onClick={() => executeSave()}
-              isLoading={isSubmitting}
-              className="w-full sm:w-auto justify-center font-semibold"
-            >
-              Proceed & Save Anyway
-            </Button>
-          </div>
         </div>
       </Modal>
 
-      {/* Save Success Popup Modal */}
+      {/* ─── Save success modal ────────────────────────────────────────────────── */}
       <Modal
         isOpen={showSuccessModal}
-        onClose={() => {
-          setShowSuccessModal(false);
-          if (savedInvoice) navigate(`/purchases/${savedInvoice.id}`);
-        }}
-        title={isEditMode ? 'Invoice Updated' : 'Invoice Saved'}
-        size="md"
-      >
-        <div className="text-center py-2 space-y-4">
-          <div className="w-16 h-16 mx-auto rounded-2xl bg-emerald-50 border-2 border-emerald-200 flex items-center justify-center text-emerald-600 shadow-sm animate-in zoom-in-75 duration-300">
-            <CheckCircle2 className="w-10 h-10" />
-          </div>
-
-          <div>
-            <h3 className="text-lg font-bold text-[#1F1F2C]">
-              {isEditMode ? 'Invoice Updated Successfully!' : 'Invoice Saved Successfully!'}
-            </h3>
-            <p className="text-xs text-[#6C7383] mt-1">
-              {isEditMode
-                ? 'Purchase invoice details have been updated in your database ledger.'
-                : 'Purchase invoice has been recorded in your database ledger.'}
-            </p>
-          </div>
-
-          {savedInvoice && (
-            <div className="p-4 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5] text-left text-xs space-y-2 font-mono">
-              <div className="flex justify-between pb-1.5 border-b border-[#ECEEF5]">
-                <span className="text-[#6C7383]">Invoice #:</span>
-                <span className="font-bold text-[#1F1F2C]">{savedInvoice.invoice_number}</span>
-              </div>
-              {savedInvoice.invoice_name && (
-                <div className="flex justify-between pb-1.5 border-b border-[#ECEEF5]">
-                  <span className="text-[#6C7383]">Invoice Name:</span>
-                  <span className="font-bold text-[#4B49AC]">{savedInvoice.invoice_name}</span>
-                </div>
-              )}
-              <div className="flex justify-between pb-1.5 border-b border-[#ECEEF5]">
-                <span className="text-[#6C7383]">Invoice Date:</span>
-                <span className="font-bold text-[#1F1F2C]">{formatDisplayDate(savedInvoice.invoice_date)}</span>
-              </div>
-              <div className="flex justify-between pb-1.5 border-b border-[#ECEEF5]">
-                <span className="text-[#6C7383]">Supplier:</span>
-                <span className="font-bold text-[#1F1F2C]">{savedInvoice.supplier?.name || 'AYYAPPA ENTERPRISES'}</span>
-              </div>
-              <div className="flex justify-between pb-1.5 border-b border-[#ECEEF5]">
-                <span className="text-[#6C7383]">Total Items:</span>
-                <span className="font-bold text-[#1F1F2C]">
-                  {savedInvoice.items?.length || 0} Products ({savedInvoice.items?.reduce((s, it) => s + (Number(it.quantity) || 0), 0) || 0} packs)
-                </span>
-              </div>
-              <div className="flex justify-between pb-1.5 border-b border-[#ECEEF5]">
-                <span className="text-[#6C7383]">Payment:</span>
-                <span className="font-bold text-[#1F1F2C]">{savedInvoice.payment_mode} ({savedInvoice.payment_status})</span>
-              </div>
-              <div className="flex justify-between pt-1 text-sm">
-                <span className="font-bold text-[#1F1F2C]">Grand Total Paid:</span>
-                <span className="font-bold text-[#4B49AC] text-base">₹{formatINR(savedInvoice.grand_total)}</span>
-              </div>
-            </div>
-          )}
-
-          <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
+        onClose={() => { setShowSuccessModal(false); if (savedInvoice) navigate(`/purchases/${savedInvoice.id}`); }}
+        title={isEditMode ? 'Invoice updated' : 'Invoice saved'}
+        size="sm"
+        footer={
+          <div className="flex items-center gap-2 w-full justify-end">
             <Button
               variant="outline"
               size="sm"
               onClick={() => {
                 setShowSuccessModal(false);
-                if (isEditMode) {
-                  navigate('/purchases');
-                } else {
-                  setSavedInvoice(null);
-                  setFormData(createBlankInvoice());
-                  loadMetadata();
-                }
+                if (isEditMode) { navigate('/purchases'); }
+                else { setSavedInvoice(null); setFormData(createBlankInvoice()); loadMetadata(); }
               }}
-              icon={isEditMode ? <ArrowLeft className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
-              className="flex-1 justify-center"
+              icon={<Plus className="h-3.5 w-3.5" />}
             >
-              {isEditMode ? 'Back to Invoices' : 'Add Another Invoice'}
+              {isEditMode ? 'Back to invoices' : 'New invoice'}
             </Button>
             <Button
               variant="primary"
               size="sm"
-              onClick={() => {
-                setShowSuccessModal(false);
-                if (savedInvoice) navigate(`/purchases/${savedInvoice.id}`);
-                else navigate('/purchases');
-              }}
-              icon={<Eye className="w-3.5 h-3.5" />}
-              className="flex-1 justify-center shadow-md shadow-[#4B49AC]/20 font-semibold"
+              onClick={() => { setShowSuccessModal(false); if (savedInvoice) navigate(`/purchases/${savedInvoice.id}`); else navigate('/purchases'); }}
+              icon={<Eye className="h-3.5 w-3.5" />}
             >
-              View Invoice Details
+              View invoice
             </Button>
           </div>
+        }
+      >
+        <div className="text-center py-2 space-y-4">
+          <div className="w-14 h-14 mx-auto rounded-xl bg-green-50 border border-green-200 flex items-center justify-center">
+            <CheckCircle2 className="h-8 w-8 text-green-600" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-slate-900">
+              {isEditMode ? 'Invoice updated successfully' : 'Invoice saved successfully'}
+            </p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Recorded in your database ledger.
+            </p>
+          </div>
+          {savedInvoice && (
+            <div className="text-left p-4 bg-slate-50 rounded-lg border border-slate-200 text-xs font-mono space-y-1.5">
+              <div className="flex justify-between gap-2 pb-1.5 border-b border-slate-200">
+                <span className="text-slate-500">Invoice #</span>
+                <span className="font-semibold text-slate-900">{savedInvoice.invoice_number}</span>
+              </div>
+              {savedInvoice.invoice_name && (
+                <div className="flex justify-between gap-2">
+                  <span className="text-slate-500">Name</span>
+                  <span className="font-semibold text-brand-700">{savedInvoice.invoice_name}</span>
+                </div>
+              )}
+              <div className="flex justify-between gap-2">
+                <span className="text-slate-500">Date</span>
+                <span className="font-semibold">{formatDisplayDate(savedInvoice.invoice_date)}</span>
+              </div>
+              <div className="flex justify-between gap-2">
+                <span className="text-slate-500">Supplier</span>
+                <span className="font-semibold">{savedInvoice.supplier?.name || 'AYYAPPA ENTERPRISES'}</span>
+              </div>
+              <div className="flex justify-between gap-2">
+                <span className="text-slate-500">Items</span>
+                <span className="font-semibold">
+                  {savedInvoice.items?.length || 0} items, {savedInvoice.items?.reduce((s, it) => s + (Number(it.quantity) || 0), 0) || 0} packs
+                </span>
+              </div>
+              <div className="flex justify-between gap-2 pt-1.5 border-t border-slate-200 text-sm">
+                <span className="font-semibold text-slate-900">Grand total</span>
+                <span className="font-bold text-brand-700">₹{formatINR(savedInvoice.grand_total)}</span>
+              </div>
+            </div>
+          )}
         </div>
       </Modal>
     </div>

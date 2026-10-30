@@ -1,71 +1,85 @@
-import { forwardRef, SelectHTMLAttributes } from 'react';
-import { clsx } from 'clsx';
-import { AlertCircle } from 'lucide-react';
+import React from 'react';
+import { ChevronDown } from 'lucide-react';
 
-export interface Option {
+interface SelectOption {
   value: string;
   label: string;
 }
 
-export interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
+interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
   error?: string;
-  options: Option[];
-  placeholder?: string;
   helperText?: string;
+  options: SelectOption[];
 }
 
-export const Select = forwardRef<HTMLSelectElement, SelectProps>(({
+export const Select: React.FC<SelectProps> = ({
   label,
   error,
-  options,
-  placeholder,
   helperText,
-  className,
+  options,
   id,
-  required,
+  className = '',
   ...props
-}, ref) => {
-  const selectId = id || (label ? label.toLowerCase().replace(/[^a-z0-9]/g, '-') : undefined);
+}) => {
+  const selectId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined);
+
+  const borderClass = error
+    ? 'border-red-400 focus:border-red-500 focus:ring-red-500/20'
+    : 'border-slate-200 focus:border-brand-600 focus:ring-brand-600/20';
 
   return (
-    <div className="w-full space-y-1.5">
+    <div className="w-full">
       {label && (
-        <label htmlFor={selectId} className="block text-xs font-bold uppercase tracking-wider text-[#1F1F2C]">
+        <label
+          htmlFor={selectId}
+          className="block text-sm font-medium text-slate-700 mb-1.5"
+        >
           {label}
-          {required && <span className="text-rose-500 ml-1">*</span>}
+          {props.required && <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>}
         </label>
       )}
-      <select
-        ref={ref}
-        id={selectId}
-        required={required}
-        className={clsx(
-          'w-full rounded-xl bg-white border text-[#1F1F2C] text-sm transition-all duration-150 py-2.5 px-3.5 focus:outline-none focus:ring-2 cursor-pointer',
-          error
-            ? 'border-rose-400 bg-rose-50/20 focus:border-rose-500 focus:ring-rose-500/20 text-rose-900'
-            : 'border-[#D5DCED] hover:border-[#B5C2E0] focus:ring-[#4B49AC]/20 focus:border-[#4B49AC]',
-          className
-        )}
-        {...props}
-      >
-        {placeholder && <option value="">{placeholder}</option>}
-        {options.map((opt) => (
-          <option key={opt.value} value={opt.value} className="bg-white text-[#1F1F2C]">
-            {opt.label}
-          </option>
-        ))}
-      </select>
-      {error ? (
-        <p className="text-xs text-rose-500 font-medium mt-1 flex items-center gap-1 animate-in fade-in duration-150">
-          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-          <span>{error}</span>
+
+      <div className="relative">
+        <select
+          id={selectId}
+          aria-invalid={!!error}
+          aria-describedby={error ? `${selectId}-error` : helperText ? `${selectId}-helper` : undefined}
+          className={[
+            'block w-full appearance-none rounded-md border bg-white text-slate-900 shadow-sm',
+            'transition-colors duration-150',
+            'focus:outline-none focus:ring-2',
+            'disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500',
+            'h-9 text-sm pl-3 pr-9',
+            borderClass,
+            className,
+          ]
+            .filter(Boolean)
+            .join(' ')}
+          {...props}
+        >
+          {options.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+
+        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400">
+          <ChevronDown className="h-4 w-4" aria-hidden="true" />
+        </div>
+      </div>
+
+      {error && (
+        <p id={`${selectId}-error`} role="alert" className="mt-1.5 text-xs text-red-600">
+          {error}
         </p>
-      ) : helperText ? (
-        <p className="text-xs text-[#8F93A0] mt-1">{helperText}</p>
-      ) : null}
+      )}
+      {!error && helperText && (
+        <p id={`${selectId}-helper`} className="mt-1.5 text-xs text-slate-500">
+          {helperText}
+        </p>
+      )}
     </div>
   );
-});
-
-Select.displayName = 'Select';
+};

@@ -2,190 +2,169 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Base ─────────────────────────────────────────────────────────────── */
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
     color-scheme: light;
+    scroll-behavior: smooth;
   }
 
   body {
-    background-color: #F5F7FF;
-    color: #1F1F2C;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    background-color: #f8fafc; /* slate-50 */
+    color: #0f172a;            /* slate-900 */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
 
+  /* Prevent iOS form zoom — keep inputs at 16px */
   input,
   select,
   textarea {
     font-size: 16px;
   }
 
-  @media (min-width: 768px) {
+  @media (min-width: 640px) {
     input,
     select,
     textarea {
       font-size: 0.875rem;
     }
   }
+
+  /* Focus ring defaults — always visible */
+  :focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: 2px;
+  }
+
+  /* Selection */
+  ::selection {
+    background-color: #dbeafe;
+    color: #1e40af;
+  }
+
+  /* Scrollbar — subtle */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: #cbd5e1;
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: #94a3b8;
+  }
 }
 
-/* Global High-Contrast Text Selection */
-::selection {
-  background-color: #4B49AC !important;
-  color: #FFFFFF !important;
-  -webkit-text-fill-color: #FFFFFF !important;
-}
-
-::-moz-selection {
-  background-color: #4B49AC !important;
-  color: #FFFFFF !important;
-  -webkit-text-fill-color: #FFFFFF !important;
-}
-
-input::selection,
-textarea::selection,
-select::selection {
-  background-color: #4B49AC !important;
-  color: #FFFFFF !important;
-  -webkit-text-fill-color: #FFFFFF !important;
-}
-
-input::-moz-selection,
-textarea::-moz-selection,
-select::-moz-selection {
-  background-color: #4B49AC !important;
-  color: #FFFFFF !important;
-  -webkit-text-fill-color: #FFFFFF !important;
-}
-
+/* ─── Components ────────────────────────────────────────────────────────── */
 @layer components {
+
+  /* Page layout helpers */
+  .page-container {
+    @apply max-w-7xl mx-auto;
+  }
+
+  /* Section card — the standard white content box */
+  .section-card {
+    @apply bg-white rounded-lg border border-slate-200 shadow-card;
+  }
+
+  .section-card-header {
+    @apply px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3;
+  }
+
+  .section-card-body {
+    @apply p-5;
+  }
+
+  /* Page title */
   .page-title {
-    @apply text-xl sm:text-2xl font-bold tracking-tight text-[#1F1F2C] flex items-center gap-2.5;
+    @apply text-xl font-semibold text-slate-900 tracking-tight;
   }
 
   .page-subtitle {
-    @apply text-xs sm:text-sm text-[#6C7383] mt-1 leading-relaxed max-w-2xl;
+    @apply text-sm text-slate-500 mt-0.5 leading-relaxed;
   }
 
-  .glass-card {
-    @apply bg-white border border-[#ECEEF5] shadow-skydash rounded-2xl;
+  /* Data display: financial amounts */
+  .amount {
+    @apply font-mono font-semibold text-slate-900 tabular-nums;
   }
 
-  .glass-panel {
-    @apply bg-white border border-[#ECEEF5] rounded-2xl shadow-skydash-lg;
+  .amount-primary {
+    @apply font-mono font-semibold text-brand-700 tabular-nums;
   }
 
+  /* Invoice / ID codes */
+  .code {
+    @apply font-mono text-sm text-slate-600 tabular-nums;
+  }
+
+  /* Table cell overrides */
+  .table-amount {
+    @apply font-mono font-semibold text-slate-900 tabular-nums text-right;
+  }
+
+  /* Skeleton loading shimmer */
+  .skeleton {
+    @apply rounded bg-slate-200;
+    background: linear-gradient(
+      90deg,
+      #e2e8f0 25%,
+      #f1f5f9 50%,
+      #e2e8f0 75%
+    );
+    background-size: 200% 100%;
+    animation: skeleton-wave 1.8s ease-in-out infinite;
+  }
+
+  /* Print utilities */
+  @media print {
+    .no-print {
+      display: none !important;
+    }
+    .print-only {
+      display: block !important;
+    }
+    body {
+      background: white;
+    }
+  }
+}
+
+/* ─── Utilities ─────────────────────────────────────────────────────────── */
+@layer utilities {
+  /* Tabular numbers for financial data */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Hide scrollbar but keep scrollable */
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Touch target helper */
   .tap-target {
-    min-height: 44px;
-    min-width: 44px;
-  }
-}
-
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: #F5F7FF;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #C8D4FF;
-  border-radius: 9999px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #98BDFF;
-}
-
-@media print {
-  @page {
-    size: A4 portrait;
-    margin: 12mm 15mm;
+    @apply min-h-[44px] min-w-[44px];
   }
 
-  body {
-    background-color: #ffffff !important;
-    color: #000000 !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  /* Safe area padding for mobile */
+  .pb-safe {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
   }
 
-  header,
-  nav,
-  aside,
-  .no-print,
-  button,
-  .sidebar,
-  .app-header {
-    display: none !important;
-  }
-
-  main, .printable-container {
-    padding: 0 !important;
-    margin: 0 !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    box-shadow: none !important;
-    border: none !important;
-    background: #ffffff !important;
-  }
-
-  .printable-document {
-    background-color: #ffffff !important;
-    color: #000000 !important;
-    border: 1px solid #4B49AC !important;
-    border-radius: 0 !important;
-    padding: 24px !important;
-    box-shadow: none !important;
-    page-break-inside: avoid;
-  }
-
-  .printable-document table {
-    width: 100% !important;
-    border-collapse: collapse !important;
-  }
-
-  .printable-document th {
-    background-color: #F5F7FF !important;
-    color: #4B49AC !important;
-    border-bottom: 2px solid #4B49AC !important;
-    padding: 8px 12px !important;
-    font-size: 11px !important;
-    text-transform: uppercase !important;
-    letter-spacing: 0.05em !important;
-  }
-
-  .printable-document td {
-    border-bottom: 1px solid #ECEEF5 !important;
-    padding: 10px 12px !important;
-    color: #1F1F2C !important;
-    font-size: 12px !important;
-  }
-
-  .printable-document tr:nth-child(even) {
-    background-color: #FAFAFE !important;
-  }
-
-  .print-text-dark {
-    color: #1F1F2C !important;
-  }
-
-  .print-text-muted {
-    color: #6C7383 !important;
-  }
-
-  .print-bg-light {
-    background-color: #F5F7FF !important;
-  }
-
-  .print-border {
-    border-color: #ECEEF5 !important;
+  .pt-safe {
+    padding-top: max(0px, env(safe-area-inset-top));
   }
 }

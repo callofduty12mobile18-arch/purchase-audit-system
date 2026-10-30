@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Sparkles, ArrowRight, Lock, Mail, AlertCircle, Shield } from 'lucide-react';
+import { BookOpen, AlertCircle } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -14,16 +14,13 @@ export const LoginPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user) {
-      navigate('/dashboard', { replace: true });
-    }
+    if (user) navigate('/dashboard', { replace: true });
   }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
-
     try {
       const res = await signIn(email, password);
       if (res.error) {
@@ -32,77 +29,73 @@ export const LoginPage: React.FC = () => {
         navigate('/dashboard');
       }
     } catch {
-      setError('An unexpected error occurred during authentication.');
+      setError('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  if (user) {
-    return null;
-  }
+  if (user) return null;
 
   return (
-    <div className="min-h-screen bg-[#F5F7FF] flex flex-col justify-center items-center px-4 relative overflow-hidden">
-      {/* Subtle ambient light gradient */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#98BDFF]/20 rounded-full blur-3xl pointer-events-none" />
-
-      <div className="w-full max-w-md relative z-10">
-        <div className="text-center mb-8">
-          <div className="inline-flex p-3.5 bg-[#4B49AC] text-white rounded-2xl mb-4 shadow-skydash-primary">
-            <Sparkles className="w-8 h-8 text-white" />
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center px-4 py-12">
+      <div className="w-full max-w-sm">
+        {/* Logo */}
+        <div className="flex flex-col items-center mb-8">
+          <div className="w-12 h-12 rounded-xl bg-brand-700 flex items-center justify-center mb-4 shadow-md">
+            <BookOpen className="h-6 w-6 text-white" aria-hidden="true" />
           </div>
-          <h1 className="text-2xl font-bold text-[#1F1F2C] tracking-tight">Audit & Planner</h1>
-          <p className="text-xs text-[#6C7383] mt-1 font-medium">Single-User Invoice Auditing & Order Intelligence</p>
+          <h1 className="text-xl font-semibold text-slate-900">Audit & Planner</h1>
+          <p className="text-sm text-slate-500 mt-1">Purchase Intelligence System</p>
         </div>
 
-        <div className="bg-white border border-[#ECEEF5] rounded-3xl p-8 shadow-skydash-lg">
+        {/* Card */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-card p-8">
+          <h2 className="text-base font-semibold text-slate-900 mb-6">Sign in to your account</h2>
+
           {error && (
-            <div className="mb-6 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2.5">
-              <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
-              <span>{error}</span>
+            <div
+              role="alert"
+              className="flex items-start gap-2.5 mb-4 p-3 bg-red-50 border border-red-200 rounded-lg"
+            >
+              <AlertCircle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" aria-hidden="true" />
+              <p className="text-sm text-red-700">{error}</p>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             <Input
-              label="Email Address"
+              label="Email address"
               type="email"
-              required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              icon={<Mail className="w-4 h-4 text-[#8F93A0]" />}
+              autoComplete="email"
+              required
               placeholder="admin@audit.local"
             />
-
             <Input
-              label="Access Key / Password"
+              label="Password"
               type="password"
-              required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              icon={<Lock className="w-4 h-4 text-[#8F93A0]" />}
+              autoComplete="current-password"
+              required
               placeholder="••••••••"
             />
-
             <Button
               type="submit"
               variant="primary"
-              className="w-full py-3 text-sm font-semibold flex items-center justify-center gap-2 mt-2"
               isLoading={loading}
-              icon={<ArrowRight className="w-4 h-4" />}
+              className="w-full justify-center mt-2"
             >
-              Sign In to System
+              Sign in
             </Button>
           </form>
-
-          <div className="mt-8 pt-5 border-t border-[#ECEEF5] text-center">
-            <p className="text-[11px] text-[#8F93A0] flex items-center justify-center gap-1.5 font-mono">
-              <Shield className="w-3.5 h-3.5 text-[#4B49AC]" />
-              Private Single-User Authentication (Supabase Core)
-            </p>
-          </div>
         </div>
+
+        <p className="text-center text-xs text-slate-400 mt-6">
+          Single-user private system
+        </p>
       </div>
     </div>
   );

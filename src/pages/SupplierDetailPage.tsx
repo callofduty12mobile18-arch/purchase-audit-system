@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Building2, ArrowLeft, Receipt, Phone, Mail, MapPin } from 'lucide-react';
+import { ArrowLeft, Building2, Phone, Mail, MapPin } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
-import { Table } from '../components/ui/Table';
+import { Table, TableColumn } from '../components/ui/Table';
 import { CardSkeleton } from '../components/ui/LoadingSkeleton';
 import { ErrorState } from '../components/ui/ErrorState';
 import { Supplier, PurchaseInvoice } from '../types';
@@ -19,187 +19,134 @@ export const SupplierDetailPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (id) loadSupplierData();
-  }, [id]);
+  useEffect(() => { if (id) load(); }, [id]);
 
-  const loadSupplierData = async () => {
-    setLoading(true);
-    setFetchError(null);
+  const load = async () => {
+    setLoading(true); setFetchError(null);
     try {
-      const sup = await dbService.getSupplierById(id!);
-      const allInvoices = await dbService.getInvoices();
-      const filtered = allInvoices.filter(inv => inv.supplier_id === id);
-
+      const [sup, allInvoices] = await Promise.all([
+        dbService.getSupplierById(id!),
+        dbService.getInvoices(),
+      ]);
       setSupplier(sup);
-      setInvoices(filtered);
-      if (!sup) {
-        setFetchError('Supplier profile not found.');
-      }
-    } catch (err: any) {
-      setFetchError(err.message || 'Failed to load supplier details.');
-    } finally {
-      setLoading(false);
-    }
+      setInvoices(allInvoices.filter((inv) => inv.supplier_id === id));
+      if (!sup) setFetchError('Supplier not found.');
+    } catch (err: unknown) {
+      setFetchError(err instanceof Error ? err.message : 'Failed to load supplier.');
+    } finally { setLoading(false); }
   };
 
   if (loading) {
     return (
-      <div className="space-y-6 max-w-6xl mx-auto pb-12">
-        <div className="h-9 w-40 bg-[#ECEEF5] rounded-xl animate-pulse" />
-        <CardSkeleton />
-        <CardSkeleton />
+      <div className="space-y-6 max-w-5xl mx-auto">
+        <div className="skeleton h-9 w-40 rounded-md" />
+        <CardSkeleton /><CardSkeleton />
       </div>
     );
   }
 
   if (fetchError || !supplier) {
-    return (
-      <div className="py-12 max-w-2xl mx-auto">
-        <ErrorState
-          title="Supplier Not Found"
-          message={fetchError || `Could not find supplier with ID: "${id}"`}
-          onRetry={loadSupplierData}
-          showHomeButton
-        />
-      </div>
-    );
+    return <ErrorState title="Supplier not found" message={fetchError ?? `No supplier with ID "${id}"`} onRetry={load} showHomeButton />;
   }
 
-  const columns = [
+  const totalSpend = invoices.reduce((s, i) => s + i.grand_total, 0);
+
+  const columns: TableColumn<PurchaseInvoice>[] = [
     {
       header: 'Invoice #',
-      cell: (row: PurchaseInvoice) => (
-        <span
+      cell: (row) => (
+        <button
+          type="button"
           onClick={() => navigate(`/purchases/${row.id}`)}
-          className="font-mono text-[#4B49AC] hover:underline cursor-pointer font-bold flex items-center gap-1.5"
+          className="font-mono text-sm font-semibold text-brand-700 hover:underline"
         >
-          <Receipt className="w-3.5 h-3.5 text-[#7DA0FA]" />
           {row.invoice_number}
-        </span>
-      )
+        </button>
+      ),
     },
+    { header: 'Date', cell: (row) => <span className="text-sm font-mono text-slate-600">{formatDisplayDate(row.invoice_date)}</span> },
     {
-      header: 'Date',
-      cell: (row: PurchaseInvoice) => <span className="text-[#1F1F2C] font-mono text-xs">{formatDisplayDate(row.invoice_date)}</span>
-    },
-    {
-      header: 'Items & Packs',
-      cell: (row: PurchaseInvoice) => {
-        const totalPacks = row.items?.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0) || 0;
+      header: 'Items',
+      cell: (row) => {
+        const packs = row.items?.reduce((s, it) => s + (Number(it.quantity) || 0), 0) || 0;
         return (
-          <div className="space-y-0.5">
-            <span className="px-2.5 py-0.5 rounded-full bg-[#F5F7FF] border border-[#D5DCED] text-[#4B49AC] font-mono text-xs font-semibold inline-block">
-              {row.items?.length || 0} items
-            </span>
-            {totalPacks > 0 && (
-              <span className="text-[11px] font-mono text-[#6C7383] block">
-                {totalPacks} packs
-              </span>
-            )}
+          <div>
+            <span className="text-sm text-slate-700">{row.items?.length || 0} items</span>
+            {packs > 0 && <p className="text-xs font-mono text-slate-500">{packs} packs</p>}
           </div>
         );
-      }
+      },
     },
+    { header: 'Status', cell: (row) => <Badge variant={row.payment_status === 'PAID' ? 'success' : 'warning'}>{row.payment_status}</Badge> },
     {
-      header: 'Payment Status',
-      cell: (row: PurchaseInvoice) => (
-        <Badge variant={row.payment_status === 'PAID' ? 'success' : 'warning'}>
-          {row.payment_status}
-        </Badge>
-      )
+      header: 'Total',
+      headerClassName: 'text-right',
+      className: 'text-right',
+      cell: (row) => <span className="font-mono font-semibold text-slate-900 tabular-nums">₹{formatINR(row.grand_total)}</span>,
     },
-    {
-      header: 'Grand Total',
-      cell: (row: PurchaseInvoice) => (
-        <span className="font-mono font-bold text-[#1F1F2C] text-sm">₹{formatINR(row.grand_total)}</span>
-      )
-    }
   ];
 
-  const totalSpend = invoices.reduce((sum, i) => sum + i.grand_total, 0);
-
   return (
-    <div className="space-y-6 max-w-6xl mx-auto pb-12">
-      {/* Top Bar */}
-      <div className="flex items-center justify-between">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => navigate('/suppliers')}
-          icon={<ArrowLeft className="w-4 h-4" />}
-          className="text-xs"
-        >
-          Back to Suppliers
-        </Button>
-      </div>
+    <div className="space-y-6 max-w-5xl mx-auto">
+      <Button variant="outline" size="sm" onClick={() => navigate('/suppliers')} icon={<ArrowLeft className="h-4 w-4" />}>
+        Back to suppliers
+      </Button>
 
-      {/* Supplier Profile Banner */}
-      <div className="p-6 rounded-2xl bg-white border border-[#ECEEF5] shadow-skydash space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-4 border-b border-[#ECEEF5]">
+      {/* Profile banner */}
+      <div className="bg-white rounded-lg border border-slate-200 shadow-card p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-4 border-b border-slate-100">
           <div className="flex items-start gap-3.5">
-            <div className="p-3 bg-[#F5F7FF] text-[#4B49AC] rounded-2xl border border-[#ECEEF5] shadow-xs">
-              <Building2 className="w-6 h-6" />
+            <div className="w-11 h-11 rounded-lg bg-brand-50 border border-brand-100 flex items-center justify-center shrink-0">
+              <Building2 className="h-5 w-5 text-brand-600" aria-hidden="true" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold text-[#1F1F2C]">{supplier.name}</h1>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-xl font-semibold text-slate-900">{supplier.name}</h1>
                 <Badge variant={supplier.is_active ? 'success' : 'default'}>
                   {supplier.is_active ? 'Active' : 'Inactive'}
                 </Badge>
               </div>
-              {supplier.gstin && (
-                <p className="text-xs font-mono text-[#6C7383] mt-0.5">GSTIN: {supplier.gstin}</p>
-              )}
+              {supplier.gstin && <p className="text-xs font-mono text-slate-500 mt-0.5">GSTIN: {supplier.gstin}</p>}
             </div>
           </div>
-
           <div className="text-left sm:text-right">
-            <span className="text-xs text-[#6C7383] uppercase font-bold tracking-wider block">Total Billed Spend</span>
-            <span className="text-2xl font-bold font-mono text-[#4B49AC]">
-              ₹{formatINR(totalSpend)}
-            </span>
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Total spend</p>
+            <p className="text-2xl font-bold font-mono tabular-nums text-brand-700 mt-1">₹{formatINR(totalSpend)}</p>
           </div>
         </div>
 
-        {/* Contact Strip */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs text-[#1F1F2C]">
+        <div className="flex flex-wrap gap-3">
           {supplier.phone && (
-            <div className="flex items-center gap-2 p-3 bg-[#F5F7FF] rounded-xl border border-[#ECEEF5]">
-              <Phone className="w-4 h-4 text-[#6C7383]" />
-              <span className="font-mono">{supplier.phone}</span>
+            <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg border border-slate-200 text-sm">
+              <Phone className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
+              <span className="font-mono text-slate-700">{supplier.phone}</span>
             </div>
           )}
           {supplier.email && (
-            <div className="flex items-center gap-2 p-3 bg-[#F5F7FF] rounded-xl border border-[#ECEEF5]">
-              <Mail className="w-4 h-4 text-[#6C7383]" />
-              <span>{supplier.email}</span>
+            <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg border border-slate-200 text-sm">
+              <Mail className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
+              <span className="text-slate-700">{supplier.email}</span>
             </div>
           )}
           {supplier.address && (
-            <div className="flex items-center gap-2 p-3 bg-[#F5F7FF] rounded-xl border border-[#ECEEF5]">
-              <MapPin className="w-4 h-4 text-[#6C7383]" />
-              <span className="truncate">{supplier.address}</span>
+            <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg border border-slate-200 text-sm">
+              <MapPin className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
+              <span className="text-slate-700 truncate max-w-[280px]">{supplier.address}</span>
             </div>
           )}
         </div>
       </div>
 
-      {/* Associated Invoices */}
-      <Card
-        title={`Purchase Invoices (${invoices.length})`}
-        subtitle="Invoices billed by this supplier"
-      >
+      <Card title={`Purchase invoices (${invoices.length})`} subtitle="All bills from this supplier">
         <Table
           columns={columns}
           data={invoices}
           keyExtractor={(row) => row.id}
           onRowClick={(row) => navigate(`/purchases/${row.id}`)}
           isLoading={false}
-          emptyVariant="invoices"
-          emptyTitle="No Invoices from this Supplier"
-          emptyText="No bills have been recorded under this supplier yet."
-          emptyActionLabel="Enter Bill for Supplier"
+          emptyTitle="No invoices from this supplier"
+          emptyText="No bills have been recorded under this supplier."
+          emptyActionLabel="New invoice"
           onEmptyAction={() => navigate('/purchases/import')}
         />
       </Card>

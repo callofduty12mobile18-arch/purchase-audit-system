@@ -1,53 +1,83 @@
 import React from 'react';
-import { clsx } from 'clsx';
 import { Loader2 } from 'lucide-react';
 
+type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
+type ButtonSize = 'sm' | 'md' | 'lg';
+
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'outline' | 'danger' | 'ghost' | 'success';
-  size?: 'sm' | 'md' | 'lg';
+  variant?: ButtonVariant;
+  size?: ButtonSize;
   isLoading?: boolean;
   icon?: React.ReactNode;
+  iconPosition?: 'left' | 'right';
+  children?: React.ReactNode;
 }
 
+const variantClasses: Record<ButtonVariant, string> = {
+  primary:
+    'bg-brand-700 text-white hover:bg-brand-800 focus-visible:ring-brand-600/30 shadow-sm disabled:bg-brand-300',
+  secondary:
+    'bg-slate-100 text-slate-700 hover:bg-slate-200 focus-visible:ring-slate-300 disabled:bg-slate-50 disabled:text-slate-400',
+  outline:
+    'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300 focus-visible:ring-slate-300 disabled:bg-slate-50 disabled:text-slate-400',
+  ghost:
+    'text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus-visible:ring-slate-300 disabled:text-slate-400',
+  danger:
+    'bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-500/30 shadow-sm disabled:bg-red-300',
+};
+
+const sizeClasses: Record<ButtonSize, string> = {
+  sm: 'h-8 px-3 text-xs gap-1.5',
+  md: 'h-9 px-4 text-sm gap-2',
+  lg: 'h-10 px-5 text-sm gap-2',
+};
+
 export const Button: React.FC<ButtonProps> = ({
-  children,
   variant = 'primary',
   size = 'md',
   isLoading = false,
   icon,
-  className,
+  iconPosition = 'left',
+  children,
+  className = '',
   disabled,
+  type = 'button',
   ...props
 }) => {
-  const baseStyles = 'inline-flex items-center justify-center font-medium rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white focus:ring-[#4B49AC]/30 disabled:opacity-50 disabled:cursor-not-allowed select-none active:scale-[0.98] min-h-[44px] md:min-h-0';
-
-  const variants = {
-    primary: 'bg-[#4B49AC] hover:bg-[#3D3B94] text-white font-semibold shadow-md shadow-[#4B49AC]/25 hover:shadow-lg hover:shadow-[#4B49AC]/35 border border-transparent',
-    secondary: 'bg-[#7DA0FA] hover:bg-[#688ff7] text-white font-semibold shadow-md shadow-[#7DA0FA]/25 border border-transparent',
-    outline: 'bg-white hover:bg-[#F5F7FF] text-[#4B49AC] font-semibold border border-[#D5DCED] hover:border-[#4B49AC] shadow-sm',
-    danger: 'bg-[#F3797E] hover:bg-[#e66267] text-white font-semibold shadow-md shadow-[#F3797E]/25 border border-transparent',
-    ghost: 'bg-transparent hover:bg-[#F5F7FF] text-[#6C7383] hover:text-[#4B49AC] border border-transparent',
-    success: 'bg-[#4B49AC] hover:bg-[#3D3B94] text-white font-semibold shadow-md shadow-[#4B49AC]/25 border border-transparent',
-  };
-
-  const sizes = {
-    sm: 'px-3.5 py-1.5 text-xs gap-1.5 rounded-lg',
-    md: 'px-4.5 py-2.5 text-sm gap-2 rounded-xl',
-    lg: 'px-6 py-3 text-base gap-2.5 rounded-xl',
-  };
+  const isDisabled = disabled || isLoading;
 
   return (
     <button
-      className={clsx(baseStyles, variants[variant], sizes[size], className)}
-      disabled={disabled || isLoading}
+      type={type}
+      disabled={isDisabled}
+      aria-busy={isLoading}
+      className={[
+        'inline-flex items-center justify-center rounded-md font-medium transition-colors',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1',
+        'disabled:pointer-events-none disabled:cursor-not-allowed',
+        'select-none whitespace-nowrap',
+        'min-w-[44px] min-h-[44px]',
+        variantClasses[variant],
+        sizeClasses[size],
+        className,
+      ].join(' ')}
       {...props}
     >
       {isLoading ? (
-        <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-      ) : icon ? (
-        <span className="shrink-0">{icon}</span>
-      ) : null}
-      {children}
+        <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" aria-hidden="true" />
+      ) : (
+        icon && iconPosition === 'left' && (
+          <span className="shrink-0" aria-hidden="true">
+            {icon}
+          </span>
+        )
+      )}
+      {children && <span>{children}</span>}
+      {!isLoading && icon && iconPosition === 'right' && (
+        <span className="shrink-0" aria-hidden="true">
+          {icon}
+        </span>
+      )}
     </button>
   );
 };

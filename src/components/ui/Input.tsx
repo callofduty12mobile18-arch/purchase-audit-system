@@ -1,96 +1,92 @@
-import React, { forwardRef } from 'react';
-import { clsx } from 'clsx';
-import { AlertCircle, CheckCircle2 } from 'lucide-react';
+import React from 'react';
 
-export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
-  isValid?: boolean;
   helperText?: string;
+  isValid?: boolean;
   icon?: React.ReactNode;
-  endIcon?: React.ReactNode;
+  iconRight?: React.ReactNode;
 }
 
-export const Input = forwardRef<HTMLInputElement, InputProps>(({
+export const Input: React.FC<InputProps> = ({
   label,
   error,
-  isValid,
   helperText,
+  isValid,
   icon,
-  endIcon,
-  className,
+  iconRight,
   id,
-  required,
+  className = '',
   ...props
-}, ref) => {
-  const inputId = id || (label ? label.toLowerCase().replace(/[^a-z0-9]/g, '-') : undefined);
+}) => {
+  const inputId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined);
+
+  const borderClass = error
+    ? 'border-red-400 focus:border-red-500 focus:ring-red-500/20'
+    : isValid
+    ? 'border-green-400 focus:border-green-500 focus:ring-green-500/20'
+    : 'border-slate-200 focus:border-brand-600 focus:ring-brand-600/20';
 
   return (
-    <div className="w-full space-y-1.5">
+    <div className="w-full">
       {label && (
         <label
           htmlFor={inputId}
-          className="block text-xs font-bold uppercase tracking-wider text-[#1F1F2C] flex items-center justify-between"
+          className="block text-sm font-medium text-slate-700 mb-1.5"
         >
-          <span>
-            {label}
-            {required && <span className="text-rose-500 ml-1">*</span>}
-          </span>
-          {isValid && !error && (
-            <span className="text-emerald-600 text-[11px] font-semibold flex items-center gap-1 normal-case tracking-normal">
-              <CheckCircle2 className="w-3.5 h-3.5" /> Valid
-            </span>
-          )}
+          {label}
+          {props.required && <span className="text-red-500 ml-0.5" aria-hidden="true">*</span>}
         </label>
       )}
+
       <div className="relative">
         {icon && (
-          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#8F93A0]">
+          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
             {icon}
           </div>
         )}
+
         <input
-          ref={ref}
           id={inputId}
-          required={required}
-          className={clsx(
-            'w-full rounded-xl bg-white border text-[#1F1F2C] placeholder-[#8F93A0] text-sm transition-all duration-150 focus:outline-none focus:ring-2',
-            icon ? 'pl-10' : 'pl-3.5',
-            (endIcon || error || isValid) ? 'pr-10' : 'pr-3.5',
-            'py-2.5 md:py-2 min-h-[44px] md:min-h-0',
-            error
-              ? 'border-rose-400 bg-rose-50/20 text-rose-900 focus:border-rose-500 focus:ring-rose-500/20'
-              : isValid
-              ? 'border-emerald-400 focus:border-emerald-500 focus:ring-emerald-500/20'
-              : 'border-[#D5DCED] hover:border-[#B5C2E0] focus:ring-[#4B49AC]/20 focus:border-[#4B49AC]',
-            className
-          )}
+          aria-invalid={!!error}
+          aria-describedby={
+            error ? `${inputId}-error` : helperText ? `${inputId}-helper` : undefined
+          }
+          className={[
+            'block w-full rounded-md border bg-white text-slate-900 shadow-sm',
+            'placeholder:text-slate-400',
+            'transition-colors duration-150',
+            'focus:outline-none focus:ring-2',
+            'disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500',
+            'h-9 text-sm px-3',
+            icon ? 'pl-9' : '',
+            iconRight ? 'pr-9' : '',
+            borderClass,
+            className,
+          ]
+            .filter(Boolean)
+            .join(' ')}
           {...props}
         />
-        {error ? (
-          <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-rose-500">
-            <AlertCircle className="w-4 h-4" />
+
+        {iconRight && (
+          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400">
+            {iconRight}
           </div>
-        ) : isValid ? (
-          <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-emerald-500">
-            <CheckCircle2 className="w-4 h-4" />
-          </div>
-        ) : endIcon ? (
-          <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-[#8F93A0]">
-            {endIcon}
-          </div>
-        ) : null}
+        )}
       </div>
-      {error ? (
-        <p className="text-xs text-rose-500 font-medium mt-1 flex items-center gap-1 animate-in fade-in duration-150">
-          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-          <span>{error}</span>
+
+      {error && (
+        <p id={`${inputId}-error`} role="alert" className="mt-1.5 text-xs text-red-600">
+          {error}
         </p>
-      ) : helperText ? (
-        <p className="text-xs text-[#8F93A0] mt-1">{helperText}</p>
-      ) : null}
+      )}
+      {!error && helperText && (
+        <p id={`${inputId}-helper`} className="mt-1.5 text-xs text-slate-500">
+          {helperText}
+        </p>
+      )}
     </div>
   );
-});
-
-Input.displayName = 'Input';
+};

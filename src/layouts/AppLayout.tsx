@@ -13,199 +13,241 @@ import {
   Menu,
   X,
   PlusCircle,
-  Bell,
-  Sparkles
+  BookOpen,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
-import { Button } from '../components/ui/Button';
 import { NetworkBanner } from '../components/ui/NetworkBanner';
 import { SessionExpiredModal } from '../components/ui/SessionExpiredModal';
 import { ErrorBoundary } from '../components/ui/ErrorBoundary';
 
-export const AppLayout: React.FC = () => {
-  const { profile, signOut, user } = useAuth();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [sessionExpired, setSessionExpired] = useState(false);
-  const navigate = useNavigate();
+interface NavItem {
+  label: string;
+  href: string;
+  icon: React.ElementType;
+}
+
+const navItems: NavItem[] = [
+  { label: 'Dashboard',    href: '/dashboard',      icon: LayoutDashboard },
+  { label: 'Invoices',     href: '/purchases',      icon: Receipt },
+  { label: 'New Invoice',  href: '/purchases/import', icon: PlusCircle },
+  { label: 'Suppliers',   href: '/suppliers',       icon: Building2 },
+  { label: 'Products',    href: '/products',        icon: Package },
+  { label: 'Analytics',   href: '/analytics',       icon: LineChart },
+  { label: 'Order Planner', href: '/order-planner', icon: ShoppingCart },
+  { label: 'Audit Logs',  href: '/audit-log',       icon: ClipboardList },
+  { label: 'Settings',    href: '/settings',        icon: Settings },
+];
+
+function useActiveNav(href: string): boolean {
   const location = useLocation();
+  if (href === '/dashboard') return location.pathname === '/dashboard';
+  if (href === '/purchases') {
+    return (
+      location.pathname === '/purchases' ||
+      (/^\/purchases\/(?!import).+/.test(location.pathname))
+    );
+  }
+  if (href === '/purchases/import') return location.pathname.startsWith('/purchases/import');
+  return (
+    location.pathname === href ||
+    location.pathname.startsWith(`${href}/`)
+  );
+}
 
-  const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-    { name: 'Invoices', href: '/purchases', icon: Receipt },
-    { name: 'New Invoice', href: '/purchases/import', icon: PlusCircle },
-    { name: 'Suppliers', href: '/suppliers', icon: Building2 },
-    { name: 'Products', href: '/products', icon: Package },
-    { name: 'Analytics', href: '/analytics', icon: LineChart },
-    { name: 'Order Planner', href: '/order-planner', icon: ShoppingCart },
-    { name: 'Audit Logs', href: '/audit-log', icon: ClipboardList },
-    { name: 'Settings', href: '/settings', icon: Settings },
-  ];
+interface SidebarNavItemProps {
+  item: NavItem;
+  onClick?: () => void;
+}
 
-  useEffect(() => {
-    setMobileMenuOpen(false);
-  }, [location.pathname]);
-
-  useEffect(() => {
-    document.body.style.overflow = mobileMenuOpen ? 'hidden' : '';
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [mobileMenuOpen]);
-
-  // Session monitor: if user suddenly becomes null without explicit signout
-  useEffect(() => {
-    const isDemo = localStorage.getItem('demo_auth_logged_in') === 'true';
-    if (!user && !isDemo) {
-      setSessionExpired(true);
-    } else {
-      setSessionExpired(false);
-    }
-  }, [user]);
-
-  const isNavActive = (href: string) => {
-    if (href === '/dashboard') return location.pathname === '/dashboard';
-    if (href === '/purchases') {
-      return location.pathname === '/purchases' || /^\/purchases\/(?!import).+/.test(location.pathname);
-    }
-    if (href === '/purchases/import') return location.pathname.startsWith('/purchases/import');
-    if (href === '/suppliers') return location.pathname.startsWith('/suppliers');
-    if (href === '/products') return location.pathname.startsWith('/products');
-    return location.pathname === href || location.pathname.startsWith(`${href}/`);
-  };
+const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, onClick }) => {
+  const isActive = useActiveNav(item.href);
+  const Icon = item.icon;
 
   return (
-    <div className="min-h-dvh bg-[#F5F7FF] text-[#1F1F2C] flex flex-col font-sans selection:bg-[#4B49AC] selection:text-white">
-      {/* 1. Global Offline & Slow Network Banner */}
-      <NetworkBanner />
+    <NavLink
+      to={item.href}
+      onClick={onClick}
+      aria-current={isActive ? 'page' : undefined}
+      className={[
+        'group flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors min-h-[40px]',
+        isActive
+          ? 'bg-brand-50 text-brand-700 border-l-2 border-brand-600 rounded-l-none pl-[10px]'
+          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900',
+      ].join(' ')}
+    >
+      <Icon
+        className={[
+          'h-4 w-4 shrink-0 transition-colors',
+          isActive ? 'text-brand-600' : 'text-slate-400 group-hover:text-slate-600',
+        ].join(' ')}
+        aria-hidden="true"
+      />
+      <span className="truncate">{item.label}</span>
+    </NavLink>
+  );
+};
 
-      {/* 2. Session Expired In-Place Recovery Modal */}
+export const AppLayout: React.FC = () => {
+  const { profile, signOut, user } = useAuth();
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [sessionExpired, setSessionExpired] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [location.pathname]);
+
+  // Prevent body scroll when mobile menu is open
+  useEffect(() => {
+    document.body.style.overflow = mobileOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [mobileOpen]);
+
+  // Session expiry detection
+  useEffect(() => {
+    const isDemo = localStorage.getItem('demo_auth_logged_in') === 'true';
+    setSessionExpired(!user && !isDemo);
+  }, [user]);
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/login');
+  };
+
+  const initials = (profile?.full_name || profile?.email || 'A')
+    .charAt(0)
+    .toUpperCase();
+
+  const Sidebar = (
+    <aside className="flex flex-col h-full">
+      {/* Brand */}
+      <div className="flex items-center gap-2.5 px-4 py-5 border-b border-slate-100">
+        <div className="w-8 h-8 rounded-lg bg-brand-700 flex items-center justify-center shrink-0" aria-hidden="true">
+          <BookOpen className="h-4 w-4 text-white" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-slate-900 truncate leading-none">Audit & Planner</p>
+          <p className="text-xs text-slate-400 mt-0.5">Purchase Intelligence</p>
+        </div>
+      </div>
+
+      {/* Nav */}
+      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto" aria-label="Main navigation">
+        {navItems.map((item) => (
+          <SidebarNavItem
+            key={item.href}
+            item={item}
+            onClick={() => setMobileOpen(false)}
+          />
+        ))}
+      </nav>
+
+      {/* User */}
+      <div className="px-3 py-4 border-t border-slate-100 pb-safe">
+        <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-md bg-slate-50 border border-slate-200">
+          <div
+            className="w-7 h-7 rounded-md bg-brand-700 text-white flex items-center justify-center text-xs font-bold shrink-0"
+            aria-hidden="true"
+          >
+            {initials}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-medium text-slate-900 truncate">
+              {profile?.full_name || 'Administrator'}
+            </p>
+            <p className="text-xs text-slate-500 truncate font-mono">
+              {profile?.email || 'admin@audit.local'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleSignOut}
+            aria-label="Sign out"
+            className="shrink-0 p-1.5 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+    </aside>
+  );
+
+  return (
+    <div className="min-h-dvh bg-slate-50 flex flex-col">
+      <NetworkBanner />
       <SessionExpiredModal
         isOpen={sessionExpired}
         onSuccess={() => setSessionExpired(false)}
         onClose={() => setSessionExpired(false)}
       />
 
-      <div className="flex-1 flex flex-col md:flex-row min-h-0">
-        {/* Mobile Top Navigation */}
-        <header className="no-print md:hidden flex items-center justify-between gap-2 px-4 py-3 bg-white/95 backdrop-blur-xl border-b border-[#ECEEF5] sticky top-0 z-40 pt-[max(0.75rem,env(safe-area-inset-top))] shadow-sm">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="p-2 rounded-xl bg-[#4B49AC] text-white shadow-md shadow-[#4B49AC]/25 shrink-0">
-              <Sparkles className="w-5 h-5" />
-            </div>
-            <div className="min-w-0">
-              <h1 className="text-sm font-bold text-[#1F1F2C] tracking-tight leading-none truncate">AUDIT & PLANNER</h1>
-              <span className="text-[10px] text-[#7DA0FA] font-bold uppercase tracking-wider">Enterprise v1.0</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="tap-target p-2 rounded-xl text-[#6C7383] hover:text-[#4B49AC] hover:bg-[#F5F7FF] border border-[#ECEEF5] transition-colors"
-              aria-label="Toggle navigation menu"
-              aria-expanded={mobileMenuOpen}
-            >
-              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </button>
-          </div>
-        </header>
+      <div className="flex flex-1 min-h-0">
+        {/* Desktop Sidebar */}
+        <div className="no-print hidden lg:flex lg:flex-col lg:w-60 lg:fixed lg:inset-y-0 lg:z-30 border-r border-slate-200 bg-white">
+          {Sidebar}
+        </div>
 
-        {mobileMenuOpen && (
-          <button
-            type="button"
-            className="no-print md:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity"
-            aria-label="Close menu"
-            onClick={() => setMobileMenuOpen(false)}
+        {/* Mobile overlay */}
+        {mobileOpen && (
+          <div
+            className="no-print lg:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm animate-fade-in"
+            onClick={() => setMobileOpen(false)}
+            aria-hidden="true"
           />
         )}
 
-        {/* Desktop & Mobile Slideover Sidebar */}
-        <aside
-          className={`no-print fixed md:sticky md:top-0 md:h-screen md:max-h-screen inset-y-0 left-0 z-50 w-64 md:w-68 bg-white border-r border-[#ECEEF5] flex flex-col transition-transform duration-300 ease-in-out md:translate-x-0 shadow-xl md:shadow-none shrink-0 ${
-            mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
-          }`}
+        {/* Mobile Sidebar drawer */}
+        <div
+          className={[
+            'no-print lg:hidden fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-slate-200',
+            'transition-transform duration-250 ease-out',
+            mobileOpen ? 'translate-x-0 shadow-xl' : '-translate-x-full',
+          ].join(' ')}
+          aria-hidden={!mobileOpen}
         >
-          {/* Brand Header */}
-          <div className="hidden md:flex items-center justify-between px-6 py-5.5 border-b border-[#ECEEF5]">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-[#4B49AC] text-white shadow-md shadow-[#4B49AC]/25">
-                <Sparkles className="w-5 h-5" />
-              </div>
-              <div>
-                <h1 className="text-base font-bold text-[#1F1F2C] tracking-tight leading-snug">Audit & Planner</h1>
-                <p className="text-[11px] text-[#7DA0FA] font-semibold">Invoice Intelligence</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="md:hidden px-5 py-4 border-b border-[#ECEEF5] flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-[#6C7383]">Navigation Menu</span>
+          <div className="flex items-center justify-between px-4 pt-4 pb-2">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Navigation</span>
             <button
               type="button"
-              onClick={() => setMobileMenuOpen(false)}
-              className="p-2 rounded-lg text-[#8F93A0] hover:text-[#1F1F2C] hover:bg-[#F5F7FF]"
-              aria-label="Close menu"
+              onClick={() => setMobileOpen(false)}
+              aria-label="Close navigation"
+              className="p-1.5 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 min-w-[36px] min-h-[36px] flex items-center justify-center"
             >
-              <X className="w-5 h-5" />
+              <X className="h-4 w-4" />
             </button>
           </div>
+          <div className="h-full">{Sidebar}</div>
+        </div>
 
-          {/* Navigation Items */}
-          <nav className="flex-1 px-3.5 py-4 space-y-1.5 overflow-y-auto pb-[max(1rem,env(safe-area-inset-bottom))]">
-            {navigation.map((item) => {
-              const isActive = isNavActive(item.href);
-              return (
-                <NavLink
-                  key={item.name}
-                  to={item.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`group flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 min-h-[42px] ${
-                    isActive
-                      ? 'bg-[#4B49AC] text-white font-semibold shadow-md shadow-[#4B49AC]/25'
-                      : 'text-[#6C7383] hover:text-[#4B49AC] hover:bg-[#F5F7FF]'
-                  }`}
-                >
-                  <item.icon className={`w-4.5 h-4.5 shrink-0 transition-transform group-hover:scale-110 ${isActive ? 'text-white' : 'text-[#8F93A0] group-hover:text-[#4B49AC]'}`} />
-                  <span className="flex-1 truncate">{item.name}</span>
-                </NavLink>
-              );
-            })}
-          </nav>
-
-          {/* User Profile Card */}
-          <div className="p-3.5 border-t border-[#ECEEF5] bg-[#F8F9FE] pb-[max(1rem,env(safe-area-inset-bottom))]">
-            <div className="p-2 rounded-xl bg-white border border-[#ECEEF5] flex items-center justify-between gap-2 shadow-sm">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-lg bg-[#4B49AC] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-sm">
-                  {profile?.email?.[0]?.toUpperCase() || 'A'}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-bold text-[#1F1F2C] truncate">{profile?.full_name || 'Auditor User'}</p>
-                  <p className="text-[10px] text-[#6C7383] font-mono truncate">{profile?.email || 'admin@audit.local'}</p>
-                </div>
+        {/* Main content */}
+        <div className="flex flex-col flex-1 lg:ml-60 min-w-0">
+          {/* Mobile top bar */}
+          <header className="no-print lg:hidden sticky top-0 z-30 bg-white border-b border-slate-200 flex items-center gap-3 px-4 h-14 pt-safe">
+            <button
+              type="button"
+              onClick={() => setMobileOpen(true)}
+              aria-label="Open navigation"
+              aria-expanded={mobileOpen}
+              aria-controls="mobile-sidebar"
+              className="p-2 rounded-md text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-6 h-6 rounded-md bg-brand-700 flex items-center justify-center shrink-0" aria-hidden="true">
+                <BookOpen className="h-3 w-3 text-white" />
               </div>
-              <button
-                onClick={signOut}
-                title="Sign Out"
-                className="p-2 rounded-lg text-[#8F93A0] hover:text-rose-600 hover:bg-rose-50 transition-colors shrink-0"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        </aside>
-
-        {/* Main Content Area */}
-        <div className="flex-1 flex flex-col min-w-0 min-h-0">
-          {/* Desktop Top Header */}
-          <header className="no-print hidden md:flex items-center justify-end px-8 py-3.5 bg-white/90 backdrop-blur-xl border-b border-[#ECEEF5] sticky top-0 z-30 shadow-xs">
-            <div className="flex items-center gap-3.5">
-              <div className="w-8 h-8 rounded-xl bg-[#F5F7FF] border border-[#ECEEF5] flex items-center justify-center text-[#6C7383] hover:text-[#4B49AC] cursor-pointer transition-colors" title="Notifications">
-                <Bell className="w-4 h-4" />
-              </div>
+              <span className="text-sm font-semibold text-slate-900 truncate">Audit & Planner</span>
             </div>
           </header>
 
-          <main className="flex-1 p-4 sm:p-6 md:p-8 overflow-y-auto bg-[#F5F7FF] pb-[max(2rem,env(safe-area-inset-bottom))]">
+          {/* Page content */}
+          <main
+            id="main-content"
+            className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto pb-safe"
+          >
             <ErrorBoundary fallbackTitle="This page encountered an error">
               <Outlet />
             </ErrorBoundary>

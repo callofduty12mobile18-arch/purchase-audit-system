@@ -33,59 +33,26 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const showToast = useCallback(
     ({ type, title, message, duration = 4000 }: Omit<ToastItem, 'id'>) => {
       const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-      const newToast: ToastItem = { id, type, title, message, duration };
-
-      setToasts((prev) => [...prev, newToast]);
-
-      if (duration > 0) {
-        setTimeout(() => {
-          removeToast(id);
-        }, duration);
-      }
+      setToasts((prev) => [...prev, { id, type, title, message, duration }]);
+      if (duration > 0) setTimeout(() => removeToast(id), duration);
     },
     [removeToast]
   );
 
-  const success = useCallback(
-    (title: string, message?: string, duration?: number) => {
-      showToast({ type: 'success', title, message, duration });
-    },
-    [showToast]
-  );
+  const success = useCallback((title: string, message?: string, duration?: number) =>
+    showToast({ type: 'success', title, message, duration }), [showToast]);
 
-  const error = useCallback(
-    (title: string, message?: string, duration?: number) => {
-      showToast({ type: 'error', title, message, duration: duration || 5000 });
-    },
-    [showToast]
-  );
+  const error = useCallback((title: string, message?: string, duration?: number) =>
+    showToast({ type: 'error', title, message, duration: duration ?? 6000 }), [showToast]);
 
-  const warning = useCallback(
-    (title: string, message?: string, duration?: number) => {
-      showToast({ type: 'warning', title, message, duration });
-    },
-    [showToast]
-  );
+  const warning = useCallback((title: string, message?: string, duration?: number) =>
+    showToast({ type: 'warning', title, message, duration }), [showToast]);
 
-  const info = useCallback(
-    (title: string, message?: string, duration?: number) => {
-      showToast({ type: 'info', title, message, duration });
-    },
-    [showToast]
-  );
+  const info = useCallback((title: string, message?: string, duration?: number) =>
+    showToast({ type: 'info', title, message, duration }), [showToast]);
 
   return (
-    <ToastContext.Provider
-      value={{
-        toasts,
-        showToast,
-        success,
-        error,
-        warning,
-        info,
-        removeToast,
-      }}
-    >
+    <ToastContext.Provider value={{ toasts, showToast, success, error, warning, info, removeToast }}>
       {children}
       <ToastContainer toasts={toasts} onRemove={removeToast} />
     </ToastContext.Provider>
@@ -93,11 +60,21 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 };
 
 export const useToast = () => {
-  const context = useContext(ToastContext);
-  if (!context) {
-    throw new Error('useToast must be used within a ToastProvider');
-  }
-  return context;
+  const ctx = useContext(ToastContext);
+  if (!ctx) throw new Error('useToast must be used within a ToastProvider');
+  return ctx;
+};
+
+// ─── Toast container ────────────────────────────────────────────────────────
+
+const toastConfig: Record<
+  ToastType,
+  { icon: React.ElementType; iconClass: string; borderClass: string }
+> = {
+  success: { icon: CheckCircle2, iconClass: 'text-green-500',  borderClass: 'border-green-200' },
+  error:   { icon: XCircle,      iconClass: 'text-red-500',    borderClass: 'border-red-200'   },
+  warning: { icon: AlertTriangle, iconClass: 'text-amber-500', borderClass: 'border-amber-200' },
+  info:    { icon: Info,          iconClass: 'text-brand-500', borderClass: 'border-brand-200' },
 };
 
 const ToastContainer: React.FC<{
@@ -109,49 +86,41 @@ const ToastContainer: React.FC<{
   return (
     <div
       aria-live="polite"
-      className="no-print fixed top-4 sm:top-auto sm:bottom-6 right-4 sm:right-6 left-4 sm:left-auto z-[99999] flex flex-col gap-2.5 max-w-md sm:max-w-sm w-auto pointer-events-none"
+      aria-label="Notifications"
+      className={[
+        'no-print fixed z-[99999] flex flex-col gap-2 pointer-events-none',
+        // Mobile: top-center; Desktop: bottom-right
+        'top-4 left-4 right-4 sm:top-auto sm:bottom-6 sm:right-6 sm:left-auto sm:w-80',
+      ].join(' ')}
     >
       {toasts.map((toast) => {
-        let borderClass = 'border-[#ECEEF5]';
-        let bgClass = 'bg-white';
-        let icon = <Info className="w-5 h-5 text-[#4B49AC]" />;
-
-        if (toast.type === 'success') {
-          borderClass = 'border-emerald-300 shadow-emerald-500/10';
-          bgClass = 'bg-white/95 text-emerald-950';
-          icon = <CheckCircle2 className="w-5 h-5 text-emerald-600" />;
-        } else if (toast.type === 'error') {
-          borderClass = 'border-rose-300 shadow-rose-500/10';
-          bgClass = 'bg-white/95 text-rose-950';
-          icon = <XCircle className="w-5 h-5 text-rose-600" />;
-        } else if (toast.type === 'warning') {
-          borderClass = 'border-amber-300 shadow-amber-500/10';
-          bgClass = 'bg-white/95 text-amber-950';
-          icon = <AlertTriangle className="w-5 h-5 text-amber-600" />;
-        }
+        const config = toastConfig[toast.type];
+        const Icon = config.icon;
 
         return (
           <div
             key={toast.id}
-            className={`pointer-events-auto flex items-start gap-3 p-4 rounded-2xl border shadow-2xl backdrop-blur-xl ${bgClass} ${borderClass} animate-in slide-in-from-top-4 sm:slide-in-from-bottom-5 duration-200`}
+            role="status"
+            className={[
+              'pointer-events-auto flex items-start gap-3 p-4 rounded-lg border bg-white shadow-dropdown',
+              'animate-slide-in-top',
+              config.borderClass,
+            ].join(' ')}
           >
-            <div className="shrink-0 mt-0.5">{icon}</div>
+            <Icon className={`h-4 w-4 mt-0.5 shrink-0 ${config.iconClass}`} aria-hidden="true" />
             <div className="flex-1 min-w-0">
-              <h5 className="text-xs sm:text-sm font-bold text-[#1F1F2C] leading-snug">
-                {toast.title}
-              </h5>
+              <p className="text-sm font-medium text-slate-900">{toast.title}</p>
               {toast.message && (
-                <p className="text-xs text-[#6C7383] mt-0.5 leading-relaxed break-words">
-                  {toast.message}
-                </p>
+                <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{toast.message}</p>
               )}
             </div>
             <button
+              type="button"
               onClick={() => onRemove(toast.id)}
-              className="p-1 text-[#8F93A0] hover:text-[#1F1F2C] rounded-lg hover:bg-black/5 transition-colors shrink-0 -mr-1 -mt-1"
-              title="Close"
+              aria-label="Dismiss notification"
+              className="shrink-0 p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors pointer-events-auto"
             >
-              <X className="w-4 h-4" />
+              <X className="h-3.5 w-3.5" />
             </button>
           </div>
         );

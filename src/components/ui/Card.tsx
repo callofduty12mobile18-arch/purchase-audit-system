@@ -1,33 +1,44 @@
 import React from 'react';
-import { clsx } from 'clsx';
 
 interface CardProps {
-  children: React.ReactNode;
-  className?: string;
   title?: string;
   subtitle?: string;
   action?: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+  bodyClassName?: string;
+  noPadding?: boolean;
 }
 
 export const Card: React.FC<CardProps> = ({
-  children,
-  className,
   title,
   subtitle,
   action,
+  children,
+  className = '',
+  bodyClassName = '',
+  noPadding = false,
 }) => {
   return (
-    <div className={clsx('bg-white border border-[#ECEEF5] shadow-skydash rounded-2xl p-4 sm:p-5 md:p-6 transition-all duration-200', className)}>
+    <div className={`bg-white rounded-lg border border-slate-200 shadow-card ${className}`}>
       {(title || action) && (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-5 border-b border-[#ECEEF5]">
-          <div className="min-w-0">
-            {title && <h3 className="text-sm font-bold tracking-wide text-[#1F1F2C] uppercase">{title}</h3>}
-            {subtitle && <p className="text-xs text-[#6C7383] mt-0.5">{subtitle}</p>}
-          </div>
-          {action && <div className="shrink-0">{action}</div>}
+        <div className="px-5 py-4 border-b border-slate-100 flex items-start justify-between gap-3">
+          {title && (
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+              {subtitle && (
+                <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>
+              )}
+            </div>
+          )}
+          {action && (
+            <div className="shrink-0 flex items-center gap-2">{action}</div>
+          )}
         </div>
       )}
-      {children}
+      <div className={noPadding ? '' : `p-5 ${bodyClassName}`}>
+        {children}
+      </div>
     </div>
   );
 };

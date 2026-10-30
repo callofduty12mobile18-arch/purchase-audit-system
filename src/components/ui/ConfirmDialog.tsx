@@ -11,7 +11,7 @@ interface ConfirmDialogProps {
   message: string;
   confirmText?: string;
   cancelText?: string;
-  variant?: 'danger' | 'warning' | 'primary';
+  variant?: 'danger' | 'warning' | 'default';
   isLoading?: boolean;
 }
 
@@ -23,11 +23,9 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   message,
   confirmText = 'Confirm',
   cancelText = 'Cancel',
-  variant = 'danger',
+  variant = 'default',
   isLoading = false,
 }) => {
-  const buttonVariant = variant === 'warning' ? 'danger' : variant;
-
   return (
     <Modal
       isOpen={isOpen}
@@ -35,23 +33,39 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
       title={title}
       size="sm"
       footer={
-        <>
-          <Button variant="outline" onClick={onClose} disabled={isLoading}>
+        <div className="flex items-center justify-end gap-2">
+          <Button variant="outline" size="sm" onClick={onClose} disabled={isLoading}>
             {cancelText}
           </Button>
-          <Button variant={buttonVariant} onClick={onConfirm} isLoading={isLoading}>
+          <Button
+            variant={variant === 'danger' ? 'danger' : 'primary'}
+            size="sm"
+            onClick={onConfirm}
+            isLoading={isLoading}
+          >
             {confirmText}
           </Button>
-        </>
+        </div>
       }
     >
       <div className="flex items-start gap-4">
-        <div className="p-3 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 shrink-0 shadow-xs">
-          <AlertTriangle className="w-5 h-5" />
-        </div>
-        <div>
-          <p className="text-sm text-[#6C7383] leading-relaxed">{message}</p>
-        </div>
+        {variant !== 'default' && (
+          <div
+            className={[
+              'shrink-0 w-10 h-10 rounded-full flex items-center justify-center',
+              variant === 'danger' ? 'bg-red-50' : 'bg-amber-50',
+            ].join(' ')}
+            aria-hidden="true"
+          >
+            <AlertTriangle
+              className={[
+                'h-5 w-5',
+                variant === 'danger' ? 'text-red-500' : 'text-amber-500',
+              ].join(' ')}
+            />
+          </div>
+        )}
+        <p className="text-sm text-slate-600 leading-relaxed">{message}</p>
       </div>
     </Modal>
   );
