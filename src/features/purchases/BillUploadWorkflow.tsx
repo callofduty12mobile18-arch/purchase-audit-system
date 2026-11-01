@@ -11,7 +11,7 @@ import { InvoiceFormData, InvoiceFormItem, PurchaseInvoice, Supplier, Product } 
 import { createBlankInvoice, createBlankInvoiceItem } from '../../services/invoiceService';
 import { dbService } from '../../services/dbService';
 import { chequeReminderService, utcIsoToIstParts } from '../../services/chequeReminderService';
-import { ChequeReminderSection } from './ChequeReminderSection';
+import { ChequeReminderSection, resolveReminderEmail } from './ChequeReminderSection';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../context/ToastContext';
 import { getTodayIST, generateISTInvoiceNumber, formatISTTimestamp, formatDisplayDate, formatINR } from '../../utils/dateUtils';
@@ -304,7 +304,7 @@ export const BillUploadWorkflow: React.FC = () => {
     if (isCheque && formData.reminder_enabled) {
       if (!formData.reminder_date) errors.push('Reminder date is required when the email reminder is enabled.');
       if (!formData.reminder_time) errors.push('Reminder time is required when the email reminder is enabled.');
-      if (!(formData.reminder_email || adminEmail).trim()) errors.push('Recipient email is required when the email reminder is enabled.');
+      if (!resolveReminderEmail(formData.reminder_email || adminEmail)) errors.push('Recipient email is required when the email reminder is enabled.');
     }
 
     setFormValidationErrors(errors);
@@ -351,7 +351,7 @@ export const BillUploadWorkflow: React.FC = () => {
             supplierName: saved.supplier?.name || data.supplier_name,
             amount: Number(saved.grand_total) || 0,
             chequePresentationDate: data.cheque_presentation_date || saved.invoice_date,
-            recipientEmail: (data.reminder_email || adminEmail).trim(),
+            recipientEmail: resolveReminderEmail(data.reminder_email || adminEmail),
             reminderDate: data.reminder_date || '',
             reminderTime: data.reminder_time || '',
             createdBy: user?.id,
@@ -614,9 +614,8 @@ export const BillUploadWorkflow: React.FC = () => {
               reminderTime={formData.reminder_time || ''}
               onDateChange={(v) => handleHeaderChange('reminder_date', v)}
               onTimeChange={(v) => handleHeaderChange('reminder_time', v)}
-              email={formData.reminder_email || adminEmail}
+              email={resolveReminderEmail(formData.reminder_email || adminEmail)}
               onEmailChange={(v) => handleHeaderChange('reminder_email', v)}
-              defaultEmail={adminEmail}
               showErrors={formValidationErrors.length > 0}
             />
           </>

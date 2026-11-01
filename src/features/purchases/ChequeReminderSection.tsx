@@ -1,6 +1,28 @@
-import React from 'react';
-import { Bell, Mail, Calendar, Clock, RotateCcw } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { Bell, Calendar, Clock } from 'lucide-react';
 import { Input } from '../../components/ui/Input';
+import { Select } from '../../components/ui/Select';
+
+/** Allowed cheque-reminder recipient addresses (selectable in the form). */
+export const REMINDER_RECIPIENT_EMAILS = [
+  'dhoniashwin18@gmail.com',
+  'callofduty12mobile18@gmail.com',
+  'polonium84r@gmail.com',
+] as const;
+
+export const DEFAULT_REMINDER_EMAIL = REMINDER_RECIPIENT_EMAILS[0];
+
+export function isPlaceholderAdminEmail(email: string | undefined | null): boolean {
+  const e = (email || '').trim().toLowerCase();
+  return !e || e === 'admin@audit.local' || e.endsWith('@audit.local');
+}
+
+/** Prefer a real configured recipient over the demo admin@audit.local address. */
+export function resolveReminderEmail(email: string | undefined | null): string {
+  const trimmed = (email || '').trim();
+  if (trimmed && !isPlaceholderAdminEmail(trimmed)) return trimmed;
+  return DEFAULT_REMINDER_EMAIL;
+}
 
 interface ChequeReminderSectionProps {
   enabled: boolean;
@@ -11,8 +33,6 @@ interface ChequeReminderSectionProps {
   onTimeChange: (value: string) => void;
   email: string;
   onEmailChange: (value: string) => void;
-  /** The authenticated administrator's registered email address. */
-  defaultEmail: string;
   /** When true, required fields are flagged (used after a failed validation attempt). */
   showErrors?: boolean;
 }
@@ -31,12 +51,28 @@ export const ChequeReminderSection: React.FC<ChequeReminderSectionProps> = ({
   onTimeChange,
   email,
   onEmailChange,
-  defaultEmail,
   showErrors = false,
 }) => {
+  const selectedEmail = resolveReminderEmail(email);
   const dateError = enabled && showErrors && !reminderDate ? 'Reminder date is required.' : undefined;
   const timeError = enabled && showErrors && !reminderTime ? 'Reminder time is required.' : undefined;
-  const emailError = enabled && showErrors && !email ? 'Recipient email is required.' : undefined;
+  const emailError = enabled && showErrors && !selectedEmail ? 'Recipient email is required.' : undefined;
+
+  const emailOptions = useMemo(() => {
+    const options = REMINDER_RECIPIENT_EMAILS.map((addr) => ({
+      value: addr,
+      label: addr,
+    }));
+    // Keep an existing non-list address visible so edits don't silently change it.
+    if (
+      email &&
+      !isPlaceholderAdminEmail(email) &&
+      !(REMINDER_RECIPIENT_EMAILS as readonly string[]).includes(email)
+    ) {
+      options.unshift({ value: email, label: email });
+    }
+    return options;
+  }, [email]);
 
   return (
     <div className="pt-4 mt-4 border-t border-slate-100">
@@ -63,7 +99,11 @@ export const ChequeReminderSection: React.FC<ChequeReminderSectionProps> = ({
           role="switch"
           aria-checked={enabled}
           aria-label="Enable cheque email reminder"
-          onClick={() => onEnabledChange(!enabled)}
+          onClick={() => {
+            const next = !enabled;
+            onEnabledChange(next);
+            if (next) onEmailChange(resolveReminderEmail(email));
+          }}
           className="shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600/30"
         >
           <span
@@ -103,29 +143,15 @@ export const ChequeReminderSection: React.FC<ChequeReminderSectionProps> = ({
             helperText="Sent in IST (Asia/Kolkata)"
             icon={<Clock className="h-4 w-4" />}
           />
-          <div>
-            <Input
-              id="reminder_email"
-              label="Recipient email"
-              type="email"
-              required
-              value={email}
-              onChange={(e) => onEmailChange(e.target.value)}
-              error={emailError}
-              placeholder="admin@example.com"
-              icon={<Mail className="h-4 w-4" />}
-            />
-            {defaultEmail && email !== defaultEmail && (
-              <button
-                type="button"
-                onClick={() => onEmailChange(defaultEmail)}
-                className="mt-1.5 inline-flex items-center gap-1 text-xs text-brand-700 hover:text-brand-800"
-              >
-                <RotateCcw className="h-3 w-3" aria-hidden="true" />
-                Use admin email ({defaultEmail})
-              </button>
-            )}
-          </div>
+          <Select
+            id="reminder_email"
+            label="Recipient email"
+            required
+            value={selectedEmail}
+            onChange={(e) => onEmailChange(e.target.value)}
+            error={emailError}
+            options={emailOptions}
+          />
         </div>
       )}
     </div>
