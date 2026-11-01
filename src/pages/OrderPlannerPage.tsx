@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import {
-  ShoppingCart, Plus, Minus, Trash2, Printer, FileDown, Wallet,
-  ArrowLeft, RotateCcw, Sparkles, Search, CheckCircle2, Package,
-  Building2, Calendar, Layers, X, Copy, ChevronRight,
+  Plus, Minus, Trash2, FileDown, Wallet,
+  RotateCcw, Sparkles, Search, Package,
+  Building2, Layers, X,
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
-import { Card } from '../components/ui/Card';
 import { Supplier, Product, PurchaseInvoice } from '../types';
 import { dbService } from '../services/dbService';
-import { getTodayIST, formatDisplayDate, formatISTTimestamp, formatINR } from '../utils/dateUtils';
+import { formatINR } from '../utils/dateUtils';
+import { generateOrderPdf } from '../utils/generateOrderPdf';
 import { useToast } from '../context/ToastContext';
 
 interface OrderPlanRow {
@@ -30,7 +30,7 @@ const inputCls =
   'focus:outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600 transition-colors';
 
 export const OrderPlannerPage: React.FC = () => {
-  const { success: toastSuccess } = useToast();
+  const { success: toastSuccess, error: toastError } = useToast();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [invoices, setInvoices] = useState<PurchaseInvoice[]>([]);
@@ -38,8 +38,8 @@ export const OrderPlannerPage: React.FC = () => {
   const [planRows, setPlanRows] = useState<OrderPlanRow[]>([]);
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<FilterTab>('ALL');
-  const [isProformaMode, setIsProformaMode] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   // ── Rate calculation (business logic preserved) ─────────────────────────────
   const calculateRateEstimate = (
@@ -225,103 +225,37 @@ export const OrderPlannerPage: React.FC = () => {
   const totalGst = orderedItems.reduce((s, r) => s + r.gst_amount, 0);
   const rawGrandTotal = orderedItems.reduce((s, r) => s + r.total, 0);
   const grandTotalRounded = Math.round(rawGrandTotal);
+  const uniqueGstRates = Array.from(new Set(orderedItems.map((r) => r.gst_rate)));
+  const gstLabel = uniqueGstRates.length === 1 ? `GST (${uniqueGstRates[0]}%)` : 'GST';
 
-  const handleCopyWhatsApp = () => {
+  const handleDownloadPdf = () => {
     if (!orderedItems.length) return;
-    const lines = [
-      `*ORDER TO: ${selectedSupplier?.name || 'DISTRIBUTOR AGENCY'}*`,
-      `*Date:* ${formatDisplayDate(new Date())}`,
-      `---`,
-      ...orderedItems.map(
-        (item, idx) =>
-          `${idx + 1}. *${item.product.nickname}* — ${item.quantity} Packs (@ ₹${formatINR(item.purchase_rate)}) = ₹${formatINR(item.total)}`
-      ),
-      `---`,
-      `*Total Volume:* ${totalPacksOrdered} Packs (${orderedItems.length} SKUs)`,
-      `*Estimated Amount:* ₹${formatINR(grandTotalRounded)} (incl. 40% GST)`,
-    ];
-    navigator.clipboard.writeText(lines.join('\n'));
-    toastSuccess('Copied to clipboard', 'WhatsApp order message ready to paste.');
+    setDownloadingPdf(true);
+    try {
+      generateOrderPdf({
+        buyerName: 'RAMACHANDRAN',
+        supplierName: selectedSupplier?.name || 'Distributor',
+        supplierGstin: selectedSupplier?.gstin,
+        lines: orderedItems.map((item) => ({
+          nickname: item.product.nickname,
+          supplierItemName: item.product.supplier_item_name,
+          quantity: item.quantity,
+          rate: item.purchase_rate,
+          total: item.total,
+        })),
+        totalPacks: totalPacksOrdered,
+        skuCount: orderedItems.length,
+        taxable: totalTaxable,
+        gst: totalGst,
+        grandTotal: grandTotalRounded,
+      });
+      toastSuccess('PDF downloaded', 'Order estimate saved to your device.');
+    } catch {
+      toastError('Download failed', 'Could not generate the order PDF. Try again.');
+    } finally {
+      setDownloadingPdf(false);
+    }
   };
-
-  const handlePrint = () => {
-    const orig = document.title;
-    const supplierSlug = selectedSupplier?.name?.replace(/[^a-zA-Z0-9]/g, '_') || 'Agency';
-    document.title = `Order_Estimate_${supplierSlug}_${getTodayIST()}`;
-    window.print();
-    setTimeout(() => { document.title = orig; }, 1200);
-  };
-
-  // ── Proforma view ────────────────────────────────────────────────────────────
-  if (isProformaMode) {
-    return (
-      <div className="space-y-6 max-w-4xl mx-auto">
-        {/* Print-hidden controls */}
-        <div className="no-print flex items-center justify-between gap-3">
-          <Button variant="outline" size="sm" onClick={() => setIsProformaMode(false)} icon={<ArrowLeft className="h-4 w-4" />}>
-            Back to edit
-          </Button>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={handleCopyWhatsApp} icon={<Copy className="h-4 w-4" />}>
-              Copy WhatsApp
-            </Button>
-            <Button variant="primary" size="sm" onClick={handlePrint} icon={<Printer className="h-4 w-4" />}>
-              Print / Save PDF
-            </Button>
-          </div>
-        </div>
-
-        {/* Proforma content */}
-        <div className="bg-white rounded-lg border border-slate-200 shadow-card p-6 space-y-5">
-          <div className="flex items-start justify-between gap-4 pb-4 border-b border-slate-200">
-            <div>
-              <h1 className="text-lg font-bold text-slate-900">Order — RAMACHANDRAN</h1>
-            </div>
-            <div className="text-right">
-              <p className="text-xs text-slate-500">Date</p>
-              <p className="text-sm font-mono font-semibold text-slate-900">{formatDisplayDate(new Date())}</p>
-            </div>
-          </div>
-
-          <table className="w-full text-sm">
-            <thead className="border-b border-slate-200">
-              <tr>
-                <th scope="col" className="py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">#</th>
-                <th scope="col" className="py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Product</th>
-                <th scope="col" className="py-2.5 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Packs</th>
-                <th scope="col" className="py-2.5 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Rate (₹)</th>
-                <th scope="col" className="py-2.5 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Total (₹)</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {orderedItems.map((row, idx) => (
-                <tr key={row.product_id}>
-                  <td className="py-2.5 text-xs font-mono text-slate-400">{idx + 1}</td>
-                  <td className="py-2.5">
-                    <p className="font-medium text-slate-900">{row.product.nickname}</p>
-                    <p className="text-xs font-mono text-slate-400">"{row.product.supplier_item_name}"</p>
-                  </td>
-                  <td className="py-2.5 text-right font-mono font-semibold tabular-nums text-slate-900">{row.quantity}</td>
-                  <td className="py-2.5 text-right font-mono text-slate-700 tabular-nums">₹{formatINR(row.purchase_rate)}</td>
-                  <td className="py-2.5 text-right font-mono font-semibold tabular-nums text-slate-900">₹{formatINR(row.total)}</td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot className="border-t-2 border-slate-300">
-              <tr>
-                <td colSpan={2} className="py-3 text-sm font-semibold text-slate-700">
-                  {orderedItems.length} SKUs · {totalPacksOrdered} packs
-                </td>
-                <td colSpan={3} className="py-3 text-right">
-                  <p className="text-lg font-bold font-mono tabular-nums text-brand-700">₹{formatINR(grandTotalRounded)}</p>
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      </div>
-    );
-  }
 
   // ── Main planner view ────────────────────────────────────────────────────────
   return (
@@ -332,7 +266,7 @@ export const OrderPlannerPage: React.FC = () => {
           <h1 className="page-title">Order planner</h1>
           <p className="page-subtitle">Configure pack quantities for distributor orders and compute GST totals.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {orderedItems.length > 0 && (
             <Button variant="outline" size="sm" onClick={handleResetAll} icon={<RotateCcw className="h-3.5 w-3.5" />}>
               Clear
@@ -342,10 +276,11 @@ export const OrderPlannerPage: React.FC = () => {
             variant="primary"
             size="sm"
             disabled={orderedItems.length === 0}
-            onClick={() => setIsProformaMode(true)}
+            onClick={handleDownloadPdf}
+            isLoading={downloadingPdf}
             icon={<FileDown className="h-4 w-4" />}
           >
-            Generate PO ({orderedItems.length})
+            Download Order PDF
           </Button>
         </div>
       </div>
@@ -649,7 +584,7 @@ export const OrderPlannerPage: React.FC = () => {
                   <span className="font-mono">₹{formatINR(totalTaxable)}</span>
                 </div>
                 <div className="flex justify-between text-xs text-slate-500">
-                  <span>GST (40%)</span>
+                  <span>{gstLabel}</span>
                   <span className="font-mono">₹{formatINR(totalGst)}</span>
                 </div>
                 <div className="flex justify-between text-sm font-semibold text-slate-900 pt-1.5 border-t border-slate-200">
@@ -666,21 +601,12 @@ export const OrderPlannerPage: React.FC = () => {
                 variant="primary"
                 size="sm"
                 disabled={orderedItems.length === 0}
-                onClick={() => setIsProformaMode(true)}
+                onClick={handleDownloadPdf}
+                isLoading={downloadingPdf}
                 icon={<FileDown className="h-3.5 w-3.5" />}
                 className="w-full justify-center"
               >
-                Generate PO
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={orderedItems.length === 0}
-                onClick={handleCopyWhatsApp}
-                icon={<Copy className="h-3.5 w-3.5" />}
-                className="w-full justify-center text-xs"
-              >
-                Copy WhatsApp order
+                Download Order PDF
               </Button>
             </div>
           </div>
@@ -701,20 +627,13 @@ export const OrderPlannerPage: React.FC = () => {
             </div>
             <div className="flex items-center gap-2">
               <Button
-                variant="outline"
-                size="sm"
-                onClick={handleCopyWhatsApp}
-                icon={<Copy className="h-3.5 w-3.5" />}
-              >
-                Copy
-              </Button>
-              <Button
                 variant="primary"
                 size="sm"
-                onClick={() => setIsProformaMode(true)}
+                onClick={handleDownloadPdf}
+                isLoading={downloadingPdf}
                 icon={<FileDown className="h-3.5 w-3.5" />}
               >
-                PO ({orderedItems.length})
+                Download PDF
               </Button>
             </div>
           </div>
