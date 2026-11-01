@@ -132,8 +132,23 @@
     .print-only {
       display: block !important;
     }
+    .print-table {
+      display: table !important;
+      width: 100% !important;
+    }
     body {
-      background: white;
+      background: white !important;
+    }
+    @page {
+      size: A4 portrait;
+      margin: 10mm;
+    }
+    .print-order-sheet {
+      box-shadow: none !important;
+      border: none !important;
+      border-radius: 0 !important;
+      padding: 0 !important;
+      max-width: none !important;
     }
   }
 }

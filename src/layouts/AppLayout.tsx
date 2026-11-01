@@ -222,7 +222,7 @@ export const AppLayout: React.FC = () => {
         </div>
 
         {/* Main content */}
-        <div className="flex flex-col flex-1 lg:ml-60 min-w-0">
+        <div className="flex flex-col flex-1 lg:ml-60 min-w-0 print:ml-0">
           {/* Mobile top bar */}
           <header className="no-print lg:hidden sticky top-0 z-30 bg-white border-b border-slate-200 flex items-center gap-3 px-4 h-14 pt-safe">
             <button
@@ -246,7 +246,7 @@ export const AppLayout: React.FC = () => {
           {/* Page content */}
           <main
             id="main-content"
-            className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto pb-safe"
+            className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto pb-safe print:p-0 print:overflow-visible"
           >
             <ErrorBoundary fallbackTitle="This page encountered an error">
               <Outlet />
