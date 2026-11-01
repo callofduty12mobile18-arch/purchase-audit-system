@@ -30,7 +30,7 @@ interface ClaimedReminder {
   invoice_number: string;
   supplier_name: string | null;
   amount: number;
-  cheque_clearance_date: string | null;
+  cheque_presentation_date: string | null;
   recipient_email: string;
   reminder_at: string;
   status: string;
@@ -112,7 +112,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         invoiceNumber: reminder.invoice_number,
         supplierName: reminder.supplier_name ?? '',
         amount: Number(reminder.amount) || 0,
-        chequeClearanceDate: reminder.cheque_clearance_date,
+        chequePresentationDate: reminder.cheque_presentation_date,
         reminderAtIso: reminder.reminder_at,
       });
 

@@ -46,7 +46,7 @@ export interface ScheduleReminderInput {
   invoiceNumber: string;
   supplierName?: string;
   amount: number;
-  chequeClearanceDate?: string;
+  chequePresentationDate?: string;
   recipientEmail: string;
   reminderDate: string; // YYYY-MM-DD (IST)
   reminderTime: string; // HH:mm (IST)
@@ -90,7 +90,7 @@ export const chequeReminderService = {
           invoice_number: input.invoiceNumber,
           supplier_name: input.supplierName ?? null,
           amount: input.amount,
-          cheque_clearance_date: input.chequeClearanceDate ?? null,
+          cheque_presentation_date: input.chequePresentationDate ?? null,
           recipient_email: input.recipientEmail,
           reminder_at: reminderAt,
           status: 'PENDING',

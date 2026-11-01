@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PlusCircle, Receipt, Package } from 'lucide-react';
+import { PlusCircle, Receipt, Package, Wallet } from 'lucide-react';
 import { StatCard } from '../components/ui/StatCard';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -76,6 +76,13 @@ export const DashboardPage: React.FC = () => {
 
   const visible = invoices.filter((i) => matchDate(i.invoice_date, dateFilter));
   const totalValue = visible.reduce((s, i) => s + i.grand_total, 0);
+  const outstandingCheques = visible.filter(
+    (i) => i.payment_mode === 'CHEQUE' && i.payment_status !== 'PAID'
+  );
+  const outstandingChequeTotal = outstandingCheques.reduce(
+    (s, i) => s + (Number(i.cheque_amount ?? i.grand_total) || 0),
+    0
+  );
   const recentInvoices = visible.slice(0, 10);
 
   const columns: TableColumn<PurchaseInvoice>[] = [
@@ -119,9 +126,16 @@ export const DashboardPage: React.FC = () => {
     {
       header: 'Payment',
       cell: (row) => (
-        <Badge variant={row.payment_status === 'PAID' ? 'success' : 'warning'}>
-          {row.payment_status}
-        </Badge>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <Badge variant={row.payment_status === 'PAID' ? 'success' : 'warning'}>
+            {row.payment_status}
+          </Badge>
+          {row.payment_mode === 'CHEQUE' && row.cheque_status && (
+            <Badge variant={row.cheque_status === 'CLEARED' ? 'success' : 'info'}>
+              {row.cheque_status}
+            </Badge>
+          )}
+        </div>
       ),
     },
     {
@@ -175,9 +189,10 @@ export const DashboardPage: React.FC = () => {
       </div>
 
       {/* KPI cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {loading ? (
           <>
+            <StatCardSkeleton />
             <StatCardSkeleton />
             <StatCardSkeleton />
           </>
@@ -200,6 +215,15 @@ export const DashboardPage: React.FC = () => {
               change={`${products.length} active`}
               changeType="positive"
               icon={<Package className="h-5 w-5" />}
+            />
+            <StatCard
+              color="amber"
+              title="Outstanding cheques"
+              value={`₹${formatINR(outstandingChequeTotal)}`}
+              subtitle="Cheques awaiting clearance"
+              change={`${outstandingCheques.length} pending`}
+              changeType={outstandingCheques.length > 0 ? 'neutral' : 'positive'}
+              icon={<Wallet className="h-5 w-5" />}
             />
           </>
         )}

@@ -53,7 +53,7 @@ export const ChequeReminderSection: React.FC<ChequeReminderSectionProps> = ({
           <div>
             <h3 className="text-sm font-semibold text-slate-900">Email reminder</h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Send an automatic email before the cheque clears.
+              Send an automatic email before the cheque is presented.
             </p>
           </div>
         </div>

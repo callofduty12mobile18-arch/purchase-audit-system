@@ -172,9 +172,16 @@ export const PurchasesPage: React.FC = () => {
     {
       header: 'Status',
       cell: (row) => (
-        <Badge variant={row.payment_status === 'PAID' ? 'success' : 'warning'}>
-          {row.payment_status}
-        </Badge>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <Badge variant={row.payment_status === 'PAID' ? 'success' : 'warning'}>
+            {row.payment_status}
+          </Badge>
+          {row.payment_mode === 'CHEQUE' && row.cheque_status && (
+            <Badge variant={row.cheque_status === 'CLEARED' ? 'success' : 'info'}>
+              {row.cheque_status}
+            </Badge>
+          )}
+        </div>
       ),
     },
     {
@@ -376,7 +383,20 @@ export const PurchasesPage: React.FC = () => {
                   <Badge variant={selectedInvoice.payment_status === 'PAID' ? 'success' : 'warning'} className="ml-1">
                     {selectedInvoice.payment_status}
                   </Badge>
+                  {selectedInvoice.payment_mode === 'CHEQUE' && (
+                    <Badge variant={selectedInvoice.cheque_status === 'CLEARED' ? 'success' : 'info'} className="ml-1">
+                      Cheque {selectedInvoice.cheque_status ?? 'PENDING'}
+                    </Badge>
+                  )}
                 </p>
+                {selectedInvoice.payment_mode === 'CHEQUE' && (
+                  <p className="text-xs text-slate-500 mt-1 font-mono">
+                    ₹{formatINR(selectedInvoice.cheque_amount ?? selectedInvoice.grand_total)}
+                    {selectedInvoice.cheque_presentation_date && (
+                      <> · {formatDisplayDate(selectedInvoice.cheque_presentation_date)}</>
+                    )}
+                  </p>
+                )}
               </div>
               <div className="p-4 rounded-lg bg-slate-50 border border-slate-200">
                 <p className="text-xs font-medium text-slate-500 flex items-center gap-1.5 mb-1">

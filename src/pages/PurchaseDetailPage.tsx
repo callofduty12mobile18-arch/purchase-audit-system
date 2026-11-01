@@ -129,6 +129,11 @@ export const PurchaseDetailPage: React.FC = () => {
               <Badge variant={invoice.payment_status === 'PAID' ? 'success' : 'warning'}>
                 {invoice.payment_status}
               </Badge>
+              {invoice.payment_mode === 'CHEQUE' && (
+                <Badge variant={invoice.cheque_status === 'CLEARED' ? 'success' : 'info'}>
+                  Cheque {invoice.cheque_status ?? 'PENDING'}
+                </Badge>
+              )}
               <Badge variant="default">{invoice.invoice_name || 'RAMACHANDRAN'}</Badge>
             </div>
             <p className="text-xs text-slate-500 mt-1">
@@ -168,6 +173,32 @@ export const PurchaseDetailPage: React.FC = () => {
             <p className="text-xs font-mono text-slate-500 mt-0.5">{totalPacks} packs</p>
           </div>
         </div>
+
+        {invoice.payment_mode === 'CHEQUE' && (
+          <div className="p-4 rounded-lg bg-brand-50 border border-brand-200">
+            <p className="text-xs font-medium text-brand-700 flex items-center gap-1.5 mb-2">
+              <Calendar className="h-3.5 w-3.5" aria-hidden="true" /> Cheque payment
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <p className="text-xs text-slate-500">Cheque status</p>
+                <p className="text-sm font-semibold text-slate-900">{invoice.cheque_status ?? 'PENDING'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500">Cheque amount</p>
+                <p className="text-sm font-semibold font-mono text-slate-900 tabular-nums">
+                  ₹{formatINR(invoice.cheque_amount ?? invoice.grand_total)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500">Presentation date</p>
+                <p className="text-sm font-semibold font-mono text-slate-900">
+                  {invoice.cheque_presentation_date ? formatDisplayDate(invoice.cheque_presentation_date) : '—'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Line items */}

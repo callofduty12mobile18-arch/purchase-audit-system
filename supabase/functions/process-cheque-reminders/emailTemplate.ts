@@ -5,7 +5,7 @@ export interface ChequeReminderEmailData {
   invoiceNumber: string;
   supplierName: string;
   amount: number;
-  chequeClearanceDate?: string | null;
+  chequePresentationDate?: string | null;
   reminderAtIso: string;
 }
 
@@ -51,14 +51,14 @@ export const buildChequeReminderEmail = (
   data: ChequeReminderEmailData
 ): { subject: string; html: string; text: string } => {
   const subject = `Cheque reminder — Invoice ${data.invoiceNumber} (${formatINR(data.amount)})`;
-  const clearance = formatCalendarDate(data.chequeClearanceDate);
+  const clearance = formatCalendarDate(data.chequePresentationDate);
   const reminderTime = `${formatIST(data.reminderAtIso)} IST`;
 
   const rows: Array<[string, string]> = [
     ['Invoice number', data.invoiceNumber],
     ['Supplier', data.supplierName || '—'],
     ['Invoice amount', formatINR(data.amount)],
-    ['Cheque clearance date', clearance],
+    ['Cheque presentation date', clearance],
     ['Reminder scheduled for', reminderTime],
   ];
 
@@ -73,12 +73,12 @@ export const buildChequeReminderEmail = (
     .join('');
 
   const text = [
-    'Cheque clearance reminder',
+    'Cheque payment reminder',
     '',
     `Invoice number: ${data.invoiceNumber}`,
     `Supplier: ${data.supplierName || '—'}`,
     `Invoice amount: ${formatINR(data.amount)}`,
-    `Cheque clearance date: ${clearance}`,
+    `Cheque presentation date: ${clearance}`,
     `Reminder scheduled for: ${reminderTime}`,
     '',
     'This is an automated reminder from the Purchase Audit & Order Intelligence System.',
@@ -100,15 +100,15 @@ export const buildChequeReminderEmail = (
           <tr>
             <td style="background:${BRAND};padding:24px 28px;">
               <p style="margin:0;font-size:12px;letter-spacing:0.08em;text-transform:uppercase;color:#BFDBFE;font-weight:600;">Audit &amp; Planner</p>
-              <p style="margin:6px 0 0;font-size:20px;color:#FFFFFF;font-weight:700;">Cheque clearance reminder</p>
+              <p style="margin:6px 0 0;font-size:20px;color:#FFFFFF;font-weight:700;">Cheque payment reminder</p>
             </td>
           </tr>
           <!-- Body -->
           <tr>
             <td style="padding:24px 28px 8px;">
-              <p style="margin:0 0 4px;font-size:15px;color:#0F172A;font-weight:600;">Upcoming cheque clearance</p>
+              <p style="margin:0 0 4px;font-size:15px;color:#0F172A;font-weight:600;">Upcoming cheque presentation</p>
               <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#475569;">
-                This is a reminder that a cheque payment for the invoice below is due to clear. Please ensure sufficient funds are available.
+                This is a reminder that a cheque payment for the invoice below is due to be presented. Please ensure sufficient funds are available.
               </p>
             </td>
           </tr>

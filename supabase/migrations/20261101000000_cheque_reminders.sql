@@ -18,11 +18,11 @@ END $$;
 -- 2. CHEQUE REMINDERS TABLE
 --    One active reminder per invoice (unique invoice_id) to guarantee we can
 --    never schedule duplicate emails for the same invoice.
---    Invoice number / supplier / amount / cheque clearance date are stored as
+--    Invoice number / supplier / amount / cheque presentation date are stored as
 --    snapshots so the scheduler does not depend on optional invoice columns.
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS cheque_reminders (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     invoice_id UUID NOT NULL REFERENCES purchase_invoices(id) ON DELETE CASCADE,
     invoice_number TEXT NOT NULL,
     supplier_name TEXT,

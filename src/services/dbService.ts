@@ -8,7 +8,9 @@ import {
   PurchaseItem,
   PriceHistory,
   AuditLog,
-  InvoiceFormData
+  InvoiceFormData,
+  PaymentStatus,
+  ChequeStatus
 } from '../types';
 
 export function generateUUID(): string {
@@ -772,9 +774,31 @@ export const dbService = {
     const safePaymentMode = (extractedData.payment_mode && validPaymentModes.includes(extractedData.payment_mode))
       ? (extractedData.payment_mode as any)
       : 'CASH';
-    const safePaymentStatus = (extractedData.payment_status === 'UNPAID' || extractedData.payment_status === 'PARTIALLY_PAID')
-      ? extractedData.payment_status
-      : (extractedData.payment_status === 'CHEQUE' ? 'CHEQUE' : 'PAID');
+
+    // Cheque invoices use payment_mode = 'CHEQUE' and stay 'UNPAID' until the
+    // scheduled clearance job marks them 'PAID' on the presentation date.
+    // 'CHEQUE' is never written into payment_status (it is not a valid value of
+    // the DB enum, which is what previously blocked cheque invoices from
+    // persisting). Editing an already-cleared cheque invoice must never revert
+    // it back to UNPAID.
+    const isChequeMode = safePaymentMode === 'CHEQUE';
+    const wasCleared = oldInvoice?.cheque_status === 'CLEARED' || oldInvoice?.payment_status === 'PAID';
+    const safePaymentStatus: PaymentStatus = isChequeMode
+      ? (wasCleared ? 'PAID' : 'UNPAID')
+      : ((extractedData.payment_status === 'UNPAID' || extractedData.payment_status === 'PARTIALLY_PAID')
+        ? extractedData.payment_status
+        : 'PAID');
+
+    const chequeStatus: ChequeStatus | null = isChequeMode
+      ? (wasCleared ? 'CLEARED' : 'PENDING')
+      : null;
+    const chequePresentationDate = isChequeMode
+      ? (extractedData.cheque_presentation_date || extractedData.invoice_date || getTodayIST())
+      : null;
+    // One payment method per invoice: the cheque covers the full invoice amount.
+    const chequeAmount = isChequeMode
+      ? Number((Number(extractedData.grand_total) || 0).toFixed(2))
+      : null;
 
     const effectiveInvoiceName = extractedData.invoice_name?.trim() || 'RAMACHANDRAN';
 
@@ -787,7 +811,9 @@ export const dbService = {
       invoice_date: extractedData.invoice_date || getTodayIST(),
       payment_mode: safePaymentMode,
       payment_status: safePaymentStatus,
-      cheque_date: extractedData.cheque_date,
+      cheque_status: chequeStatus,
+      cheque_amount: chequeAmount,
+      cheque_presentation_date: chequePresentationDate,
       subtotal: extractedData.subtotal,
       taxable_amount: extractedData.taxable_amount,
       cgst: extractedData.cgst,
@@ -825,6 +851,9 @@ export const dbService = {
           invoice_date: extractedData.invoice_date,
           payment_mode: safePaymentMode,
           payment_status: safePaymentStatus,
+          cheque_status: chequeStatus,
+          cheque_amount: chequeAmount,
+          cheque_presentation_date: chequePresentationDate,
           subtotal: extractedData.subtotal,
           taxable_amount: extractedData.taxable_amount,
           cgst: extractedData.cgst,
@@ -851,6 +880,9 @@ export const dbService = {
             invoice_date: extractedData.invoice_date,
             payment_mode: safePaymentMode,
             payment_status: safePaymentStatus,
+            cheque_status: chequeStatus,
+            cheque_amount: chequeAmount,
+            cheque_presentation_date: chequePresentationDate,
             subtotal: extractedData.subtotal,
             taxable_amount: extractedData.taxable_amount,
             cgst: extractedData.cgst,

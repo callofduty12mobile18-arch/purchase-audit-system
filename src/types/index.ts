@@ -1,12 +1,17 @@
 // Core Data Types for Purchase Audit & Order Planning System
 
 export type PaymentMode = 'CASH' | 'CHEQUE' | 'UPI' | 'BANK_TRANSFER' | 'CREDIT' | 'OTHER';
-export type PaymentStatus = 'PAID' | 'CHEQUE' | 'UNPAID' | 'PARTIALLY_PAID';
+// NOTE: 'CHEQUE' is a payment MODE, not a payment status — it must never be
+// written into the DB payment_status enum. Cheque invoices stay UNPAID until
+// their presentation date, then become PAID.
+export type PaymentStatus = 'PAID' | 'UNPAID' | 'PARTIALLY_PAID';
 export type VerificationStatus = 'DRAFT' | 'PENDING_VERIFICATION' | 'VERIFIED' | 'REJECTED';
 export type OcrStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'MANUAL';
 export type PriceType = 'PURCHASE_REF' | 'SELLING';
 export type StockTransactionType = 'PURCHASE' | 'ADJUSTMENT' | 'RETURN' | 'DISCARD';
 export type ChequeReminderStatus = 'PENDING' | 'PROCESSING' | 'SENT' | 'FAILED' | 'CANCELLED';
+/** Lifecycle of a cheque payment. Managed automatically on the presentation date. */
+export type ChequeStatus = 'PENDING' | 'CLEARED';
 
 export interface UserProfile {
   id: string;
@@ -94,7 +99,12 @@ export interface PurchaseInvoice {
   invoice_date: string;
   payment_mode: PaymentMode;
   payment_status: PaymentStatus;
-  cheque_date?: string;
+  /** Lifecycle of a cheque payment. Null/undefined for non-cheque invoices. */
+  cheque_status?: ChequeStatus | null;
+  /** Full invoice amount covered by the cheque (one payment method per invoice). */
+  cheque_amount?: number | null;
+  /** Date the cheque is expected to be presented / clear (YYYY-MM-DD, IST). */
+  cheque_presentation_date?: string | null;
   subtotal: number;
   taxable_amount: number;
   cgst: number;
@@ -158,7 +168,7 @@ export interface ChequeReminder {
   invoice_number: string;
   supplier_name?: string;
   amount: number;
-  cheque_clearance_date?: string;
+  cheque_presentation_date?: string;
   recipient_email: string;
   reminder_at: string;
   status: ChequeReminderStatus;
@@ -217,7 +227,9 @@ export interface InvoiceFormData {
   invoice_date: string;
   payment_mode: PaymentMode;
   payment_status: PaymentStatus;
-  cheque_date?: string;
+  cheque_status?: ChequeStatus | null;
+  cheque_amount?: number | null;
+  cheque_presentation_date?: string | null;
   reminder_enabled?: boolean;
   reminder_date?: string;
   reminder_time?: string;

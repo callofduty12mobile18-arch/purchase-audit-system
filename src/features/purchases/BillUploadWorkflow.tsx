@@ -102,7 +102,9 @@ export const BillUploadWorkflow: React.FC = () => {
             invoice_number: existingInv.invoice_number || '',
             payment_mode: existingInv.payment_mode || 'CASH',
             payment_status: existingInv.payment_status || 'PAID',
-            cheque_date: existingInv.cheque_date || existingInv.invoice_date || getTodayIST(),
+            cheque_status: existingInv.cheque_status ?? null,
+            cheque_amount: existingInv.cheque_amount ?? null,
+            cheque_presentation_date: existingInv.cheque_presentation_date || existingInv.invoice_date || getTodayIST(),
             reminder_enabled: reminderActive,
             reminder_date: reminderActive ? reminderParts.date : '',
             reminder_time: reminderActive ? reminderParts.time : '',
@@ -134,8 +136,8 @@ export const BillUploadWorkflow: React.FC = () => {
         invoice_date: prev.invoice_date || getTodayIST(),
         invoice_number: prev.invoice_number || generateISTInvoiceNumber(),
         payment_mode: prev.payment_mode === 'CHEQUE' ? 'CHEQUE' : 'CASH',
-        payment_status: prev.payment_status === 'CHEQUE' ? 'CHEQUE' : 'PAID',
-        cheque_date: prev.cheque_date || prev.invoice_date || getTodayIST(),
+        payment_status: prev.payment_mode === 'CHEQUE' ? 'UNPAID' : 'PAID',
+        cheque_presentation_date: prev.cheque_presentation_date || prev.invoice_date || getTodayIST(),
       }));
     } catch (err: unknown) {
       toastError('Load failed', err instanceof Error ? err.message : 'Check database connection.');
@@ -298,7 +300,7 @@ export const BillUploadWorkflow: React.FC = () => {
     if (formData.items.some((it) => !it.invoice_amount || it.invoice_amount <= 0)) errors.push('All line items must have a bill amount > 0.');
 
     // Cheque email reminder validation (only relevant for cheque payments)
-    const isCheque = formData.payment_mode === 'CHEQUE' || formData.payment_status === 'CHEQUE';
+    const isCheque = formData.payment_mode === 'CHEQUE';
     if (isCheque && formData.reminder_enabled) {
       if (!formData.reminder_date) errors.push('Reminder date is required when the email reminder is enabled.');
       if (!formData.reminder_time) errors.push('Reminder time is required when the email reminder is enabled.');
@@ -335,8 +337,7 @@ export const BillUploadWorkflow: React.FC = () => {
 
       // Keep the cheque email reminder in sync with the saved invoice.
       // This is non-fatal: a reminder problem must never block the invoice save.
-      const isCheque = saved.payment_mode === 'CHEQUE' || saved.payment_status === 'CHEQUE'
-        || data.payment_mode === 'CHEQUE' || data.payment_status === 'CHEQUE';
+      const isCheque = saved.payment_mode === 'CHEQUE' || data.payment_mode === 'CHEQUE';
       const reminderEnabled = isCheque && Boolean(data.reminder_enabled);
       try {
         await chequeReminderService.syncForInvoice(reminderEnabled, {
@@ -344,7 +345,7 @@ export const BillUploadWorkflow: React.FC = () => {
           invoiceNumber: saved.invoice_number,
           supplierName: saved.supplier?.name || data.supplier_name,
           amount: Number(saved.grand_total) || 0,
-          chequeClearanceDate: data.cheque_date || saved.invoice_date,
+          chequePresentationDate: data.cheque_presentation_date || saved.invoice_date,
           recipientEmail: (data.reminder_email || adminEmail).trim(),
           reminderDate: data.reminder_date || '',
           reminderTime: data.reminder_time || '',
@@ -371,7 +372,7 @@ export const BillUploadWorkflow: React.FC = () => {
     );
   }
 
-  const chequeMode = formData.payment_status === 'CHEQUE' || formData.payment_mode === 'CHEQUE';
+  const chequeMode = formData.payment_mode === 'CHEQUE';
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-24 lg:pb-8">
@@ -506,9 +507,15 @@ export const BillUploadWorkflow: React.FC = () => {
                 id="payment_mode"
                 value={formData.payment_mode === 'CHEQUE' ? 'CHEQUE' : 'CASH'}
                 onChange={(e) => {
-                  handleHeaderChange('payment_mode', e.target.value);
-                  if (e.target.value === 'CHEQUE' && formData.payment_status !== 'CHEQUE') handleHeaderChange('payment_status', 'CHEQUE');
-                  if (e.target.value !== 'CHEQUE') handleHeaderChange('reminder_enabled', false);
+                  const mode = e.target.value;
+                  handleHeaderChange('payment_mode', mode);
+                  if (mode === 'CHEQUE') {
+                    // A cheque never settles the invoice on hand-over.
+                    handleHeaderChange('payment_status', 'UNPAID');
+                  } else {
+                    handleHeaderChange('payment_status', 'PAID');
+                    handleHeaderChange('reminder_enabled', false);
+                  }
                 }}
                 className={inputCls + ' appearance-none pr-8 cursor-pointer'}
               >
@@ -527,15 +534,12 @@ export const BillUploadWorkflow: React.FC = () => {
             <div className="relative">
               <select
                 id="payment_status"
-                value={formData.payment_status === 'CHEQUE' ? 'CHEQUE' : 'PAID'}
-                onChange={(e) => {
-                  handleHeaderChange('payment_status', e.target.value);
-                  if (e.target.value === 'CHEQUE' && formData.payment_mode !== 'CHEQUE') handleHeaderChange('payment_mode', 'CHEQUE');
-                }}
+                value={formData.payment_status === 'PAID' ? 'PAID' : 'UNPAID'}
+                onChange={(e) => handleHeaderChange('payment_status', e.target.value)}
                 className={inputCls + ' appearance-none pr-8 cursor-pointer'}
               >
                 <option value="PAID">Paid</option>
-                <option value="CHEQUE">Cheque</option>
+                <option value="UNPAID">Unpaid</option>
               </select>
               <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400" aria-hidden="true">
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
@@ -544,25 +548,25 @@ export const BillUploadWorkflow: React.FC = () => {
           </div>
         </div>
 
-        {/* Cheque date row */}
+        {/* Cheque presentation date row */}
         {chequeMode && (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-slate-100">
               <div>
-                <label htmlFor="cheque_date" className="block text-sm font-medium text-slate-700 mb-1.5 flex items-center gap-1.5">
+                <label htmlFor="cheque_presentation_date" className="block text-sm font-medium text-slate-700 mb-1.5 flex items-center gap-1.5">
                   <Calendar className="h-3.5 w-3.5 text-brand-600" aria-hidden="true" />
-                  Cheque clearance date <span className="text-red-500" aria-hidden="true">*</span>
+                  Cheque presentation date <span className="text-red-500" aria-hidden="true">*</span>
                 </label>
                 <input
-                  id="cheque_date"
+                  id="cheque_presentation_date"
                   type="date"
                   required
-                  value={formData.cheque_date || formData.invoice_date}
-                  onChange={(e) => handleHeaderChange('cheque_date', e.target.value)}
+                  value={formData.cheque_presentation_date || formData.invoice_date}
+                  onChange={(e) => handleHeaderChange('cheque_presentation_date', e.target.value)}
                   className={inputCls}
                 />
                 <p className="text-xs text-slate-500 mt-1">
-                  Date the cheque amount will be credited ({formatDisplayDate(formData.cheque_date || formData.invoice_date)})
+                  Date the cheque is presented to the bank. The invoice clears automatically on this date ({formatDisplayDate(formData.cheque_presentation_date || formData.invoice_date)}).
                 </p>
               </div>
             </div>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { LineChart as LineChartIcon, TrendingUp, Receipt, Package, BarChart3, Layers } from 'lucide-react';
+import { LineChart as LineChartIcon, TrendingUp, Receipt, Package, BarChart3, Layers, Wallet } from 'lucide-react';
 import {
   ResponsiveContainer, BarChart, Bar, LineChart, Line, AreaChart, Area,
   CartesianGrid, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, Legend,
@@ -56,6 +56,13 @@ export const AnalyticsPage: React.FC = () => {
 
   const filteredInvoices = invoices.filter((i) => matchDate(i.invoice_date, timeFilter));
   const totalSpend = filteredInvoices.reduce((s, i) => s + i.grand_total, 0);
+  const outstandingCheques = filteredInvoices.filter(
+    (i) => i.payment_mode === 'CHEQUE' && i.payment_status !== 'PAID'
+  );
+  const outstandingChequeTotal = outstandingCheques.reduce(
+    (s, i) => s + (Number(i.cheque_amount ?? i.grand_total) || 0),
+    0
+  );
 
   // Monthly timeline
   const monthlyMap: Record<string, { month: string; spend: number; invoiceCount: number }> = {};
@@ -142,14 +149,23 @@ export const AnalyticsPage: React.FC = () => {
       </div>
 
       {/* KPI cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {loading ? (
-          <><StatCardSkeleton /><StatCardSkeleton /><StatCardSkeleton /></>
+          <><StatCardSkeleton /><StatCardSkeleton /><StatCardSkeleton /><StatCardSkeleton /></>
         ) : (
           <>
             <StatCard color="blue" title="Total billed spend" value={`₹${formatINR(totalSpend)}`} subtitle="Procurement total" icon={<Receipt className="h-5 w-5" />} />
             <StatCard color="violet" title="Recorded invoices" value={filteredInvoices.length} subtitle="Verified bills" icon={<TrendingUp className="h-5 w-5" />} />
             <StatCard color="green" title="Active SKUs purchased" value={productBreakdown.length} subtitle="Unique products ordered" icon={<Package className="h-5 w-5" />} />
+            <StatCard
+              color="amber"
+              title="Outstanding cheques"
+              value={`₹${formatINR(outstandingChequeTotal)}`}
+              subtitle="Cheques awaiting clearance"
+              change={`${outstandingCheques.length} pending`}
+              changeType={outstandingCheques.length > 0 ? 'neutral' : 'positive'}
+              icon={<Wallet className="h-5 w-5" />}
+            />
           </>
         )}
       </div>
