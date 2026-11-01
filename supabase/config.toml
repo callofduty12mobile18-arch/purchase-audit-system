@@ -6,3 +6,12 @@
 # the function whenever the shared secret is missing or incorrect.
 [functions.process-cheque-reminders]
 verify_jwt = false
+
+# save-cheque-reminder is called from the frontend. JWT verification is disabled
+# at the gateway level because the demo-auth fallback (used when Supabase Auth
+# is not configured) does not produce a real JWT. Authorization is enforced
+# inside the function: either a valid Supabase JWT or the x-app-secret header
+# (matching APP_SECRET) is required, and the target invoice_id is verified to
+# exist before any write occurs.
+[functions.save-cheque-reminder]
+verify_jwt = false

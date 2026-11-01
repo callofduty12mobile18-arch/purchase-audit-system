@@ -335,28 +335,64 @@ export const BillUploadWorkflow: React.FC = () => {
     try {
       const saved = await dbService.confirmAndSaveInvoice(data, undefined, id);
 
-      // Keep the cheque email reminder in sync with the saved invoice.
-      // This is non-fatal: a reminder problem must never block the invoice save.
+      // ── Cheque email reminder sync ──────────────────────────────────────────
+      // The reminder is only relevant for cheque invoices with reminder_enabled.
+      // A reminder failure must NEVER block or reverse the invoice save — the
+      // invoice is already persisted at this point. We surface the error as a
+      // warning so the user knows to re-enable the reminder manually.
       const isCheque = saved.payment_mode === 'CHEQUE' || data.payment_mode === 'CHEQUE';
       const reminderEnabled = isCheque && Boolean(data.reminder_enabled);
-      try {
-        await chequeReminderService.syncForInvoice(reminderEnabled, {
-          invoiceId: saved.id,
-          invoiceNumber: saved.invoice_number,
-          supplierName: saved.supplier?.name || data.supplier_name,
-          amount: Number(saved.grand_total) || 0,
-          chequePresentationDate: data.cheque_presentation_date || saved.invoice_date,
-          recipientEmail: (data.reminder_email || adminEmail).trim(),
-          reminderDate: data.reminder_date || '',
-          reminderTime: data.reminder_time || '',
-          createdBy: user?.id,
-        });
-      } catch (remErr: unknown) {
-        toastWarning('Reminder not saved', remErr instanceof Error ? remErr.message : 'Could not save the cheque email reminder.');
+
+      if (isCheque) {
+        try {
+          await chequeReminderService.syncForInvoice(reminderEnabled, {
+            invoiceId: saved.id,
+            invoiceNumber: saved.invoice_number,
+            supplierName: saved.supplier?.name || data.supplier_name,
+            amount: Number(saved.grand_total) || 0,
+            chequePresentationDate: data.cheque_presentation_date || saved.invoice_date,
+            recipientEmail: (data.reminder_email || adminEmail).trim(),
+            reminderDate: data.reminder_date || '',
+            reminderTime: data.reminder_time || '',
+            createdBy: user?.id,
+          });
+          // Only show "reminder scheduled" confirmation when it was actually requested
+          if (reminderEnabled) {
+            toastSuccess(
+              isEditMode ? 'Invoice updated' : 'Invoice saved',
+              `#${saved.invoice_number} recorded. Email reminder scheduled.`
+            );
+          } else {
+            toastSuccess(
+              isEditMode ? 'Invoice updated' : 'Invoice saved',
+              `#${saved.invoice_number} recorded.`
+            );
+          }
+        } catch (remErr: unknown) {
+          // Invoice saved — reminder did not. Tell the user precisely.
+          const remMsg =
+            remErr instanceof Error ? remErr.message : 'Could not save the cheque email reminder.';
+          // Show invoice success FIRST, then reminder warning separately so the
+          // user understands the invoice itself is safe.
+          toastSuccess(
+            isEditMode ? 'Invoice updated' : 'Invoice saved',
+            `#${saved.invoice_number} recorded.`
+          );
+          toastWarning(
+            'Email reminder not scheduled',
+            `Invoice saved successfully. Reminder failed: ${remMsg}. ` +
+              'Please edit this invoice to re-enable the reminder.'
+          );
+        }
+      } else {
+        toastSuccess(
+          isEditMode ? 'Invoice updated' : 'Invoice saved',
+          `#${saved.invoice_number} recorded.`
+        );
       }
 
-      setSavedInvoice(saved); setShowSuccessModal(true);
-      toastSuccess(isEditMode ? 'Invoice updated' : 'Invoice saved', `#${saved.invoice_number} recorded.`);
+      setSavedInvoice(saved);
+      setShowSuccessModal(true);
     } catch (err: unknown) {
       toastError(isEditMode ? 'Update error' : 'Save error', err instanceof Error ? err.message : 'Error saving.');
     } finally { setIsSubmitting(false); }
