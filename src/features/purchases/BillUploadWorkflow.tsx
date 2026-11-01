@@ -10,6 +10,9 @@ import { CardSkeleton } from '../../components/ui/LoadingSkeleton';
 import { InvoiceFormData, InvoiceFormItem, PurchaseInvoice, Supplier, Product } from '../../types';
 import { createBlankInvoice, createBlankInvoiceItem } from '../../services/invoiceService';
 import { dbService } from '../../services/dbService';
+import { chequeReminderService, utcIsoToIstParts } from '../../services/chequeReminderService';
+import { ChequeReminderSection } from './ChequeReminderSection';
+import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../context/ToastContext';
 import { getTodayIST, generateISTInvoiceNumber, formatISTTimestamp, formatDisplayDate, formatINR } from '../../utils/dateUtils';
 
@@ -32,6 +35,10 @@ export const BillUploadWorkflow: React.FC = () => {
   const isEditMode = Boolean(id);
   const navigate = useNavigate();
   const { success: toastSuccess, error: toastError, warning: toastWarning } = useToast();
+  const { user, profile } = useAuth();
+
+  // Registered email of the authenticated administrator (auto-filled into reminders).
+  const adminEmail = profile?.email || user?.email || '';
 
   const [formData, setFormData] = useState<InvoiceFormData>(createBlankInvoice());
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -82,6 +89,11 @@ export const BillUploadWorkflow: React.FC = () => {
             validation: { valid: true, warnings: [] },
           }));
 
+          // Re-hydrate any existing cheque email reminder for this invoice.
+          const existingReminder = await chequeReminderService.getByInvoice(id);
+          const reminderActive = Boolean(existingReminder && existingReminder.status !== 'CANCELLED');
+          const reminderParts = existingReminder ? utcIsoToIstParts(existingReminder.reminder_at) : { date: '', time: '' };
+
           setFormData({
             supplier_name: existingInv.supplier?.name || 'AYYAPPA ENTERPRISES',
             supplier_gstin: existingInv.supplier?.gstin || '33AABFA2949R1Z5',
@@ -91,6 +103,10 @@ export const BillUploadWorkflow: React.FC = () => {
             payment_mode: existingInv.payment_mode || 'CASH',
             payment_status: existingInv.payment_status || 'PAID',
             cheque_date: existingInv.cheque_date || existingInv.invoice_date || getTodayIST(),
+            reminder_enabled: reminderActive,
+            reminder_date: reminderActive ? reminderParts.date : '',
+            reminder_time: reminderActive ? reminderParts.time : '',
+            reminder_email: existingReminder?.recipient_email || '',
             items: mappedItems.length > 0 ? mappedItems : [createBlankInvoiceItem()],
             subtotal: existingInv.subtotal,
             taxable_amount: existingInv.taxable_amount,
@@ -150,7 +166,7 @@ export const BillUploadWorkflow: React.FC = () => {
     };
   };
 
-  const handleHeaderChange = (field: keyof InvoiceFormData, value: string | number) => {
+  const handleHeaderChange = (field: keyof InvoiceFormData, value: string | number | boolean) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -280,6 +296,15 @@ export const BillUploadWorkflow: React.FC = () => {
     if (formData.items.some((it) => !it.supplier_item_name?.trim())) errors.push('All line items must have a product selected.');
     if (formData.items.some((it) => !it.pack_qty || it.pack_qty <= 0)) errors.push('All line items must have pack quantity > 0.');
     if (formData.items.some((it) => !it.invoice_amount || it.invoice_amount <= 0)) errors.push('All line items must have a bill amount > 0.');
+
+    // Cheque email reminder validation (only relevant for cheque payments)
+    const isCheque = formData.payment_mode === 'CHEQUE' || formData.payment_status === 'CHEQUE';
+    if (isCheque && formData.reminder_enabled) {
+      if (!formData.reminder_date) errors.push('Reminder date is required when the email reminder is enabled.');
+      if (!formData.reminder_time) errors.push('Reminder time is required when the email reminder is enabled.');
+      if (!(formData.reminder_email || adminEmail).trim()) errors.push('Recipient email is required when the email reminder is enabled.');
+    }
+
     setFormValidationErrors(errors);
     return errors.length === 0;
   };
@@ -304,8 +329,31 @@ export const BillUploadWorkflow: React.FC = () => {
 
   const executeSave = async (overrideData?: InvoiceFormData) => {
     setIsSubmitting(true); setShowDuplicateModal(false);
+    const data = overrideData || formData;
     try {
-      const saved = await dbService.confirmAndSaveInvoice(overrideData || formData, undefined, id);
+      const saved = await dbService.confirmAndSaveInvoice(data, undefined, id);
+
+      // Keep the cheque email reminder in sync with the saved invoice.
+      // This is non-fatal: a reminder problem must never block the invoice save.
+      const isCheque = saved.payment_mode === 'CHEQUE' || saved.payment_status === 'CHEQUE'
+        || data.payment_mode === 'CHEQUE' || data.payment_status === 'CHEQUE';
+      const reminderEnabled = isCheque && Boolean(data.reminder_enabled);
+      try {
+        await chequeReminderService.syncForInvoice(reminderEnabled, {
+          invoiceId: saved.id,
+          invoiceNumber: saved.invoice_number,
+          supplierName: saved.supplier?.name || data.supplier_name,
+          amount: Number(saved.grand_total) || 0,
+          chequeClearanceDate: data.cheque_date || saved.invoice_date,
+          recipientEmail: (data.reminder_email || adminEmail).trim(),
+          reminderDate: data.reminder_date || '',
+          reminderTime: data.reminder_time || '',
+          createdBy: user?.id,
+        });
+      } catch (remErr: unknown) {
+        toastWarning('Reminder not saved', remErr instanceof Error ? remErr.message : 'Could not save the cheque email reminder.');
+      }
+
       setSavedInvoice(saved); setShowSuccessModal(true);
       toastSuccess(isEditMode ? 'Invoice updated' : 'Invoice saved', `#${saved.invoice_number} recorded.`);
     } catch (err: unknown) {
@@ -460,6 +508,7 @@ export const BillUploadWorkflow: React.FC = () => {
                 onChange={(e) => {
                   handleHeaderChange('payment_mode', e.target.value);
                   if (e.target.value === 'CHEQUE' && formData.payment_status !== 'CHEQUE') handleHeaderChange('payment_status', 'CHEQUE');
+                  if (e.target.value !== 'CHEQUE') handleHeaderChange('reminder_enabled', false);
                 }}
                 className={inputCls + ' appearance-none pr-8 cursor-pointer'}
               >
@@ -497,25 +546,40 @@ export const BillUploadWorkflow: React.FC = () => {
 
         {/* Cheque date row */}
         {chequeMode && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-slate-100">
-            <div>
-              <label htmlFor="cheque_date" className="block text-sm font-medium text-slate-700 mb-1.5 flex items-center gap-1.5">
-                <Calendar className="h-3.5 w-3.5 text-brand-600" aria-hidden="true" />
-                Cheque clearance date <span className="text-red-500" aria-hidden="true">*</span>
-              </label>
-              <input
-                id="cheque_date"
-                type="date"
-                required
-                value={formData.cheque_date || formData.invoice_date}
-                onChange={(e) => handleHeaderChange('cheque_date', e.target.value)}
-                className={inputCls}
-              />
-              <p className="text-xs text-slate-500 mt-1">
-                Date the cheque amount will be credited ({formatDisplayDate(formData.cheque_date || formData.invoice_date)})
-              </p>
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-slate-100">
+              <div>
+                <label htmlFor="cheque_date" className="block text-sm font-medium text-slate-700 mb-1.5 flex items-center gap-1.5">
+                  <Calendar className="h-3.5 w-3.5 text-brand-600" aria-hidden="true" />
+                  Cheque clearance date <span className="text-red-500" aria-hidden="true">*</span>
+                </label>
+                <input
+                  id="cheque_date"
+                  type="date"
+                  required
+                  value={formData.cheque_date || formData.invoice_date}
+                  onChange={(e) => handleHeaderChange('cheque_date', e.target.value)}
+                  className={inputCls}
+                />
+                <p className="text-xs text-slate-500 mt-1">
+                  Date the cheque amount will be credited ({formatDisplayDate(formData.cheque_date || formData.invoice_date)})
+                </p>
+              </div>
             </div>
-          </div>
+
+            <ChequeReminderSection
+              enabled={Boolean(formData.reminder_enabled)}
+              onEnabledChange={(v) => handleHeaderChange('reminder_enabled', v)}
+              reminderDate={formData.reminder_date || ''}
+              reminderTime={formData.reminder_time || ''}
+              onDateChange={(v) => handleHeaderChange('reminder_date', v)}
+              onTimeChange={(v) => handleHeaderChange('reminder_time', v)}
+              email={formData.reminder_email || adminEmail}
+              onEmailChange={(v) => handleHeaderChange('reminder_email', v)}
+              defaultEmail={adminEmail}
+              showErrors={formValidationErrors.length > 0}
+            />
+          </>
         )}
       </div>
 

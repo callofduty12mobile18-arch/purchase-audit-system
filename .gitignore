@@ -29,6 +29,9 @@ dist-ssr
 .env.*.local
 ocr-service/.env
 
+# Supabase CLI local state
+supabase/.temp/
+
 # Python OCR Service
 ocr-service/venv/
 ocr-service/debug/

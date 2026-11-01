@@ -1,0 +1,8 @@
+# Supabase project configuration
+
+# process-cheque-reminders is invoked only by pg_cron (server-to-server) and is
+# guarded by the x-cron-secret header instead of a user JWT, so JWT verification
+# is disabled for this function only. Public invocation is still rejected inside
+# the function whenever the shared secret is missing or incorrect.
+[functions.process-cheque-reminders]
+verify_jwt = false

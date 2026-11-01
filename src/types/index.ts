@@ -6,6 +6,7 @@ export type VerificationStatus = 'DRAFT' | 'PENDING_VERIFICATION' | 'VERIFIED' |
 export type OcrStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'MANUAL';
 export type PriceType = 'PURCHASE_REF' | 'SELLING';
 export type StockTransactionType = 'PURCHASE' | 'ADJUSTMENT' | 'RETURN' | 'DISCARD';
+export type ChequeReminderStatus = 'PENDING' | 'PROCESSING' | 'SENT' | 'FAILED' | 'CANCELLED';
 
 export interface UserProfile {
   id: string;
@@ -151,6 +152,24 @@ export interface AuditLog {
   timestamp: string;
 }
 
+export interface ChequeReminder {
+  id: string;
+  invoice_id: string;
+  invoice_number: string;
+  supplier_name?: string;
+  amount: number;
+  cheque_clearance_date?: string;
+  recipient_email: string;
+  reminder_at: string;
+  status: ChequeReminderStatus;
+  attempts: number;
+  last_error?: string | null;
+  sent_at?: string | null;
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface RowValidation {
   valid: boolean;
   warnings: string[];
@@ -199,6 +218,10 @@ export interface InvoiceFormData {
   payment_mode: PaymentMode;
   payment_status: PaymentStatus;
   cheque_date?: string;
+  reminder_enabled?: boolean;
+  reminder_date?: string;
+  reminder_time?: string;
+  reminder_email?: string;
   items: InvoiceFormItem[];
   total_items?: number;
   total_packs?: number;
