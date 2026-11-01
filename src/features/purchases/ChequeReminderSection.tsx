@@ -59,7 +59,7 @@ export const ChequeReminderSection: React.FC<ChequeReminderSectionProps> = ({
   const emailError = enabled && showErrors && !selectedEmail ? 'Recipient email is required.' : undefined;
 
   const emailOptions = useMemo(() => {
-    const options = REMINDER_RECIPIENT_EMAILS.map((addr) => ({
+    const options: { value: string; label: string }[] = REMINDER_RECIPIENT_EMAILS.map((addr) => ({
       value: addr,
       label: addr,
     }));
