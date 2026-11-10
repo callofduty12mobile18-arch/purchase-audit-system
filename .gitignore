@@ -41,6 +41,8 @@ __pycache__/
 *.py[cod]
 *$py.class
 # IDE & Agent tools
+.vercel/
+.tmp-verify/
 .gemini/
 .agent/
 .agents/
