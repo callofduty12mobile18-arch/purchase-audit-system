@@ -1,6 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PlusCircle, Receipt, Package, Wallet } from 'lucide-react';
+import {
+  PlusCircle,
+  Receipt,
+  Package,
+  Wallet,
+  Banknote,
+  Clock,
+  CheckCircle2,
+  AlertCircle
+} from 'lucide-react';
 import { StatCard } from '../components/ui/StatCard';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -11,6 +20,7 @@ import { StatCardSkeleton } from '../components/ui/LoadingSkeleton';
 import { ErrorState } from '../components/ui/ErrorState';
 import { PurchaseInvoice, Product } from '../types';
 import { dbService } from '../services/dbService';
+import { paymentService } from '../services/paymentService';
 import { useToast } from '../context/ToastContext';
 import { getTodayIST, formatDisplayDate, formatINR } from '../utils/dateUtils';
 
@@ -22,6 +32,12 @@ export const DashboardPage: React.FC = () => {
   const [dateFilter, setDateFilter] = useState('ALL');
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [paymentMetrics, setPaymentMetrics] = useState({
+    totalOutstanding: 0,
+    totalPendingCheques: 0,
+    totalClearedCheques: 0,
+    totalCashPayments: 0,
+  });
 
   const loadData = async (background = false) => {
     if (!background) setLoading(true);
@@ -76,14 +92,17 @@ export const DashboardPage: React.FC = () => {
 
   const visible = invoices.filter((i) => matchDate(i.invoice_date, dateFilter));
   const totalValue = visible.reduce((s, i) => s + i.grand_total, 0);
-  const outstandingCheques = visible.filter(
-    (i) => i.payment_mode === 'CHEQUE' && i.payment_status !== 'PAID'
-  );
-  const outstandingChequeTotal = outstandingCheques.reduce(
-    (s, i) => s + (Number(i.cheque_amount ?? i.grand_total) || 0),
-    0
-  );
   const recentInvoices = visible.slice(0, 10);
+
+  useEffect(() => {
+    let active = true;
+    paymentService.getDashboardMetrics(visible).then((res) => {
+      if (active) setPaymentMetrics(res);
+    });
+    return () => {
+      active = false;
+    };
+  }, [invoices, dateFilter]);
 
   const columns: TableColumn<PurchaseInvoice>[] = [
     {
@@ -125,18 +144,31 @@ export const DashboardPage: React.FC = () => {
     },
     {
       header: 'Payment',
-      cell: (row) => (
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <Badge variant={row.payment_status === 'PAID' ? 'success' : 'warning'}>
-            {row.payment_status}
-          </Badge>
-          {row.payment_mode === 'CHEQUE' && row.cheque_status && (
-            <Badge variant={row.cheque_status === 'CLEARED' ? 'success' : 'info'}>
-              {row.cheque_status}
+      cell: (row) => {
+        const variant =
+          row.payment_status === 'PAID'
+            ? 'success'
+            : row.payment_status === 'CHEQUE_PENDING'
+            ? 'info'
+            : row.payment_status === 'PARTIALLY_PAID'
+            ? 'warning'
+            : row.payment_status === 'OVERDUE'
+            ? 'danger'
+            : 'default';
+
+        return (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Badge variant={variant}>
+              {row.payment_status}
             </Badge>
-          )}
-        </div>
-      ),
+            {row.payment_mode === 'CHEQUE' && row.cheque_status && (
+              <Badge variant={row.cheque_status === 'CLEARED' ? 'success' : 'info'}>
+                {row.cheque_status}
+              </Badge>
+            )}
+          </div>
+        );
+      },
     },
     {
       header: 'Total',
@@ -188,10 +220,11 @@ export const DashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* KPI cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* Settlement & Cash/Cheque KPI Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {loading ? (
           <>
+            <StatCardSkeleton />
             <StatCardSkeleton />
             <StatCardSkeleton />
             <StatCardSkeleton />
@@ -199,34 +232,62 @@ export const DashboardPage: React.FC = () => {
         ) : (
           <>
             <StatCard
-              color="blue"
-              title="Total purchase value"
-              value={`₹${formatINR(totalValue)}`}
-              subtitle="Total procurement spend"
-              change={`${visible.length} invoice${visible.length !== 1 ? 's' : ''}`}
-              changeType="positive"
-              icon={<Receipt className="h-5 w-5" />}
-            />
-            <StatCard
-              color="violet"
-              title="Cataloged products"
-              value={products.length}
-              subtitle="Mapped SKU aliases"
-              change={`${products.length} active`}
-              changeType="positive"
-              icon={<Package className="h-5 w-5" />}
-            />
-            <StatCard
               color="amber"
-              title="Outstanding cheques"
-              value={`₹${formatINR(outstandingChequeTotal)}`}
+              title="Total Outstanding"
+              value={`₹${formatINR(paymentMetrics.totalOutstanding)}`}
+              subtitle="Unsettled invoice balance"
+              change={paymentMetrics.totalOutstanding > 0 ? 'Pending payment' : 'All settled'}
+              changeType={paymentMetrics.totalOutstanding > 0 ? 'negative' : 'positive'}
+              icon={<AlertCircle className="h-5 w-5" />}
+            />
+            <StatCard
+              color="blue"
+              title="Total Pending Cheques"
+              value={`₹${formatINR(paymentMetrics.totalPendingCheques)}`}
               subtitle="Cheques awaiting clearance"
-              change={`${outstandingCheques.length} pending`}
-              changeType={outstandingCheques.length > 0 ? 'neutral' : 'positive'}
-              icon={<Wallet className="h-5 w-5" />}
+              changeType="neutral"
+              icon={<Clock className="h-5 w-5" />}
+            />
+            <StatCard
+              color="green"
+              title="Total Cleared Cheques"
+              value={`₹${formatINR(paymentMetrics.totalClearedCheques)}`}
+              subtitle="Realized cheque payments"
+              changeType="positive"
+              icon={<CheckCircle2 className="h-5 w-5" />}
+            />
+            <StatCard
+              color="green"
+              title="Total Cash Payments"
+              value={`₹${formatINR(paymentMetrics.totalCashPayments)}`}
+              subtitle="Direct cash settlements"
+              changeType="positive"
+              icon={<Banknote className="h-5 w-5" />}
             />
           </>
         )}
+      </div>
+
+      {/* Secondary Procurement Volume Overview */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <StatCard
+          color="blue"
+          title="Total purchase value"
+          value={`₹${formatINR(totalValue)}`}
+          subtitle="Total procurement spend"
+          change={`${visible.length} invoice${visible.length !== 1 ? 's' : ''}`}
+          changeType="positive"
+          icon={<Receipt className="h-5 w-5" />}
+        />
+        <StatCard
+          color="violet"
+          title="Cataloged products"
+          value={products.length}
+          subtitle="Mapped SKU aliases"
+          change={`${products.length} active`}
+          changeType="positive"
+          icon={<Package className="h-5 w-5" />}
+        />
       </div>
 
       {/* Recent invoices */}

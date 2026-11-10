@@ -171,18 +171,31 @@ export const PurchasesPage: React.FC = () => {
     },
     {
       header: 'Status',
-      cell: (row) => (
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <Badge variant={row.payment_status === 'PAID' ? 'success' : 'warning'}>
-            {row.payment_status}
-          </Badge>
-          {row.payment_mode === 'CHEQUE' && row.cheque_status && (
-            <Badge variant={row.cheque_status === 'CLEARED' ? 'success' : 'info'}>
-              {row.cheque_status}
+      cell: (row) => {
+        const variant =
+          row.payment_status === 'PAID'
+            ? 'success'
+            : row.payment_status === 'CHEQUE_PENDING'
+            ? 'info'
+            : row.payment_status === 'PARTIALLY_PAID'
+            ? 'warning'
+            : row.payment_status === 'OVERDUE'
+            ? 'danger'
+            : 'default';
+
+        return (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Badge variant={variant}>
+              {row.payment_status}
             </Badge>
-          )}
-        </div>
-      ),
+            {row.payment_mode === 'CHEQUE' && row.cheque_status && (
+              <Badge variant={row.cheque_status === 'CLEARED' ? 'success' : 'info'}>
+                {row.cheque_status}
+              </Badge>
+            )}
+          </div>
+        );
+      },
     },
     {
       header: 'Total',
@@ -380,7 +393,20 @@ export const PurchasesPage: React.FC = () => {
                 </p>
                 <p className="text-xs text-slate-500 mt-0.5">
                   {selectedInvoice.payment_mode}{' '}
-                  <Badge variant={selectedInvoice.payment_status === 'PAID' ? 'success' : 'warning'} className="ml-1">
+                  <Badge
+                    variant={
+                      selectedInvoice.payment_status === 'PAID'
+                        ? 'success'
+                        : selectedInvoice.payment_status === 'CHEQUE_PENDING'
+                        ? 'info'
+                        : selectedInvoice.payment_status === 'PARTIALLY_PAID'
+                        ? 'warning'
+                        : selectedInvoice.payment_status === 'OVERDUE'
+                        ? 'danger'
+                        : 'default'
+                    }
+                    className="ml-1"
+                  >
                     {selectedInvoice.payment_status}
                   </Badge>
                   {selectedInvoice.payment_mode === 'CHEQUE' && (

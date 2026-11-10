@@ -10,6 +10,7 @@ import { ErrorState } from '../components/ui/ErrorState';
 import { PurchaseInvoice, PurchaseItem } from '../types';
 import { dbService } from '../services/dbService';
 import { formatDisplayDate, formatISTTimestamp, formatINR } from '../utils/dateUtils';
+import { PaymentDetailsSection } from '../features/purchases/PaymentDetailsSection';
 
 export const PurchaseDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -126,7 +127,19 @@ export const PurchaseDetailPage: React.FC = () => {
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-xl font-bold font-mono text-slate-900">{invoice.invoice_number}</h1>
-              <Badge variant={invoice.payment_status === 'PAID' ? 'success' : 'warning'}>
+              <Badge
+                variant={
+                  invoice.payment_status === 'PAID'
+                    ? 'success'
+                    : invoice.payment_status === 'CHEQUE_PENDING'
+                    ? 'info'
+                    : invoice.payment_status === 'PARTIALLY_PAID'
+                    ? 'warning'
+                    : invoice.payment_status === 'OVERDUE'
+                    ? 'danger'
+                    : 'default'
+                }
+              >
                 {invoice.payment_status}
               </Badge>
               {invoice.payment_mode === 'CHEQUE' && (
@@ -200,6 +213,9 @@ export const PurchaseDetailPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Payment details and partial payments ledger */}
+      <PaymentDetailsSection invoice={invoice} onInvoiceUpdated={setInvoice} />
 
       {/* Line items */}
       <Card

@@ -4,7 +4,36 @@ export type PaymentMode = 'CASH' | 'CHEQUE' | 'UPI' | 'BANK_TRANSFER' | 'CREDIT'
 // NOTE: 'CHEQUE' is a payment MODE, not a payment status — it must never be
 // written into the DB payment_status enum. Cheque invoices stay UNPAID until
 // their presentation date, then become PAID.
-export type PaymentStatus = 'PAID' | 'UNPAID' | 'PARTIALLY_PAID';
+export type PaymentStatus = 'PAID' | 'UNPAID' | 'PARTIALLY_PAID' | 'CHEQUE_PENDING' | 'OVERDUE';
+export type PaymentMethod = 'CASH' | 'CHEQUE';
+export type PaymentRecordStatus = 'PENDING' | 'CLEARED' | 'BOUNCED' | 'CANCELLED';
+
+export interface InvoicePayment {
+  id: string;
+  invoice_id: string;
+  payment_method: PaymentMethod;
+  amount: number;
+  payment_date: string;
+  payment_status: PaymentRecordStatus;
+  cheque_number?: string | null;
+  bank_name?: string | null;
+  cheque_date?: string | null;
+  clearance_date?: string | null;
+  notes?: string | null;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InvoicePaymentSummary {
+  invoice_id: string;
+  invoice_amount: number;
+  cleared_amount: number;
+  outstanding_amount: number;
+  pending_cheque_amount: number;
+  payment_status: PaymentStatus;
+  payments: InvoicePayment[];
+}
 export type VerificationStatus = 'DRAFT' | 'PENDING_VERIFICATION' | 'VERIFIED' | 'REJECTED';
 export type OcrStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'MANUAL';
 export type PriceType = 'PURCHASE_REF' | 'SELLING';
