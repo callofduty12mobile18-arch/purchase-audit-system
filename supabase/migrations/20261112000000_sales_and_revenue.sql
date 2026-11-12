@@ -89,3 +89,4 @@ EXCEPTION WHEN duplicate_object THEN null; END $$;
 
 -- Explicit grants for anon (if demo auth) and service_role
 GRANT ALL ON public.sales TO authenticated, anon, service_role;
+

@@ -431,3 +431,4 @@ export const AddSaleModal: React.FC<AddSaleModalProps> = ({
     </Modal>
   );
 };
+
