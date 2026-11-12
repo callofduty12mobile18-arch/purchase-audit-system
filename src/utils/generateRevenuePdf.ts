@@ -259,3 +259,4 @@ export function generateRevenuePdf(payload: RevenuePdfPayload): void {
   const filename = `Revenue_Profit_Report_${cleanPeriod}_${todayStr}.pdf`;
   doc.save(filename);
 }
+

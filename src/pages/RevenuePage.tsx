@@ -78,21 +78,21 @@ const RevenueKpiCard: React.FC<RevenueKpiCardProps> = ({
   valueColor = 'text-slate-900'
 }) => {
   return (
-    <div className="bg-white rounded-xl border border-slate-200/90 shadow-card hover:shadow-card-hover transition-all duration-200 p-5 flex flex-col justify-between">
+    <div className="bg-white rounded-xl border border-slate-200/90 shadow-card hover:shadow-card-hover transition-all duration-200 p-4 sm:p-5 flex flex-col justify-between">
       {/* Top Header */}
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 truncate">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-500 truncate">
           {title}
         </span>
-        <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${iconBg} ${iconColor}`}>
+        <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center shrink-0 ${iconBg} ${iconColor}`}>
           {icon}
         </div>
       </div>
 
       {/* Primary Value */}
-      <div className="mt-3 min-w-0">
+      <div className="mt-2.5 sm:mt-3 min-w-0">
         <p
-          className={`text-2xl sm:text-3xl font-bold font-mono tracking-tight tabular-nums truncate ${valueColor}`}
+          className={`text-xl sm:text-2xl lg:text-3xl font-bold font-mono tracking-tight tabular-nums truncate ${valueColor}`}
           title={String(value)}
         >
           {value}
@@ -224,12 +224,13 @@ export const RevenuePage: React.FC = () => {
   const columns: TableColumn<SaleTransaction>[] = [
     {
       header: 'Product Name (A-Z)',
+      className: 'min-w-[150px]',
       cell: (row) => (
         <div>
           <p className="text-xs font-semibold text-slate-900">
             {row.product?.nickname || 'Unknown Item'}
           </p>
-          <p className="text-[10px] text-slate-400 font-mono truncate max-w-[200px]" title={row.product?.supplier_item_name}>
+          <p className="text-[10px] text-slate-400 font-mono truncate max-w-[180px]" title={row.product?.supplier_item_name}>
             {row.product?.supplier_item_name}
           </p>
         </div>
@@ -237,8 +238,8 @@ export const RevenuePage: React.FC = () => {
     },
     {
       header: 'Total Quantity',
-      headerClassName: 'text-right',
-      className: 'text-right',
+      headerClassName: 'text-right min-w-[95px]',
+      className: 'text-right min-w-[95px]',
       cell: (row) => (
         <span className="text-xs font-mono font-semibold text-slate-900 tabular-nums">
           {row.quantity} <span className="text-[10px] text-slate-400 font-sans">{row.product?.uom || 'units'}</span>
@@ -247,8 +248,8 @@ export const RevenuePage: React.FC = () => {
     },
     {
       header: 'Unit Cost',
-      headerClassName: 'text-right',
-      className: 'text-right',
+      headerClassName: 'text-right min-w-[90px]',
+      className: 'text-right min-w-[90px]',
       cell: (row) => (
         <span className="text-xs font-mono text-slate-600 tabular-nums">
           ₹{formatINR(row.purchase_price)}
@@ -294,8 +295,8 @@ export const RevenuePage: React.FC = () => {
     },
     {
       header: 'Total Purchase Amount',
-      headerClassName: 'text-right',
-      className: 'text-right',
+      headerClassName: 'text-right min-w-[125px]',
+      className: 'text-right min-w-[125px]',
       cell: (row) => (
         <span className="text-xs font-mono font-bold text-slate-800 tabular-nums">
           ₹{formatINR(row.total_cogs)}
@@ -304,8 +305,8 @@ export const RevenuePage: React.FC = () => {
     },
     {
       header: 'Total Revenue',
-      headerClassName: 'text-right',
-      className: 'text-right',
+      headerClassName: 'text-right min-w-[110px]',
+      className: 'text-right min-w-[110px]',
       cell: (row) => (
         <span className="text-xs font-mono font-bold text-brand-700 tabular-nums">
           ₹{formatINR(row.total_revenue)}
@@ -314,8 +315,8 @@ export const RevenuePage: React.FC = () => {
     },
     {
       header: 'Gross Profit',
-      headerClassName: 'text-right',
-      className: 'text-right',
+      headerClassName: 'text-right min-w-[110px]',
+      className: 'text-right min-w-[110px]',
       cell: (row) => {
         const isProf = row.gross_profit >= 0;
         return (
@@ -372,19 +373,19 @@ export const RevenuePage: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5 flex-wrap">
-            <h1 className="page-title">Revenue & Profit Analytics</h1>
+            <h1 className="page-title text-xl sm:text-2xl">Revenue & Profit Analytics</h1>
           </div>
-          <p className="page-subtitle mt-0.5">
+          <p className="page-subtitle mt-0.5 text-xs sm:text-sm text-slate-500">
             Track sales performance, cost of goods sold (COGS), gross margins, and inventory valuation in real time.
           </p>
         </div>
 
-        <div className="flex items-center gap-3 self-start sm:self-auto shrink-0">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full lg:w-auto">
           {/* Date Filter */}
-          <div className="w-40 sm:w-44">
+          <div className="w-full sm:w-44">
             <Select
               value={dateFilter}
               onChange={(e) => {
@@ -401,25 +402,30 @@ export const RevenuePage: React.FC = () => {
             />
           </div>
 
-          {/* Download PDF Button */}
-          <Button
-            variant="secondary"
-            onClick={handleDownloadPdf}
-            isLoading={downloadingPdf}
-            icon={<Download className="h-4 w-4" />}
-            title="Download Revenue & Profit Report as PDF"
-          >
-            Download PDF
-          </Button>
+          {/* Action Buttons Row */}
+          <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
+            {/* Download PDF Button */}
+            <Button
+              variant="secondary"
+              onClick={handleDownloadPdf}
+              isLoading={downloadingPdf}
+              icon={<Download className="h-4 w-4 shrink-0" />}
+              className="justify-center w-full sm:w-auto text-xs px-2 sm:px-4 min-h-[38px]"
+              title="Download Revenue & Profit Report as PDF"
+            >
+              Download PDF
+            </Button>
 
-          {/* Add Sale Button */}
-          <Button
-            variant="primary"
-            onClick={() => setIsAddOpen(true)}
-            icon={<Plus className="h-4 w-4" />}
-          >
-            Add Sale
-          </Button>
+            {/* Add Sale Button */}
+            <Button
+              variant="primary"
+              onClick={() => setIsAddOpen(true)}
+              icon={<Plus className="h-4 w-4 shrink-0" />}
+              className="justify-center w-full sm:w-auto text-xs px-2 sm:px-4 min-h-[38px]"
+            >
+              Add Sale
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -539,7 +545,7 @@ export const RevenuePage: React.FC = () => {
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={analyticsData.monthlyTimeline}
-                    margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                    margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                     <XAxis
@@ -552,7 +558,8 @@ export const RevenuePage: React.FC = () => {
                     />
                     <YAxis
                       stroke="#94a3b8"
-                      fontSize={11}
+                      fontSize={10}
+                      width={44}
                       tickLine={false}
                       axisLine={false}
                       tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`}
@@ -635,46 +642,49 @@ export const RevenuePage: React.FC = () => {
             <p className="text-xs text-slate-400 mt-1">Product profitability will render here as sales are made.</p>
           </div>
         ) : (
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={analyticsData.productBreakdown.slice(0, 12)}
-                margin={{ top: 10, right: 10, left: 0, bottom: 20 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis
-                  dataKey="name"
-                  stroke="#94a3b8"
-                  fontSize={10}
-                  tickLine={false}
-                  axisLine={false}
-                  interval={0}
-                  angle={-25}
-                  textAnchor="end"
-                />
-                <YAxis
-                  stroke="#94a3b8"
-                  fontSize={11}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`}
-                />
-                <Tooltip
-                  formatter={(val: number, name: string) => [`₹${formatINR(val)}`, name]}
-                  contentStyle={{
-                    backgroundColor: '#fff',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '8px',
-                    fontSize: '12px'
-                  }}
-                />
-                <Bar dataKey="profit" name="Gross Profit" radius={[4, 4, 0, 0]}>
-                  {analyticsData.productBreakdown.slice(0, 12).map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.profit >= 0 ? '#10B981' : '#EF4444'} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="w-full overflow-x-auto">
+            <div className="h-64 min-w-[540px] sm:min-w-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={analyticsData.productBreakdown.slice(0, 12)}
+                  margin={{ top: 10, right: 10, left: -10, bottom: 20 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis
+                    dataKey="name"
+                    stroke="#94a3b8"
+                    fontSize={10}
+                    tickLine={false}
+                    axisLine={false}
+                    interval={0}
+                    angle={-25}
+                    textAnchor="end"
+                  />
+                  <YAxis
+                    stroke="#94a3b8"
+                    fontSize={10}
+                    width={44}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`}
+                  />
+                  <Tooltip
+                    formatter={(val: number, name: string) => [`₹${formatINR(val)}`, name]}
+                    contentStyle={{
+                      backgroundColor: '#fff',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      fontSize: '12px'
+                    }}
+                  />
+                  <Bar dataKey="profit" name="Gross Profit" radius={[4, 4, 0, 0]}>
+                    {analyticsData.productBreakdown.slice(0, 12).map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.profit >= 0 ? '#10B981' : '#EF4444'} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         )}
       </Card>
@@ -684,11 +694,11 @@ export const RevenuePage: React.FC = () => {
         title="Sales Transaction History"
         subtitle="Product catalog items in alphabetical order with total purchase amounts, quantities, and editable selling prices"
         action={
-          <div className="relative w-64 sm:w-80">
+          <div className="relative w-full sm:w-72 lg:w-80">
             <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
             <input
               type="text"
-              placeholder="Search product name or code..."
+              placeholder="Search product name..."
               value={searchQuery}
               onChange={(e) => {
                 setSearchQuery(e.target.value);
@@ -715,9 +725,9 @@ export const RevenuePage: React.FC = () => {
 
         {/* Pagination Bar */}
         {tableFilteredSales.length > pageSize && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-xs text-slate-500">
-            <span>
-              Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, tableFilteredSales.length)} of {tableFilteredSales.length} transactions
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-slate-100 text-xs text-slate-500">
+            <span className="text-center sm:text-left">
+              Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, tableFilteredSales.length)} of {tableFilteredSales.length} items
             </span>
             <div className="flex items-center gap-2">
               <Button
