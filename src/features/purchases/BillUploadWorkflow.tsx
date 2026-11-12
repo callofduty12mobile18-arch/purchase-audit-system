@@ -13,7 +13,7 @@ import { dbService } from '../../services/dbService';
 import { paymentService } from '../../services/paymentService';
 import { chequeReminderService, utcIsoToIstParts } from '../../services/chequeReminderService';
 import { ChequeReminderSection, resolveReminderEmail } from './ChequeReminderSection';
-import { PartialPaymentSection } from './PartialPaymentSection';
+import { PartialPaymentSection, BANK_OPTIONS } from './PartialPaymentSection';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../context/ToastContext';
 import { getTodayIST, generateISTInvoiceNumber, formatISTTimestamp, formatDisplayDate, formatINR } from '../../utils/dateUtils';
@@ -121,6 +121,7 @@ export const BillUploadWorkflow: React.FC = () => {
             cheque_status: existingInv.cheque_status ?? null,
             cheque_amount: existingInv.cheque_amount ?? null,
             cheque_presentation_date: existingInv.cheque_presentation_date || existingInv.invoice_date || getTodayIST(),
+            bank_name: existingInv.bank_name || payments.find(p => p.bank_name)?.bank_name || 'IOB',
             reminder_enabled: reminderActive,
             reminder_date: reminderActive ? reminderParts.date : '',
             reminder_time: reminderActive ? reminderParts.time : '',
@@ -477,6 +478,25 @@ export const BillUploadWorkflow: React.FC = () => {
         } catch (payErr) {
           console.warn('Could not record partial payments to ledger:', payErr);
         }
+      } else if (data.payment_mode === 'CHEQUE') {
+        try {
+          const currentPayments = await paymentService.getPaymentsByInvoiceId(saved.id, saved);
+          if (currentPayments.length === 0) {
+            const isCleared = saved.payment_status === 'PAID';
+            const bank = data.bank_name || 'IOB';
+            await paymentService.addPayment(saved, {
+              payment_method: 'CHEQUE',
+              amount: Number(saved.grand_total) || 0,
+              payment_date: saved.invoice_date || getTodayIST(),
+              bank_name: bank,
+              cheque_date: saved.invoice_date || getTodayIST(),
+              clearance_date: data.cheque_presentation_date || saved.invoice_date || getTodayIST(),
+              notes: `Cheque (${bank}) payment`,
+            });
+          }
+        } catch (payErr) {
+          console.warn('Could not record cheque payment to ledger:', payErr);
+        }
       }
 
       setSavedInvoice(saved);
@@ -690,7 +710,36 @@ export const BillUploadWorkflow: React.FC = () => {
         {/* Cheque presentation date row */}
         {chequeMode && formData.payment_status !== 'PARTIALLY_PAID' && (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-slate-100">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-4 border-t border-slate-100">
+              <div>
+                <label htmlFor="bank_name" className="block text-sm font-medium text-slate-700 mb-1.5 flex items-center gap-1.5">
+                  <Building2 className="h-3.5 w-3.5 text-brand-600" aria-hidden="true" />
+                  Bank name <span className="text-red-500" aria-hidden="true">*</span>
+                </label>
+                <div className="relative">
+                  <select
+                    id="bank_name"
+                    value={formData.bank_name || 'IOB'}
+                    onChange={(e) => handleHeaderChange('bank_name', e.target.value)}
+                    className={`${inputCls} appearance-none pr-8 cursor-pointer font-medium text-slate-900`}
+                  >
+                    {BANK_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400" aria-hidden="true">
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  Select the bank issuing or clearing the cheque.
+                </p>
+              </div>
+
               <div>
                 <label htmlFor="cheque_presentation_date" className="block text-sm font-medium text-slate-700 mb-1.5 flex items-center gap-1.5">
                   <Calendar className="h-3.5 w-3.5 text-brand-600" aria-hidden="true" />

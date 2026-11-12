@@ -134,6 +134,8 @@ export interface PurchaseInvoice {
   cheque_amount?: number | null;
   /** Date the cheque is expected to be presented / clear (YYYY-MM-DD, IST). */
   cheque_presentation_date?: string | null;
+  /** Bank issuing the cheque (e.g. IOB, KVB, TMB, SBI) */
+  bank_name?: string | null;
   subtotal: number;
   taxable_amount: number;
   cgst: number;
@@ -259,6 +261,7 @@ export interface InvoiceFormData {
   cheque_status?: ChequeStatus | null;
   cheque_amount?: number | null;
   cheque_presentation_date?: string | null;
+  bank_name?: string | null;
   reminder_enabled?: boolean;
   reminder_date?: string;
   reminder_time?: string;

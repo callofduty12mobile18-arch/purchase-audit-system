@@ -814,6 +814,7 @@ export const dbService = {
       cheque_status: chequeStatus,
       cheque_amount: chequeAmount,
       cheque_presentation_date: chequePresentationDate,
+      bank_name: extractedData.bank_name || (safePaymentMode === 'CHEQUE' ? 'IOB' : null),
       subtotal: extractedData.subtotal,
       taxable_amount: extractedData.taxable_amount,
       cgst: extractedData.cgst,

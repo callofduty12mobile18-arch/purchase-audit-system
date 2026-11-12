@@ -170,7 +170,7 @@ export const paymentService = {
         payment_date: invoice.invoice_date || getTodayIST(),
         payment_status: isCleared ? 'CLEARED' : 'PENDING',
         cheque_number: invoice.invoice_number ? `CHQ-${invoice.invoice_number.slice(-4)}` : null,
-        bank_name: 'Primary Bank',
+        bank_name: invoice.bank_name || 'IOB',
         cheque_date: invoice.invoice_date || getTodayIST(),
         clearance_date: isCleared ? (invoice.cheque_presentation_date || invoice.invoice_date) : null,
         notes: 'Legacy cheque payment',

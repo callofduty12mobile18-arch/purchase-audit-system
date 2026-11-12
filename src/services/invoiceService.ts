@@ -35,6 +35,7 @@ export const createBlankInvoice = (): InvoiceFormData => ({
   cheque_status: null,
   cheque_amount: null,
   cheque_presentation_date: getTodayIST(),
+  bank_name: 'IOB',
   reminder_enabled: false,
   reminder_date: '',
   reminder_time: '',
