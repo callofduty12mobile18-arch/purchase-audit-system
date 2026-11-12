@@ -21,7 +21,8 @@ import {
   Boxes,
   Percent,
   Sparkles,
-  ArrowUpRight
+  ArrowUpRight,
+  Download
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -56,6 +57,7 @@ import {
 } from '../types';
 import { revenueService } from '../services/revenueService';
 import { formatINR, formatDisplayDate, getTodayIST, formatDisplayMonthYear } from '../utils/dateUtils';
+import { generateRevenuePdf } from '../utils/generateRevenuePdf';
 import { useToast } from '../context/ToastContext';
 
 interface RevenueKpiCardProps {
@@ -134,6 +136,7 @@ export const RevenuePage: React.FC = () => {
   // Pagination
   const [currentPage, setCurrentPage] = useState<number>(1);
   const pageSize = 10;
+  const [downloadingPdf, setDownloadingPdf] = useState<boolean>(false);
 
   const loadData = async (background = false) => {
     if (!background) setLoading(true);
@@ -329,6 +332,33 @@ export const RevenuePage: React.FC = () => {
     }
   ];
 
+  const handleDownloadPdf = () => {
+    try {
+      setDownloadingPdf(true);
+      const periodLabelMap: Partial<Record<RevenueDateFilter, string>> = {
+        ALL: 'All Time',
+        THIS_MONTH: `This Month (${formatDisplayMonthYear(new Date())})`,
+        LAST_MONTH: 'Last Month',
+        THIS_YEAR: `This Year (${new Date().getFullYear()})`,
+        CUSTOM: customStart && customEnd ? `${customStart} to ${customEnd}` : 'Custom Range'
+      };
+
+      generateRevenuePdf({
+        periodLabel: periodLabelMap[dateFilter] || 'All Time',
+        totalPurchased: metrics.totalCogs,
+        totalSold: metrics.totalRevenue,
+        grossProfit: metrics.grossProfit,
+        profitMargin: metrics.grossProfitMargin,
+        items: tableFilteredSales
+      });
+      toastSuccess('PDF Downloaded', 'Revenue & Profit report generated successfully.');
+    } catch (err: any) {
+      toastError('Download Failed', err?.message || 'Could not generate report.');
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
+
   if (fetchError) {
     return (
       <ErrorState
@@ -370,6 +400,17 @@ export const RevenuePage: React.FC = () => {
               ]}
             />
           </div>
+
+          {/* Download PDF Button */}
+          <Button
+            variant="secondary"
+            onClick={handleDownloadPdf}
+            isLoading={downloadingPdf}
+            icon={<Download className="h-4 w-4" />}
+            title="Download Revenue & Profit Report as PDF"
+          >
+            Download PDF
+          </Button>
 
           {/* Add Sale Button */}
           <Button
