@@ -220,21 +220,13 @@ export const RevenuePage: React.FC = () => {
   // Table columns
   const columns: TableColumn<SaleTransaction>[] = [
     {
-      header: 'Item Code',
-      cell: (row) => (
-        <span className="p-1 rounded bg-brand-50 border border-brand-200 text-xs font-mono font-bold text-brand-700">
-          {row.sale_number}
-        </span>
-      )
-    },
-    {
       header: 'Product Name (A-Z)',
       cell: (row) => (
         <div>
           <p className="text-xs font-semibold text-slate-900">
             {row.product?.nickname || 'Unknown Item'}
           </p>
-          <p className="text-[10px] text-slate-400 font-mono truncate max-w-[170px]" title={row.product?.supplier_item_name}>
+          <p className="text-[10px] text-slate-400 font-mono truncate max-w-[200px]" title={row.product?.supplier_item_name}>
             {row.product?.supplier_item_name}
           </p>
         </div>
