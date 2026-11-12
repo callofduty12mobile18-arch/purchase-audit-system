@@ -134,13 +134,16 @@ export const PurchasesPage: React.FC = () => {
       header: 'Invoice',
       cell: (row) => (
         <div>
-          <p className="font-mono text-sm font-semibold text-brand-700">{row.invoice_number}</p>
+          <p className="font-mono text-sm font-semibold text-brand-700 whitespace-nowrap">{row.invoice_number}</p>
           <p className="text-xs text-slate-500 mt-0.5">{row.invoice_name || 'RAMACHANDRAN'}</p>
+          <span className="sm:hidden text-[11px] text-slate-400 font-mono block mt-0.5">{formatDisplayDate(row.invoice_date)}</span>
         </div>
       ),
     },
     {
       header: 'Supplier',
+      headerClassName: 'hidden sm:table-cell',
+      className: 'hidden sm:table-cell',
       cell: (row) => (
         <span className="text-sm font-medium text-slate-900">
           {row.supplier?.name || 'AYYAPPA ENTERPRISES'}
@@ -149,26 +152,32 @@ export const PurchasesPage: React.FC = () => {
     },
     {
       header: 'Date',
+      headerClassName: 'hidden md:table-cell',
+      className: 'hidden md:table-cell',
       cell: (row) => (
-        <span className="text-sm font-mono text-slate-600">
+        <span className="text-sm font-mono text-slate-600 whitespace-nowrap">
           {formatDisplayDate(row.invoice_date)}
         </span>
       ),
     },
     {
       header: 'Items',
+      headerClassName: 'hidden lg:table-cell',
+      className: 'hidden lg:table-cell',
       cell: (row) => {
         const packs = row.items?.reduce((s, it) => s + (Number(it.quantity) || 0), 0) || 0;
         return (
           <div>
-            <span className="text-sm text-slate-700">{row.items?.length || 0} items</span>
-            {packs > 0 && <p className="text-xs font-mono text-slate-500">{packs} packs</p>}
+            <span className="text-sm text-slate-700 whitespace-nowrap">{row.items?.length || 0} items</span>
+            {packs > 0 && <p className="text-xs font-mono text-slate-500 whitespace-nowrap">{packs} packs</p>}
           </div>
         );
       },
     },
     {
       header: 'Mode',
+      headerClassName: 'hidden sm:table-cell',
+      className: 'hidden sm:table-cell',
       cell: (row) => <span className="text-sm text-slate-600 font-mono">{row.payment_mode}</span>,
     },
     {
@@ -201,8 +210,8 @@ export const PurchasesPage: React.FC = () => {
     },
     {
       header: 'Total',
-      headerClassName: 'text-right',
-      className: 'text-right',
+      headerClassName: 'text-right whitespace-nowrap',
+      className: 'text-right whitespace-nowrap',
       cell: (row) => (
         <span className="font-mono font-semibold text-slate-900 tabular-nums">
           ₹{formatINR(row.grand_total)}
@@ -232,16 +241,18 @@ export const PurchasesPage: React.FC = () => {
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-white rounded-lg border border-slate-200 shadow-card p-4">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Total invoices</p>
+        <div className="bg-white rounded-lg border border-slate-200 shadow-card p-3 sm:p-4 min-w-0">
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide truncate">Total invoices</p>
           {loading ? <Skeleton className="h-7 w-12 mt-1.5" /> : (
-            <p className="text-2xl font-bold font-mono tabular-nums text-slate-900 mt-1">{filtered.length}</p>
+            <p className="text-xl sm:text-2xl font-bold font-mono tabular-nums text-slate-900 mt-1">{filtered.length}</p>
           )}
         </div>
-        <div className="bg-white rounded-lg border border-slate-200 shadow-card p-4">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Total spend</p>
+        <div className="bg-white rounded-lg border border-slate-200 shadow-card p-3 sm:p-4 min-w-0">
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide truncate">Total spend</p>
           {loading ? <Skeleton className="h-7 w-28 mt-1.5" /> : (
-            <p className="text-2xl font-bold font-mono tabular-nums text-brand-700 mt-1">₹{formatINR(totalSpend)}</p>
+            <p className="text-base sm:text-2xl font-bold font-mono tabular-nums text-brand-700 mt-1 truncate" title={`₹${formatINR(totalSpend)}`}>
+              ₹{formatINR(totalSpend)}
+            </p>
           )}
         </div>
       </div>
