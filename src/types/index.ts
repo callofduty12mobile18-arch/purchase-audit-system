@@ -302,3 +302,91 @@ export interface InvoiceFormData {
 // Aliases for compatibility
 export type ExtractedOcrItem = InvoiceFormItem;
 export type ExtractedOcrInvoice = InvoiceFormData;
+
+// ============================================================================
+// Revenue & Sales Management Types
+// ============================================================================
+
+export type SaleStatus = 'COMPLETED' | 'CANCELLED' | 'RETURNED';
+
+export type RevenueDateFilter =
+  | 'TODAY'
+  | 'YESTERDAY'
+  | 'THIS_WEEK'
+  | 'THIS_MONTH'
+  | 'LAST_MONTH'
+  | 'THIS_YEAR'
+  | 'CUSTOM'
+  | 'ALL';
+
+export interface CogsBatchAllocation {
+  purchase_item_id?: string;
+  invoice_id?: string;
+  invoice_number?: string;
+  invoice_date?: string;
+  quantity: number;
+  unit_cost: number;
+  total_cost: number;
+}
+
+export interface SaleTransaction {
+  id: string;
+  sale_number: string;
+  product_id: string;
+  product?: Product;
+  quantity: number;
+  purchase_price: number; // Unit COGS
+  selling_price: number;  // Unit selling price
+  total_revenue: number;  // quantity * selling_price
+  total_cogs: number;     // Sum of allocated purchase costs
+  gross_profit: number;   // total_revenue - total_cogs
+  profit_margin: number;  // (gross_profit / total_revenue) * 100
+  sale_date: string;
+  customer_name?: string | null;
+  notes?: string | null;
+  status: SaleStatus;
+  costing_method?: 'FIFO';
+  cogs_breakdown?: CogsBatchAllocation[];
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateSaleInput {
+  product_id: string;
+  quantity: number;
+  selling_price: number;
+  sale_date?: string;
+  customer_name?: string;
+  notes?: string;
+}
+
+export interface UpdateSaleInput {
+  quantity?: number;
+  selling_price?: number;
+  sale_date?: string;
+  customer_name?: string;
+  notes?: string;
+  status?: SaleStatus;
+}
+
+export interface ProductStockInfo {
+  product: Product;
+  totalPurchased: number;
+  totalSold: number;
+  currentStock: number;
+  stockValue: number;
+  nextUnitPurchaseCost: number;
+  hasMissingCost: boolean;
+}
+
+export interface RevenueMetrics {
+  totalRevenue: number;
+  totalCogs: number;
+  grossProfit: number;
+  grossProfitMargin: number;
+  totalItemsSold: number;
+  totalTransactions: number;
+  currentStockValue: number;
+}
+

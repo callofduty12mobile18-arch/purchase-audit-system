@@ -109,7 +109,7 @@ export const DashboardPage: React.FC = () => {
       cell: (row) => (
         <div>
           <p className="font-mono text-sm font-semibold text-brand-700">{row.invoice_number}</p>
-          <p className="text-xs text-slate-500 mt-0.5">{row.invoice_name || 'RAMACHANDRAN'}</p>
+          <p className="text-xs text-slate-500 mt-0.5">{row.invoice_name || '—'}</p>
         </div>
       ),
     },
@@ -117,7 +117,7 @@ export const DashboardPage: React.FC = () => {
       header: 'Supplier',
       cell: (row) => (
         <span className="text-sm font-medium text-slate-900">
-          {row.supplier?.name || 'AYYAPPA ENTERPRISES'}
+          {row.supplier?.name || '—'}
         </span>
       ),
     },

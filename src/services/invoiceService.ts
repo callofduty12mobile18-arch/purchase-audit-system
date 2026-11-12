@@ -25,8 +25,8 @@ export const createBlankInvoiceItem = (): InvoiceFormItem => ({
 });
 
 export const createBlankInvoice = (): InvoiceFormData => ({
-  supplier_name: 'AYYAPPA ENTERPRISES',
-  supplier_gstin: '33AABFA2949R1Z5',
+  supplier_name: '',
+  supplier_gstin: '',
   invoice_number: generateISTInvoiceNumber(),
   invoice_name: '',
   invoice_date: getTodayIST(),
@@ -35,7 +35,7 @@ export const createBlankInvoice = (): InvoiceFormData => ({
   cheque_status: null,
   cheque_amount: null,
   cheque_presentation_date: getTodayIST(),
-  bank_name: 'IOB',
+  bank_name: '',
   reminder_enabled: false,
   reminder_date: '',
   reminder_time: '',

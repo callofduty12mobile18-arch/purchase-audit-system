@@ -111,9 +111,9 @@ export const BillUploadWorkflow: React.FC = () => {
           );
 
           setFormData({
-            supplier_name: existingInv.supplier?.name || 'AYYAPPA ENTERPRISES',
-            supplier_gstin: existingInv.supplier?.gstin || '33AABFA2949R1Z5',
-            invoice_name: existingInv.invoice_name || 'RAMACHANDRAN',
+            supplier_name: existingInv.supplier?.name || '',
+            supplier_gstin: existingInv.supplier?.gstin || '',
+            invoice_name: existingInv.invoice_name || '',
             invoice_date: existingInv.invoice_date || getTodayIST(),
             invoice_number: existingInv.invoice_number || '',
             payment_mode: existingInv.payment_mode || 'CASH',
@@ -121,7 +121,7 @@ export const BillUploadWorkflow: React.FC = () => {
             cheque_status: existingInv.cheque_status ?? null,
             cheque_amount: existingInv.cheque_amount ?? null,
             cheque_presentation_date: existingInv.cheque_presentation_date || existingInv.invoice_date || getTodayIST(),
-            bank_name: existingInv.bank_name || payments.find(p => p.bank_name)?.bank_name || 'IOB',
+            bank_name: existingInv.bank_name || payments.find(p => p.bank_name)?.bank_name || '',
             reminder_enabled: reminderActive,
             reminder_date: reminderActive ? reminderParts.date : '',
             reminder_time: reminderActive ? reminderParts.time : '',
@@ -153,11 +153,12 @@ export const BillUploadWorkflow: React.FC = () => {
         }
       }
 
+      const firstSupplier = fetchedSuppliers.length > 0 ? fetchedSuppliers[0] : null;
       setFormData((prev) => ({
         ...prev,
-        supplier_name: 'AYYAPPA ENTERPRISES',
-        supplier_gstin: '33AABFA2949R1Z5',
-        invoice_name: prev.invoice_name || 'RAMACHANDRAN',
+        supplier_name: prev.supplier_name || firstSupplier?.name || '',
+        supplier_gstin: prev.supplier_gstin || firstSupplier?.gstin || '',
+        invoice_name: prev.invoice_name || '',
         invoice_date: prev.invoice_date || getTodayIST(),
         invoice_number: prev.invoice_number || generateISTInvoiceNumber(),
         payment_mode: prev.payment_mode === 'CHEQUE' ? 'CHEQUE' : 'CASH',
@@ -350,10 +351,17 @@ export const BillUploadWorkflow: React.FC = () => {
   const handleInitiateConfirm = async () => {
     if (!validateForm()) { toastWarning('Incomplete form', 'Check the highlighted fields.'); return; }
     const finalNumber = formData.invoice_number?.trim() || generateISTInvoiceNumber();
-    const submissionData: InvoiceFormData = { ...formData, supplier_name: 'AYYAPPA ENTERPRISES', supplier_gstin: '33AABFA2949R1Z5', invoice_number: finalNumber };
+    const resolvedSupplierName = formData.supplier_name?.trim() || (suppliers[0]?.name ?? '');
+    const matchedSupplier = suppliers.find((s) => s.name.trim().toLowerCase() === resolvedSupplierName.toLowerCase());
+    const resolvedGstin = formData.supplier_gstin?.trim() || matchedSupplier?.gstin || '';
+    const submissionData: InvoiceFormData = {
+      ...formData,
+      supplier_name: resolvedSupplierName,
+      supplier_gstin: resolvedGstin,
+      invoice_number: finalNumber
+    };
     setIsSubmitting(true);
     try {
-      const matchedSupplier = suppliers.find((s) => s.name.trim().toLowerCase() === 'ayyappa enterprises');
       if (matchedSupplier) {
         const dup = await dbService.checkDuplicateInvoice(matchedSupplier.id, finalNumber, submissionData.invoice_date, id);
         if (dup) { setExistingDuplicate(dup); setShowDuplicateModal(true); setIsSubmitting(false); return; }
@@ -613,7 +621,7 @@ export const BillUploadWorkflow: React.FC = () => {
             <div className="relative">
               <select
                 id="invoice_name"
-                value={formData.invoice_name || 'RAMACHANDRAN'}
+                value={formData.invoice_name || ''}
                 onChange={(e) => handleHeaderChange('invoice_name', e.target.value)}
                 className={inputCls + ' appearance-none pr-8 cursor-pointer'}
               >
@@ -1126,7 +1134,7 @@ export const BillUploadWorkflow: React.FC = () => {
               </div>
               <div className="flex justify-between gap-2">
                 <span className="text-slate-500">Supplier</span>
-                <span className="font-semibold">{savedInvoice.supplier?.name || 'AYYAPPA ENTERPRISES'}</span>
+                <span className="font-semibold">{savedInvoice.supplier?.name || '—'}</span>
               </div>
               <div className="flex justify-between gap-2">
                 <span className="text-slate-500">Items</span>

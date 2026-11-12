@@ -61,11 +61,10 @@ export const PurchasesPage: React.FC = () => {
     return () => { window.removeEventListener('visibilitychange', sync); window.removeEventListener('focus', sync); };
   }, []);
 
-  // Memo name options
+  // Memo name options derived purely from database invoices
   const memoOptions = React.useMemo(() => {
-    const preset = ['RAMACHANDRAN', 'ASHWIN KARTHIK', 'BERRY QUEQ', 'SUBIKSHA STORE'];
-    const fromData = invoices.map((i) => i.invoice_name).filter(Boolean) as string[];
-    const unique = Array.from(new Set([...preset, ...fromData]));
+    const fromData = invoices.map((i) => i.invoice_name?.trim()).filter(Boolean) as string[];
+    const unique = Array.from(new Set(fromData)).sort();
     return [
       { value: 'ALL', label: 'All memo names' },
       ...unique.map((n) => ({ value: n, label: n })),
@@ -99,7 +98,7 @@ export const PurchasesPage: React.FC = () => {
       (inv.invoice_name?.toLowerCase().includes(q)) ||
       (inv.supplier?.name?.toLowerCase().includes(q))
     );
-    const matchMemo = memoFilter === 'ALL' || (inv.invoice_name || 'RAMACHANDRAN').toUpperCase() === memoFilter;
+    const matchMemo = memoFilter === 'ALL' || (inv.invoice_name || '').toUpperCase() === memoFilter.toUpperCase();
     const matchStatus = statusFilter === 'ALL' || inv.payment_status === statusFilter;
     return matchSearch && matchDate(inv.invoice_date, dateFilter, customDate) && matchMemo && matchStatus;
   });
@@ -135,7 +134,7 @@ export const PurchasesPage: React.FC = () => {
       cell: (row) => (
         <div>
           <p className="font-mono text-sm font-semibold text-brand-700 whitespace-nowrap">{row.invoice_number}</p>
-          <p className="text-xs text-slate-500 mt-0.5">{row.invoice_name || 'RAMACHANDRAN'}</p>
+          <p className="text-xs text-slate-500 mt-0.5">{row.invoice_name || '—'}</p>
           <span className="sm:hidden text-[11px] text-slate-400 font-mono block mt-0.5">{formatDisplayDate(row.invoice_date)}</span>
         </div>
       ),
@@ -146,7 +145,7 @@ export const PurchasesPage: React.FC = () => {
       className: 'hidden sm:table-cell',
       cell: (row) => (
         <span className="text-sm font-medium text-slate-900">
-          {row.supplier?.name || 'AYYAPPA ENTERPRISES'}
+          {row.supplier?.name || '—'}
         </span>
       ),
     },
@@ -360,7 +359,7 @@ export const PurchasesPage: React.FC = () => {
           isOpen={!!selectedInvoice}
           onClose={() => setSelectedInvoice(null)}
           title={`Invoice #${selectedInvoice.invoice_number}`}
-          subtitle={`${selectedInvoice.supplier?.name || 'AYYAPPA ENTERPRISES'} · ${formatDisplayDate(selectedInvoice.invoice_date)}`}
+          subtitle={`${selectedInvoice.supplier?.name || '—'} · ${formatDisplayDate(selectedInvoice.invoice_date)}`}
           size="xl"
           footer={
             <div className="w-full flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
@@ -407,7 +406,7 @@ export const PurchasesPage: React.FC = () => {
                   <Building2 className="h-3.5 w-3.5 text-brand-600" aria-hidden="true" /> Supplier
                 </p>
                 <p className="text-sm font-semibold text-slate-900 truncate">
-                  {selectedInvoice.supplier?.name || 'AYYAPPA ENTERPRISES'}
+                  {selectedInvoice.supplier?.name || '—'}
                 </p>
                 <p className="text-xs text-slate-500 font-mono mt-0.5">{selectedInvoice.supplier?.gstin}</p>
               </div>

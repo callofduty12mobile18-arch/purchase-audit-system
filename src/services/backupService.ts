@@ -51,18 +51,9 @@ function triggerDownload(content: string, filename: string, mimeType: string) {
   URL.revokeObjectURL(url);
 }
 
-function getLocalPayments(): InvoicePayment[] {
-  try {
-    const raw = localStorage.getItem('ramachandran_invoice_payments_v1');
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
 export const backupService = {
   /**
-   * Assemble complete system backup
+   * Assemble complete system backup directly from database
    */
   createFullBackup: async (userEmail: string = 'polonium84r@gmail.com'): Promise<FullBackupPayload> => {
     const [invoices, products, suppliers, auditLogs] = await Promise.all([
@@ -72,17 +63,14 @@ export const backupService = {
       dbService.getAuditLogs(),
     ]);
 
-    let payments = getLocalPayments();
+    let payments: InvoicePayment[] = [];
     try {
-      const { data } = await supabase.from('invoice_payments').select('*');
-      if (data && data.length > 0) {
-        // Merge Supabase with local
-        const remoteIds = new Set(data.map((p) => p.id));
-        const localsMissing = payments.filter((p) => !remoteIds.has(p.id));
-        payments = [...data, ...localsMissing];
+      const { data, error } = await supabase.from('invoice_payments').select('*').order('payment_date', { ascending: true });
+      if (!error && data) {
+        payments = data as InvoicePayment[];
       }
-    } catch {
-      // Offline fallback
+    } catch (e) {
+      console.warn('Backup payments fetch note:', e);
     }
 
     return {
@@ -234,24 +222,7 @@ export const backupService = {
 
     const { invoices, products, suppliers, payments, audit_logs } = payload.data;
 
-    // 1. Restore local storage caches
-    if (Array.isArray(invoices)) {
-      localStorage.setItem('ramachandran_invoices_v1', JSON.stringify(invoices));
-    }
-    if (Array.isArray(products)) {
-      localStorage.setItem('ramachandran_products_v1', JSON.stringify(products));
-    }
-    if (Array.isArray(suppliers)) {
-      localStorage.setItem('ramachandran_suppliers_v1', JSON.stringify(suppliers));
-    }
-    if (Array.isArray(payments)) {
-      localStorage.setItem('ramachandran_invoice_payments_v1', JSON.stringify(payments));
-    }
-    if (Array.isArray(audit_logs)) {
-      localStorage.setItem('ramachandran_audit_v1', JSON.stringify(audit_logs));
-    }
-
-    // 2. Best-effort restore to Supabase remote DB
+    // Restore directly to Supabase remote DB
     try {
       if (Array.isArray(suppliers) && suppliers.length > 0) {
         await supabase.from('suppliers').upsert(
@@ -279,6 +250,73 @@ export const backupService = {
             current_selling_price: p.current_selling_price,
             min_stock_level: p.min_stock_level,
             is_active: p.is_active ?? true,
+          }))
+        );
+      }
+
+      if (Array.isArray(invoices) && invoices.length > 0) {
+        for (const inv of invoices) {
+          await supabase.from('purchase_invoices').upsert({
+            id: inv.id,
+            supplier_id: inv.supplier_id,
+            invoice_number: inv.invoice_number,
+            invoice_name: inv.invoice_name || '',
+            invoice_date: inv.invoice_date,
+            payment_mode: inv.payment_mode,
+            payment_status: inv.payment_status,
+            cheque_status: inv.cheque_status,
+            cheque_amount: inv.cheque_amount,
+            cheque_presentation_date: inv.cheque_presentation_date,
+            bank_name: inv.bank_name,
+            subtotal: inv.subtotal,
+            taxable_amount: inv.taxable_amount,
+            cgst: inv.cgst,
+            sgst: inv.sgst,
+            igst: inv.igst,
+            total_tax: inv.total_tax,
+            round_off: inv.round_off,
+            grand_total: inv.grand_total,
+            verification_status: inv.verification_status,
+            ocr_status: inv.ocr_status,
+          });
+
+          if (inv.items && inv.items.length > 0) {
+            await supabase.from('purchase_items').upsert(
+              inv.items.map((it) => ({
+                id: it.id,
+                purchase_invoice_id: inv.id,
+                product_id: it.product_id,
+                supplier_item_name_snapshot: it.supplier_item_name_snapshot,
+                hsn_snapshot: it.hsn_snapshot,
+                quantity: it.quantity,
+                uom_snapshot: it.uom_snapshot,
+                purchase_rate: it.purchase_rate,
+                gst_rate: it.gst_rate,
+                taxable_value: it.taxable_value,
+                cgst: it.cgst,
+                sgst: it.sgst,
+                igst: it.igst,
+                total: it.total,
+              }))
+            );
+          }
+        }
+      }
+
+      if (Array.isArray(payments) && payments.length > 0) {
+        await supabase.from('invoice_payments').upsert(
+          payments.map((p) => ({
+            id: p.id,
+            invoice_id: p.invoice_id,
+            payment_method: p.payment_method,
+            amount: p.amount,
+            payment_date: p.payment_date,
+            payment_status: p.payment_status,
+            cheque_number: p.cheque_number,
+            bank_name: p.bank_name,
+            cheque_date: p.cheque_date,
+            clearance_date: p.clearance_date,
+            notes: p.notes,
           }))
         );
       }

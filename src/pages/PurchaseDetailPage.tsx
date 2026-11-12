@@ -147,7 +147,7 @@ export const PurchaseDetailPage: React.FC = () => {
                   Cheque {invoice.cheque_status ?? 'PENDING'}
                 </Badge>
               )}
-              <Badge variant="default">{invoice.invoice_name || 'RAMACHANDRAN'}</Badge>
+              <Badge variant="default">{invoice.invoice_name || '—'}</Badge>
             </div>
             <p className="text-xs text-slate-500 mt-1">
               Recorded {formatISTTimestamp(invoice.created_at)}
@@ -166,7 +166,7 @@ export const PurchaseDetailPage: React.FC = () => {
             <p className="text-xs font-medium text-slate-500 flex items-center gap-1.5 mb-1">
               <Building2 className="h-3.5 w-3.5 text-brand-600" aria-hidden="true" /> Supplier
             </p>
-            <p className="text-sm font-semibold text-slate-900">{invoice.supplier?.name || 'AYYAPPA ENTERPRISES'}</p>
+            <p className="text-sm font-semibold text-slate-900">{invoice.supplier?.name || '—'}</p>
             <p className="text-xs font-mono text-slate-500 mt-0.5">{invoice.supplier?.gstin}</p>
           </div>
           <div className="p-4 rounded-lg bg-slate-50 border border-slate-200">

@@ -24,307 +24,33 @@ export function generateUUID(): string {
   });
 }
 
-export const DEFAULT_SUPPLIERS: Supplier[] = [
-  {
-    id: 'a0000000-0000-0000-0000-000000000001',
-    name: 'AYYAPPA ENTERPRISES',
-    gstin: '33AABFA2949R1Z5',
-    address: 'NO 308A CTH ROAD, THIRUNINDRAVUR, Tamil Nadu',
-    phone: '9841055999',
-    payment_terms: 'CREDIT',
-    is_active: true,
-    created_at: '2026-08-08T00:00:00.000Z',
-    updated_at: '2026-08-08T00:00:00.000Z'
-  }
-];
-
-export const DEFAULT_17_PRODUCTS: Product[] = [
-  {
-    id: 'b0000000-0000-0000-0000-000000000014',
-    supplier_item_name: 'AM CLUBNY COOL SLEEKSFTK',
-    nickname: 'American Club',
-    hsn: '24022090',
-    uom: 'PAC',
-    current_purchase_ref_price: 321.43,
-    current_selling_price: 360.00,
-    min_stock_level: 5,
-    is_active: true,
-    created_at: '2026-08-08T00:00:00.000Z',
-    updated_at: '2026-08-08T00:00:00.000Z'
-  },
-  {
-    id: 'b0000000-0000-0000-0000-000000000019',
-    supplier_item_name: 'CI CONNECT FT 20R C 390/-',
-    nickname: 'CI Connect',
-    hsn: '24022090',
-    uom: 'PAC',
-    current_purchase_ref_price: 392.86,
-    current_selling_price: 390.00,
-    min_stock_level: 5,
-    is_active: true,
-    created_at: '2026-08-08T00:00:00.000Z',
-    updated_at: '2026-08-08T00:00:00.000Z'
-  },
-  {
-    id: 'b0000000-0000-0000-0000-000000000013',
-    supplier_item_name: 'CI Double Burst FS-BDG-ND 20BE',
-    nickname: 'CI Double Burst 20s',
-    hsn: '24022090',
-    uom: 'PAC',
-    current_purchase_ref_price: 431.56,
-    current_selling_price: 480.00,
-    min_stock_level: 5,
-    is_active: true,
-    created_at: '2026-08-08T00:00:00.000Z',
-    updated_at: '2026-08-08T00:00:00.000Z'
-  },
-  {
-    id: 'b0000000-0000-0000-0000-000000000009',
-    supplier_item_name: 'FLAKE GOLD CREST 10HL 70',
-    nickname: 'Flake',
-    hsn: '24022090',
-    uom: 'PAC',
-    current_purchase_ref_price: 63.99,
-    current_selling_price: 70.00,
-    min_stock_level: 5,
-    is_active: true,
-    created_at: '2026-08-08T00:00:00.000Z',
-    updated_at: '2026-08-08T00:00:00.000Z'
-  },
-  {
-    id: 'b0000000-0000-0000-0000-000000000018',
-    supplier_item_name: 'GOLD FLAKE FX SPECIAL 2-POD',
-    nickname: 'FX Special',
-    hsn: '24022090',
-    uom: 'PAC',
-    current_purchase_ref_price: 337.30,
-    current_selling_price: 390.00,
-    min_stock_level: 5,
-    is_active: true,
-    created_at: '2026-08-08T00:00:00.000Z',
-    updated_at: '2026-08-08T00:00:00.000Z'
-  },
-  {
-    id: 'b0000000-0000-0000-0000-000000000007',
-    supplier_item_name: 'GOLD FL FT-10BE MD+NPCT-FF',
-    nickname: 'Filter',
-    hsn: '24022090',
-    uom: 'PAC',
-    current_purchase_ref_price: 116.57,
-    current_selling_price: 127.00,
-    min_stock_level: 5,
-    is_active: true,
-    created_at: '2026-08-08T00:00:00.000Z',
-    updated_at: '2026-08-08T00:00:00.000Z'
-  },
-  {
-    id: 'b0000000-0000-0000-0000-000000000001',
-    supplier_item_name: 'CI Ice Burst 10M 10BE',
-    nickname: 'Ice Burst 10s',
-    hsn: '24022090',
-    uom: 'PAC',
-    current_purchase_ref_price: 215.78,
-    current_selling_price: 240.00,
-    min_stock_level: 5,
-    is_active: true,
-    created_at: '2026-08-08T00:00:00.000Z',
-    updated_at: '2026-08-08T00:00:00.000Z'
-  },
-  {
-    id: 'b0000000-0000-0000-0000-000000000002',
-    supplier_item_name: 'CI Ice Burst 20BE',
-    nickname: 'Ice Burst 20s',
-    hsn: '24022090',
-    uom: 'PAC',
-    current_purchase_ref_price: 431.56,
-    current_selling_price: 480.00,
-    min_stock_level: 5,
-    is_active: true,
-    created_at: '2026-08-08T00:00:00.000Z',
-    updated_at: '2026-08-08T00:00:00.000Z'
-  },
-  {
-    id: 'b0000000-0000-0000-0000-000000000011',
-    supplier_item_name: 'Indie Mint 10BE 115',
-    nickname: 'Indie Mint',
-    hsn: '24022090',
-    uom: 'PAC',
-    current_purchase_ref_price: 114.09,
-    current_selling_price: 125.00,
-    min_stock_level: 5,
-    is_active: true,
-    created_at: '2026-08-08T00:00:00.000Z',
-    updated_at: '2026-08-08T00:00:00.000Z'
-  },
-  {
-    id: 'b0000000-0000-0000-0000-000000000004',
-    supplier_item_name: 'GFK RED NBUNDLE+NPCT1 10R',
-    nickname: 'King',
-    hsn: '24022090',
-    uom: 'PAC',
-    current_purchase_ref_price: 220.24,
-    current_selling_price: 240.00,
-    min_stock_level: 5,
-    is_active: true,
-    created_at: '2026-08-08T00:00:00.000Z',
-    updated_at: '2026-08-08T00:00:00.000Z'
-  },
-  {
-    id: 'b0000000-0000-0000-0000-000000000005',
-    supplier_item_name: 'GFK RED NBUNDLE+NPCT 120R',
-    nickname: 'King 20s',
-    hsn: '24022090',
-    uom: 'PAC',
-    current_purchase_ref_price: 430.56,
-    current_selling_price: 480.00,
-    min_stock_level: 5,
-    is_active: true,
-    created_at: '2026-08-08T00:00:00.000Z',
-    updated_at: '2026-08-08T00:00:00.000Z'
-  },
-  {
-    id: 'b0000000-0000-0000-0000-000000000006',
-    supplier_item_name: 'GFK BLUE NBUNDLE+NPCT 10R',
-    nickname: 'Lights',
-    hsn: '24022090',
-    uom: 'PAC',
-    current_purchase_ref_price: 220.24,
-    current_selling_price: 240.00,
-    min_stock_level: 5,
-    is_active: true,
-    created_at: '2026-08-08T00:00:00.000Z',
-    updated_at: '2026-08-08T00:00:00.000Z'
-  },
-  {
-    id: 'b0000000-0000-0000-0000-000000000010',
-    supplier_item_name: 'GFT MINI 10BE 70',
-    nickname: 'Mini 70',
-    hsn: '24022090',
-    uom: 'PAC',
-    current_purchase_ref_price: 81.35,
-    current_selling_price: 89.00,
-    min_stock_level: 5,
-    is_active: true,
-    created_at: '2026-08-08T00:00:00.000Z',
-    updated_at: '2026-08-08T00:00:00.000Z'
-  },
-  {
-    id: 'b0000000-0000-0000-0000-000000000017',
-    supplier_item_name: 'GFK MIXPOD MD+NPCT FT 10BE',
-    nickname: 'Mixpod 10s',
-    hsn: '24022090',
-    uom: 'PAC',
-    current_purchase_ref_price: 220.24,
-    current_selling_price: 240.00,
-    min_stock_level: 5,
-    is_active: true,
-    created_at: '2026-08-08T00:00:00.000Z',
-    updated_at: '2026-08-08T00:00:00.000Z'
-  },
-  {
-    id: 'b0000000-0000-0000-0000-000000000008',
-    supplier_item_name: 'SCISSORS FT 10BE-NB-MD1-NP',
-    nickname: 'Scissors',
-    hsn: '24022090',
-    uom: 'PAC',
-    current_purchase_ref_price: 99.70,
-    current_selling_price: 109.00,
-    min_stock_level: 5,
-    is_active: true,
-    created_at: '2026-08-08T00:00:00.000Z',
-    updated_at: '2026-08-08T00:00:00.000Z'
-  },
-  {
-    id: 'b0000000-0000-0000-0000-000000000012',
-    supplier_item_name: 'WAVE COOL MINT 10R C 96',
-    nickname: 'Wave Cool Mint',
-    hsn: '24022090',
-    uom: 'PAC',
-    current_purchase_ref_price: 87.00,
-    current_selling_price: 96.00,
-    min_stock_level: 5,
-    is_active: true,
-    created_at: '2026-08-08T00:00:00.000Z',
-    updated_at: '2026-08-08T00:00:00.000Z'
-  },
-  {
-    id: 'b0000000-0000-0000-0000-000000000015',
-    supplier_item_name: 'WAVE COOL MINT DLX FT 10BE',
-    nickname: 'Wave Cool Mint DLX',
-    hsn: '24022090',
-    uom: 'PAC',
-    current_purchase_ref_price: 53.00,
-    current_selling_price: 60.00,
-    min_stock_level: 5,
-    is_active: true,
-    created_at: '2026-08-08T00:00:00.000Z',
-    updated_at: '2026-08-08T00:00:00.000Z'
-  },
-  {
-    id: 'b0000000-0000-0000-0000-000000000016',
-    supplier_item_name: 'WAVEBOSS REFINED TASTE DS',
-    nickname: 'Waveboss',
-    hsn: '24022090',
-    uom: 'PAC',
-    current_purchase_ref_price: 53.00,
-    current_selling_price: 60.00,
-    min_stock_level: 5,
-    is_active: true,
-    created_at: '2026-08-08T00:00:00.000Z',
-    updated_at: '2026-08-08T00:00:00.000Z'
-  },
-  {
-    id: 'b0000000-0000-0000-0000-000000000003',
-    supplier_item_name: 'NC DLX FT 10BE (MD+NPCT)-FF',
-    nickname: 'Wills',
-    hsn: '24022090',
-    uom: 'PAC',
-    current_purchase_ref_price: 114.09,
-    current_selling_price: 125.00,
-    min_stock_level: 5,
-    is_active: true,
-    created_at: '2026-08-08T00:00:00.000Z',
-    updated_at: '2026-08-08T00:00:00.000Z'
-  }
-];
-
-export const DEFAULT_PRODUCTS = DEFAULT_17_PRODUCTS;
-
-const LOCAL_STORAGE_KEY_PRODUCTS = 'ramachandran_products_v1';
-const LOCAL_STORAGE_KEY_SUPPLIERS = 'ramachandran_suppliers_v1';
-const LOCAL_STORAGE_KEY_INVOICES = 'ramachandran_invoices_v1';
-const LOCAL_STORAGE_KEY_AUDIT = 'ramachandran_audit_v1';
-const LOCAL_STORAGE_KEY_PRICE_HISTORY = 'ramachandran_price_history_v1';
-
-const getLocalData = <T>(key: string, fallback: T): T => {
-  try {
-    const raw = localStorage.getItem(key);
-    if (raw === null || raw === undefined) return fallback;
-    const parsed = JSON.parse(raw);
-    return parsed as T;
-  } catch {
-    return fallback;
-  }
-};
-
-const setLocalData = <T>(key: string, data: T): void => {
-  try {
-    localStorage.setItem(key, JSON.stringify(data));
-  } catch {
-    // Ignore quota errors
-  }
-};
+// All data is dynamically fetched from and synced directly with Supabase database.
+// Empty fallback arrays preserved for type-signature backward compatibility only.
+export const DEFAULT_SUPPLIERS: Supplier[] = [];
+export const DEFAULT_17_PRODUCTS: Product[] = [];
+export const DEFAULT_PRODUCTS: Product[] = [];
 
 export const dbService = {
-  // Clear all data directly from Supabase and Local Storage
+  // Clear all data directly from Supabase remote database
   clearAllData: async (): Promise<void> => {
-    localStorage.removeItem(LOCAL_STORAGE_KEY_PRODUCTS);
-    localStorage.removeItem(LOCAL_STORAGE_KEY_SUPPLIERS);
-    localStorage.removeItem(LOCAL_STORAGE_KEY_INVOICES);
-    localStorage.removeItem(LOCAL_STORAGE_KEY_AUDIT);
-    localStorage.removeItem(LOCAL_STORAGE_KEY_PRICE_HISTORY);
+    // Purge any residual legacy localStorage keys
+    try {
+      localStorage.removeItem('ramachandran_products_v1');
+      localStorage.removeItem('ramachandran_suppliers_v1');
+      localStorage.removeItem('ramachandran_invoices_v1');
+      localStorage.removeItem('ramachandran_audit_v1');
+      localStorage.removeItem('ramachandran_price_history_v1');
+      localStorage.removeItem('ramachandran_invoice_payments_v1');
+      localStorage.removeItem('ramachandran_sales_v1');
+    } catch {
+      // Ignore
+    }
 
     try {
+      try {
+        await supabase.from('sales').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      } catch {}
+      await supabase.from('invoice_payments').delete().neq('id', '00000000-0000-0000-0000-000000000000');
       await supabase.from('purchase_items').delete().neq('id', '00000000-0000-0000-0000-000000000000');
       await supabase.from('purchase_invoice_documents').delete().neq('id', '00000000-0000-0000-0000-000000000000');
       await supabase.from('purchase_invoices').delete().neq('id', '00000000-0000-0000-0000-000000000000');
@@ -335,77 +61,81 @@ export const dbService = {
       await supabase.from('suppliers').delete().neq('id', '00000000-0000-0000-0000-000000000000');
       await supabase.from('audit_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
     } catch (e) {
-      console.warn('Supabase remote clear note:', e);
+      console.error('Supabase remote clear error:', e);
+      throw e;
     }
   },
 
   // --- SUPPLIERS ---
   getSuppliers: async (): Promise<Supplier[]> => {
-    try {
-      const { data, error } = await supabase
-        .from('suppliers')
-        .select('*')
-        .order('name');
-      if (!error && data !== null) {
-        const suppliers = data.length > 0 ? (data as Supplier[]) : DEFAULT_SUPPLIERS;
-        setLocalData(LOCAL_STORAGE_KEY_SUPPLIERS, suppliers);
-        return suppliers;
-      }
-    } catch (e) {
-      console.warn('Supabase suppliers fetch note:', e);
+    const { data, error } = await supabase
+      .from('suppliers')
+      .select('*')
+      .order('name');
+    if (error) {
+      console.error('Supabase suppliers fetch error:', error);
+      throw error;
     }
-    return getLocalData<Supplier[]>(LOCAL_STORAGE_KEY_SUPPLIERS, DEFAULT_SUPPLIERS);
+    return (data || []) as Supplier[];
   },
 
   getSupplierById: async (id: string): Promise<Supplier | null> => {
-    const suppliers = await dbService.getSuppliers();
-    return suppliers.find(s => s.id === id) || null;
+    if (!id) return null;
+    const { data, error } = await supabase
+      .from('suppliers')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+    if (error) {
+      console.error('Supabase supplier by id error:', error);
+      return null;
+    }
+    return data as Supplier | null;
   },
 
   saveSupplier: async (supplier: Partial<Supplier>): Promise<Supplier> => {
     const now = new Date().toISOString();
-    const isExistingUUID = supplier.id && supplier.id.length === 36 && supplier.id.includes('-');
-    const id = isExistingUUID ? supplier.id! : generateUUID();
+    const isExistingUUID = Boolean(supplier.id && supplier.id.length === 36 && supplier.id.includes('-'));
+
+    // Check existing supplier in database for accurate audit diff
+    let existingSupplier: Supplier | null = null;
+    if (isExistingUUID && supplier.id) {
+      existingSupplier = await dbService.getSupplierById(supplier.id);
+    } else if (supplier.name) {
+      const { data } = await supabase
+        .from('suppliers')
+        .select('*')
+        .ilike('name', supplier.name.trim())
+        .maybeSingle();
+      if (data) {
+        existingSupplier = data as Supplier;
+      }
+    }
+
+    const id = existingSupplier?.id || (isExistingUUID ? supplier.id! : generateUUID());
     const newRecord: Supplier = {
       id,
-      name: supplier.name || 'Vendor',
-      gstin: supplier.gstin || '',
-      address: supplier.address || '',
-      phone: supplier.phone || '',
-      email: supplier.email || '',
-      payment_terms: supplier.payment_terms || 'CREDIT',
-      notes: supplier.notes || '',
-      is_active: supplier.is_active ?? true,
-      created_at: supplier.created_at || now,
+      name: supplier.name?.trim() || existingSupplier?.name || 'Vendor',
+      gstin: supplier.gstin !== undefined ? supplier.gstin.trim() : (existingSupplier?.gstin || ''),
+      address: supplier.address !== undefined ? supplier.address : (existingSupplier?.address || ''),
+      phone: supplier.phone !== undefined ? supplier.phone : (existingSupplier?.phone || ''),
+      email: supplier.email !== undefined ? supplier.email : (existingSupplier?.email || ''),
+      payment_terms: supplier.payment_terms || existingSupplier?.payment_terms || 'CREDIT',
+      notes: supplier.notes !== undefined ? supplier.notes : (existingSupplier?.notes || ''),
+      is_active: supplier.is_active ?? existingSupplier?.is_active ?? true,
+      created_at: existingSupplier?.created_at || supplier.created_at || now,
       updated_at: now
     };
 
-    // Update local cache
-    const current = await dbService.getSuppliers();
-    const idx = current.findIndex(s => s.id === id || s.name.toLowerCase() === newRecord.name.toLowerCase());
-    let updatedList: Supplier[];
-    if (idx >= 0) {
-      updatedList = [...current];
-      updatedList[idx] = { ...current[idx], ...newRecord };
-    } else {
-      updatedList = [...current, newRecord];
-    }
-    setLocalData(LOCAL_STORAGE_KEY_SUPPLIERS, updatedList);
+    const { error } = await supabase
+      .from('suppliers')
+      .upsert(newRecord);
 
-    // Sync to Supabase in background
-    try {
-      const { error } = await supabase
-        .from('suppliers')
-        .upsert({
-          ...newRecord,
-          updated_at: now
-        });
-      if (error) console.warn('Supabase supplier upsert note:', error.message);
-    } catch (e) {
-      console.warn('Supabase supplier exception:', e);
+    if (error) {
+      console.error('Supabase supplier upsert error:', error);
+      throw error;
     }
 
-    const existingSupplier = current[idx];
     const oldSupplierVal = existingSupplier ? {
       name: existingSupplier.name,
       gstin: existingSupplier.gstin,
@@ -434,88 +164,70 @@ export const dbService = {
 
   // --- PRODUCTS & CATEGORIES ---
   getCategories: async (): Promise<Category[]> => {
-    try {
-      const { data, error } = await supabase
-        .from('categories')
-        .select('*')
-        .order('name');
-      if (!error && data) return data as Category[];
-    } catch {
-      // Fallback
+    const { data, error } = await supabase
+      .from('categories')
+      .select('*')
+      .order('name');
+    if (error) {
+      console.error('Supabase categories fetch error:', error);
+      return [];
     }
-    return [];
+    return (data || []) as Category[];
   },
 
   getProducts: async (): Promise<Product[]> => {
-    let prods: Product[] = [];
-    let remoteSuccess = false;
-    try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*, category:categories(*)')
-        .order('nickname');
-      if (!error && data !== null) {
-        prods = data as Product[];
-        remoteSuccess = true;
-      }
-    } catch (e) {
-      console.warn('Supabase products fetch note:', e);
+    const { data, error } = await supabase
+      .from('products')
+      .select('*, category:categories(*)')
+      .order('nickname');
+
+    if (error) {
+      console.error('Supabase products fetch error:', error);
+      throw error;
     }
 
-    if (!remoteSuccess) {
-      prods = getLocalData<Product[]>(LOCAL_STORAGE_KEY_PRODUCTS, DEFAULT_PRODUCTS);
-    } else if (prods.length === 0) {
-      prods = [...DEFAULT_PRODUCTS];
-    }
-
-    // Ensure all default products exist and rates are up to date
-    const merged = [...prods];
-    DEFAULT_PRODUCTS.forEach(dp => {
-      const idx = merged.findIndex(p =>
-        p.supplier_item_name.trim().toLowerCase() === dp.supplier_item_name.trim().toLowerCase()
-      );
-      if (idx === -1) {
-        merged.push(dp);
-      } else {
-        // Update if existing had 0 or missing prices
-        if (dp.current_purchase_ref_price && !merged[idx].current_purchase_ref_price) {
-          merged[idx] = { ...merged[idx], current_purchase_ref_price: dp.current_purchase_ref_price };
-        }
-      }
-    });
-
-    merged.sort((a, b) => {
-      const nameA = (a.nickname || a.supplier_item_name || '').trim().toLowerCase();
-      const nameB = (b.nickname || b.supplier_item_name || '').trim().toLowerCase();
-      return nameA.localeCompare(nameB);
-    });
-
-    setLocalData(LOCAL_STORAGE_KEY_PRODUCTS, merged);
-    return merged;
+    return (data || []) as Product[];
   },
 
   getProductById: async (id: string): Promise<Product | null> => {
-    const prods = await dbService.getProducts();
-    return prods.find(p => p.id === id) || null;
+    if (!id) return null;
+    const { data, error } = await supabase
+      .from('products')
+      .select('*, category:categories(*)')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Supabase getProductById error:', error);
+      return null;
+    }
+
+    return data as Product | null;
   },
 
   saveProduct: async (product: Partial<Product>, priceChangeReason?: string, skipAuditLog = false): Promise<Product> => {
     const now = new Date().toISOString();
-    const currentProds = await dbService.getProducts();
-    const existing = currentProds.find(p =>
-      (product.id && p.id === product.id) ||
-      p.supplier_item_name.toLowerCase() === (product.supplier_item_name || '').toLowerCase()
-    );
-    const id = existing?.id || (product.id && product.id.length === 36 && product.id.includes('-') ? product.id : generateUUID());
-    let oldPrice: number | undefined;
-    if (existing) {
-      oldPrice = existing.current_purchase_ref_price;
+    let existing: Product | null = null;
+    if (product.id && product.id.length === 36 && product.id.includes('-')) {
+      existing = await dbService.getProductById(product.id);
+    } else if (product.supplier_item_name) {
+      const { data } = await supabase
+        .from('products')
+        .select('*')
+        .ilike('supplier_item_name', product.supplier_item_name.trim())
+        .maybeSingle();
+      if (data) {
+        existing = data as Product;
+      }
     }
+
+    const id = existing?.id || (product.id && product.id.length === 36 && product.id.includes('-') ? product.id : generateUUID());
+    const oldPrice = existing?.current_purchase_ref_price;
 
     const savedProd: Product = {
       id,
-      supplier_item_name: product.supplier_item_name || existing?.supplier_item_name || 'Item',
-      nickname: product.nickname || existing?.nickname || product.supplier_item_name || 'Item',
+      supplier_item_name: product.supplier_item_name?.trim() || existing?.supplier_item_name || 'Item',
+      nickname: product.nickname?.trim() || existing?.nickname || product.supplier_item_name?.trim() || 'Item',
       sku: product.sku || existing?.sku,
       barcode: product.barcode || existing?.barcode,
       hsn: product.hsn || existing?.hsn || '24022090',
@@ -528,24 +240,13 @@ export const dbService = {
       updated_at: now
     };
 
-    // Update local cache and maintain alphabetical sort
-    const updatedList = [...currentProds.filter(p => p.id !== savedProd.id), savedProd].sort((a, b) => {
-      const nameA = (a.nickname || a.supplier_item_name || '').trim().toLowerCase();
-      const nameB = (b.nickname || b.supplier_item_name || '').trim().toLowerCase();
-      return nameA.localeCompare(nameB);
-    });
-    setLocalData(LOCAL_STORAGE_KEY_PRODUCTS, updatedList);
+    const { error } = await supabase
+      .from('products')
+      .upsert(savedProd);
 
-    // Sync to Supabase
-    try {
-      const { error } = await supabase
-        .from('products')
-        .upsert(savedProd);
-      if (error) {
-        console.warn('Supabase product upsert note:', error.message);
-      }
-    } catch (e) {
-      console.warn('Supabase product upsert exception:', e);
+    if (error) {
+      console.error('Supabase product upsert error:', error);
+      throw error;
     }
 
     if (
@@ -603,86 +304,57 @@ export const dbService = {
 
   // --- INVOICES & PURCHASES ---
   getInvoices: async (): Promise<PurchaseInvoice[]> => {
-    const localInvoices = getLocalData<PurchaseInvoice[]>(LOCAL_STORAGE_KEY_INVOICES, []);
+    const { data, error } = await supabase
+      .from('purchase_invoices')
+      .select('*, supplier:suppliers(*), items:purchase_items(*, product:products(*))')
+      .order('invoice_date', { ascending: false });
 
-    try {
-      const { data, error } = await supabase
-        .from('purchase_invoices')
-        .select('*, supplier:suppliers(*), items:purchase_items(*, product:products(*))')
-        .order('invoice_date', { ascending: false });
-
-      if (!error && data !== null) {
-        const remoteInvoices = (data as PurchaseInvoice[]).map(inv => {
-          const localMatch = localInvoices.find(l => l.id === inv.id);
-          return {
-            ...inv,
-            invoice_name: inv.invoice_name || localMatch?.invoice_name || 'RAMACHANDRAN'
-          };
-        }).sort(
-          (a, b) => new Date(b.invoice_date || b.created_at || 0).getTime() - new Date(a.invoice_date || a.created_at || 0).getTime()
-        );
-        // Authoritative remote state overwrites local cache cleanly
-        setLocalData(LOCAL_STORAGE_KEY_INVOICES, remoteInvoices);
-        return remoteInvoices;
-      }
-    } catch (e) {
-      console.warn('Supabase invoices fetch note:', e);
+    if (error) {
+      console.error('Supabase invoices fetch error:', error);
+      throw error;
     }
 
-    // Only fallback to local storage if network request failed (offline)
-    return getLocalData<PurchaseInvoice[]>(LOCAL_STORAGE_KEY_INVOICES, []);
+    return (data || []) as PurchaseInvoice[];
   },
 
   getInvoiceById: async (id: string): Promise<PurchaseInvoice | null> => {
     if (!id) return null;
 
-    try {
-      const { data, error } = await supabase
-        .from('purchase_invoices')
-        .select('*, supplier:suppliers(*), items:purchase_items(*, product:products(*))')
-        .eq('id', id)
-        .maybeSingle();
+    const { data, error } = await supabase
+      .from('purchase_invoices')
+      .select('*, supplier:suppliers(*), items:purchase_items(*, product:products(*))')
+      .eq('id', id)
+      .maybeSingle();
 
-      if (!error) {
-        if (data) {
-          const localInvoices = getLocalData<PurchaseInvoice[]>(LOCAL_STORAGE_KEY_INVOICES, []);
-          const localMatch = localInvoices.find(i => i.id === id);
-          const freshInvoice: PurchaseInvoice = {
-            ...(data as PurchaseInvoice),
-            invoice_name: (data as any).invoice_name || localMatch?.invoice_name || 'RAMACHANDRAN'
-          };
-          const updated = [freshInvoice, ...localInvoices.filter(i => i.id !== id)];
-          setLocalData(LOCAL_STORAGE_KEY_INVOICES, updated);
-          return freshInvoice;
-        } else {
-          // Record was deleted in Supabase; purge it from local cache too
-          const localInvoices = getLocalData<PurchaseInvoice[]>(LOCAL_STORAGE_KEY_INVOICES, []);
-          const filtered = localInvoices.filter(i => i.id !== id);
-          if (filtered.length !== localInvoices.length) {
-            setLocalData(LOCAL_STORAGE_KEY_INVOICES, filtered);
-          }
-          return null;
-        }
-      }
-    } catch (e) {
-      console.warn('Supabase single invoice fetch note:', e);
+    if (error) {
+      console.error('Supabase single invoice fetch error:', error);
+      throw error;
     }
 
-    // Offline fallback only when network failed
-    const localInvoices = getLocalData<PurchaseInvoice[]>(LOCAL_STORAGE_KEY_INVOICES, []);
-    return localInvoices.find(inv => inv.id === id) || null;
+    return (data as PurchaseInvoice) || null;
   },
 
   checkDuplicateInvoice: async (supplierId: string, invoiceNumber: string, invoiceDate?: string, excludeInvoiceId?: string): Promise<PurchaseInvoice | null> => {
-    const invoices = await dbService.getInvoices();
-    const dup = invoices.find(inv => {
-      if (excludeInvoiceId && inv.id === excludeInvoiceId) return false;
-      const numMatch = inv.invoice_number.trim().toLowerCase() === invoiceNumber.trim().toLowerCase();
-      const supMatch = inv.supplier_id === supplierId || inv.supplier?.id === supplierId;
-      const dateMatch = invoiceDate ? inv.invoice_date === invoiceDate : true;
-      return numMatch && supMatch && dateMatch;
-    });
-    return dup || null;
+    if (!supplierId || !invoiceNumber) return null;
+    let query = supabase
+      .from('purchase_invoices')
+      .select('*, supplier:suppliers(*)')
+      .eq('supplier_id', supplierId)
+      .ilike('invoice_number', invoiceNumber.trim());
+
+    if (invoiceDate) {
+      query = query.eq('invoice_date', invoiceDate);
+    }
+    if (excludeInvoiceId) {
+      query = query.neq('id', excludeInvoiceId);
+    }
+
+    const { data, error } = await query.maybeSingle();
+    if (error) {
+      console.warn('Check duplicate invoice query warning:', error);
+      return null;
+    }
+    return (data as PurchaseInvoice) || null;
   },
 
   confirmAndSaveInvoice: async (extractedData: InvoiceFormData, _documentPath?: string, existingInvoiceId?: string): Promise<PurchaseInvoice> => {
@@ -691,40 +363,22 @@ export const dbService = {
     const invoiceId = existingInvoiceId || generateUUID();
 
     // Fetch previous invoice if editing for audit log diff
-    let oldInvoice: PurchaseInvoice | undefined;
+    let oldInvoice: PurchaseInvoice | null = null;
     if (isEdit) {
-      const currentInvoices = await dbService.getInvoices();
-      oldInvoice = currentInvoices.find(i => i.id === invoiceId);
+      oldInvoice = await dbService.getInvoiceById(invoiceId);
     }
 
+    // Resolve or create supplier directly in DB
     const suppliers = await dbService.getSuppliers();
     let supplier = suppliers.find(
-      s => s.name.trim().toLowerCase() === extractedData.supplier_name.trim().toLowerCase()
+      s => s.name.trim().toLowerCase() === (extractedData.supplier_name || '').trim().toLowerCase()
     );
 
     if (!supplier) {
       supplier = await dbService.saveSupplier({
-        name: extractedData.supplier_name,
-        gstin: extractedData.supplier_gstin
+        name: extractedData.supplier_name?.trim() || 'Vendor',
+        gstin: extractedData.supplier_gstin?.trim() || ''
       });
-    } else {
-      // Ensure the supplier exists in Supabase remote table to prevent FK constraint failure
-      try {
-        await supabase.from('suppliers').upsert({
-          id: supplier.id,
-          name: supplier.name,
-          gstin: supplier.gstin || '',
-          address: supplier.address || '',
-          phone: supplier.phone || '',
-          email: supplier.email || '',
-          payment_terms: supplier.payment_terms || 'CREDIT',
-          notes: supplier.notes || '',
-          is_active: supplier.is_active ?? true,
-          updated_at: now
-        });
-      } catch (e) {
-        console.warn('Supplier remote sync note:', e);
-      }
     }
 
     // 1. Process and Insert Line Items & Auto-map Products
@@ -775,12 +429,6 @@ export const dbService = {
       ? (extractedData.payment_mode as any)
       : 'CASH';
 
-    // Cheque invoices use payment_mode = 'CHEQUE' and stay 'UNPAID' until the
-    // scheduled clearance job marks them 'PAID' on the presentation date.
-    // 'CHEQUE' is never written into payment_status (it is not a valid value of
-    // the DB enum, which is what previously blocked cheque invoices from
-    // persisting). Editing an already-cleared cheque invoice must never revert
-    // it back to UNPAID.
     const isChequeMode = safePaymentMode === 'CHEQUE';
     const wasCleared = oldInvoice?.cheque_status === 'CLEARED' || oldInvoice?.payment_status === 'PAID';
     const safePaymentStatus: PaymentStatus = extractedData.payment_status === 'PARTIALLY_PAID'
@@ -795,17 +443,20 @@ export const dbService = {
     const chequePresentationDate = isChequeMode
       ? (extractedData.cheque_presentation_date || extractedData.invoice_date || getTodayIST())
       : null;
-    // One payment method per invoice: the cheque covers the full invoice amount.
     const chequeAmount = isChequeMode
       ? Number((Number(extractedData.grand_total) || 0).toFixed(2))
       : null;
 
-    const effectiveInvoiceName = extractedData.invoice_name?.trim() || 'RAMACHANDRAN';
+    const effectiveInvoiceName = extractedData.invoice_name?.trim() || '';
 
-    const newInvoice: PurchaseInvoice = {
+    // If updating, delete existing items from remote table to cleanly replace with new line items
+    if (isEdit) {
+      await supabase.from('purchase_items').delete().eq('purchase_invoice_id', invoiceId);
+    }
+
+    const invoiceRow = {
       id: invoiceId,
       supplier_id: supplier.id,
-      supplier: supplier,
       invoice_number: invoiceNumber,
       invoice_name: effectiveInvoiceName,
       invoice_date: extractedData.invoice_date || getTodayIST(),
@@ -814,7 +465,7 @@ export const dbService = {
       cheque_status: chequeStatus,
       cheque_amount: chequeAmount,
       cheque_presentation_date: chequePresentationDate,
-      bank_name: extractedData.bank_name || (safePaymentMode === 'CHEQUE' ? 'IOB' : null),
+      bank_name: extractedData.bank_name || null,
       subtotal: extractedData.subtotal,
       taxable_amount: extractedData.taxable_amount,
       cgst: extractedData.cgst,
@@ -825,123 +476,66 @@ export const dbService = {
       grand_total: extractedData.grand_total,
       verification_status: 'VERIFIED',
       ocr_status: (isEdit && oldInvoice ? oldInvoice.ocr_status : 'MANUAL'),
-      items: itemsToInsert,
       created_at: oldInvoice?.created_at || now,
       updated_at: now
     };
 
-    // Update local cache immediately
-    const currentInvoices = getLocalData<PurchaseInvoice[]>(LOCAL_STORAGE_KEY_INVOICES, []);
-    const updatedInvoices = [newInvoice, ...currentInvoices.filter(i => i.id !== invoiceId)];
-    setLocalData(LOCAL_STORAGE_KEY_INVOICES, updatedInvoices);
+    const { error: invErr } = await supabase
+      .from('purchase_invoices')
+      .upsert(invoiceRow);
 
-    // Sync to Supabase in parallel
-    try {
-      // If updating, delete existing items from remote table to cleanly replace with new line items
-      if (isEdit) {
-        await supabase.from('purchase_items').delete().eq('purchase_invoice_id', invoiceId);
-      }
-
-      const { error: invErr } = await supabase
-        .from('purchase_invoices')
-        .upsert({
-          id: invoiceId,
-          supplier_id: supplier.id,
-          invoice_number: invoiceNumber,
-          invoice_name: effectiveInvoiceName,
-          invoice_date: extractedData.invoice_date,
-          payment_mode: safePaymentMode,
-          payment_status: safePaymentStatus,
-          cheque_status: chequeStatus,
-          cheque_amount: chequeAmount,
-          cheque_presentation_date: chequePresentationDate,
-          subtotal: extractedData.subtotal,
-          taxable_amount: extractedData.taxable_amount,
-          cgst: extractedData.cgst,
-          sgst: extractedData.sgst,
-          igst: extractedData.igst,
-          total_tax: extractedData.total_tax,
-          round_off: extractedData.round_off,
-          grand_total: extractedData.grand_total,
-          verification_status: 'VERIFIED',
-          ocr_status: (isEdit && oldInvoice ? oldInvoice.ocr_status : 'MANUAL'),
-          created_at: oldInvoice?.created_at || now,
-          updated_at: now
-        });
-
-      if (invErr) {
-        // Fallback retry if invoice_name column is not present in remote schema
-        console.warn('Supabase purchase_invoices upsert note:', invErr.message);
-        const { error: retryErr } = await supabase
-          .from('purchase_invoices')
-          .upsert({
-            id: invoiceId,
-            supplier_id: supplier.id,
-            invoice_number: invoiceNumber,
-            invoice_date: extractedData.invoice_date,
-            payment_mode: safePaymentMode,
-            payment_status: safePaymentStatus,
-            cheque_status: chequeStatus,
-            cheque_amount: chequeAmount,
-            cheque_presentation_date: chequePresentationDate,
-            subtotal: extractedData.subtotal,
-            taxable_amount: extractedData.taxable_amount,
-            cgst: extractedData.cgst,
-            sgst: extractedData.sgst,
-            igst: extractedData.igst,
-            total_tax: extractedData.total_tax,
-            round_off: extractedData.round_off,
-            grand_total: extractedData.grand_total,
-            verification_status: 'VERIFIED',
-            ocr_status: (isEdit && oldInvoice ? oldInvoice.ocr_status : 'MANUAL'),
-            created_at: oldInvoice?.created_at || now,
-            updated_at: now
-          });
-        if (retryErr) {
-          console.error('Supabase purchase_invoices retry error:', retryErr);
-        }
-      }
-
-      // ALWAYS insert line items to remote Supabase database
-      if (itemsToInsert.length > 0) {
-        const { error: itemsErr } = await supabase
-          .from('purchase_items')
-          .upsert(
-            itemsToInsert.map(i => ({
-              id: i.id,
-              purchase_invoice_id: invoiceId,
-              product_id: (i.product_id && i.product_id.length === 36 && i.product_id.includes('-')) ? i.product_id : null,
-              supplier_item_name_snapshot: i.supplier_item_name_snapshot,
-              hsn_snapshot: i.hsn_snapshot,
-              quantity: i.quantity,
-              uom_snapshot: i.uom_snapshot || 'PAC',
-              purchase_rate: i.purchase_rate,
-              gst_rate: i.gst_rate || 0,
-              taxable_value: i.taxable_value || 0,
-              cgst: i.cgst || 0,
-              sgst: i.sgst || 0,
-              igst: i.igst || 0,
-              total: i.total,
-              created_at: now
-            }))
-          );
-        if (itemsErr) {
-          console.error('Supabase purchase_items upsert error:', itemsErr);
-        }
-      }
-    } catch (err) {
-      console.error('Supabase sync exception:', err);
+    if (invErr) {
+      console.error('Supabase purchase_invoices upsert error:', invErr);
+      throw invErr;
     }
 
-    // Audit Log
+    // Insert line items directly to Supabase
+    if (itemsToInsert.length > 0) {
+      const { error: itemsErr } = await supabase
+        .from('purchase_items')
+        .upsert(
+          itemsToInsert.map(i => ({
+            id: i.id,
+            purchase_invoice_id: invoiceId,
+            product_id: (i.product_id && i.product_id.length === 36 && i.product_id.includes('-')) ? i.product_id : null,
+            supplier_item_name_snapshot: i.supplier_item_name_snapshot,
+            hsn_snapshot: i.hsn_snapshot,
+            quantity: i.quantity,
+            uom_snapshot: i.uom_snapshot || 'PAC',
+            purchase_rate: i.purchase_rate,
+            gst_rate: i.gst_rate || 0,
+            taxable_value: i.taxable_value || 0,
+            cgst: i.cgst || 0,
+            sgst: i.sgst || 0,
+            igst: i.igst || 0,
+            total: i.total,
+            created_at: now
+          }))
+        );
+      if (itemsErr) {
+        console.error('Supabase purchase_items upsert error:', itemsErr);
+        throw itemsErr;
+      }
+    }
+
+    const savedInvoice: PurchaseInvoice = {
+      ...invoiceRow,
+      supplier,
+      items: itemsToInsert,
+      payment_mode: safePaymentMode,
+      payment_status: safePaymentStatus,
+      verification_status: 'VERIFIED'
+    };
+
+    // Audit Log directly in database
     if (isEdit) {
       await dbService.logAudit(
         'INVOICE_UPDATED',
         'purchase_invoices',
         invoiceId,
         oldInvoice ? { invoice_number: oldInvoice.invoice_number, grand_total: oldInvoice.grand_total, item_count: oldInvoice.items?.length } : null,
-        { invoice_number: newInvoice.invoice_number, grand_total: newInvoice.grand_total, item_count: itemsToInsert.length },
-        `Updated purchase invoice #${newInvoice.invoice_number} from ${supplier.name}`
+        { invoice_number: savedInvoice.invoice_number, grand_total: savedInvoice.grand_total, item_count: itemsToInsert.length },
+        `Updated purchase invoice #${savedInvoice.invoice_number} from ${supplier.name}`
       );
     } else {
       await dbService.logAudit(
@@ -949,12 +543,12 @@ export const dbService = {
         'purchase_invoices',
         invoiceId,
         null,
-        { invoice_number: newInvoice.invoice_number, grand_total: newInvoice.grand_total, item_count: itemsToInsert.length },
-        `Confirmed purchase invoice #${newInvoice.invoice_number} from ${supplier.name}`
+        { invoice_number: savedInvoice.invoice_number, grand_total: savedInvoice.grand_total, item_count: itemsToInsert.length },
+        `Confirmed purchase invoice #${savedInvoice.invoice_number} from ${supplier.name}`
       );
     }
 
-    return newInvoice;
+    return savedInvoice;
   },
 
   updateInvoice: async (id: string, extractedData: InvoiceFormData): Promise<PurchaseInvoice> => {
@@ -962,27 +556,24 @@ export const dbService = {
   },
 
   deleteInvoice: async (id: string): Promise<boolean> => {
-    // 1. Fetch current invoices to obtain the target invoice metadata for audit logging
-    const invoices = await dbService.getInvoices();
-    const targetInvoice = invoices.find(inv => inv.id === id);
+    const targetInvoice = await dbService.getInvoiceById(id);
 
-    // 2. Remove from local storage cache immediately
-    const updatedInvoices = invoices.filter(inv => inv.id !== id);
-    setLocalData(LOCAL_STORAGE_KEY_INVOICES, updatedInvoices);
-
-    // 3. Delete from Supabase remote database
+    // Delete child records and parent directly in Supabase
     try {
+      await supabase.from('invoice_payments').delete().eq('invoice_id', id);
       await supabase.from('purchase_items').delete().eq('purchase_invoice_id', id);
       await supabase.from('purchase_invoice_documents').delete().eq('purchase_invoice_id', id);
       const { error } = await supabase.from('purchase_invoices').delete().eq('id', id);
       if (error) {
-        console.warn('Supabase delete invoice note:', error.message);
+        console.error('Supabase delete invoice error:', error.message);
+        throw error;
       }
     } catch (e) {
-      console.warn('Supabase delete invoice exception:', e);
+      console.error('Supabase delete invoice exception:', e);
+      throw e;
     }
 
-    // 4. Record permanent immutable audit trail event for deletion
+    // Record permanent immutable audit trail event for deletion in DB
     if (targetInvoice) {
       await dbService.logAudit(
         'INVOICE_DELETED',
@@ -1005,19 +596,15 @@ export const dbService = {
 
   // --- PRICE HISTORY ---
   getPriceHistory: async (): Promise<PriceHistory[]> => {
-    try {
-      const { data, error } = await supabase
-        .from('price_history')
-        .select('*, product:products(*)')
-        .order('changed_at', { ascending: false });
-      if (!error && data !== null) {
-        setLocalData(LOCAL_STORAGE_KEY_PRICE_HISTORY, data as PriceHistory[]);
-        return data as PriceHistory[];
-      }
-    } catch {
-      // Fallback
+    const { data, error } = await supabase
+      .from('price_history')
+      .select('*, product:products(*)')
+      .order('changed_at', { ascending: false });
+    if (error) {
+      console.error('Supabase price_history fetch error:', error);
+      return [];
     }
-    return getLocalData<PriceHistory[]>(LOCAL_STORAGE_KEY_PRICE_HISTORY, []);
+    return (data || []) as PriceHistory[];
   },
 
   addPriceHistory: async (entry: Omit<PriceHistory, 'id' | 'changed_at'>): Promise<PriceHistory> => {
@@ -1029,18 +616,13 @@ export const dbService = {
       changed_at: now
     };
 
-    const currentHistory = await dbService.getPriceHistory();
-    setLocalData(LOCAL_STORAGE_KEY_PRICE_HISTORY, [newEntry, ...currentHistory]);
+    const { error } = await supabase
+      .from('price_history')
+      .insert(newEntry);
 
-    try {
-      await supabase
-        .from('price_history')
-        .insert({
-          ...newEntry,
-          changed_at: now
-        });
-    } catch (e) {
-      console.warn('Price history sync note:', e);
+    if (error) {
+      console.error('Supabase price history insert error:', error);
+      throw error;
     }
 
     return newEntry;
@@ -1048,28 +630,25 @@ export const dbService = {
 
   // --- AUDIT LOGS ---
   getAuditLogs: async (): Promise<AuditLog[]> => {
-    try {
-      const { data, error } = await supabase
-        .from('audit_logs')
-        .select('*')
-        .order('timestamp', { ascending: false });
+    const { data, error } = await supabase
+      .from('audit_logs')
+      .select('*')
+      .order('timestamp', { ascending: false });
 
-      if (!error && data !== null) {
-        let allLogs = data as AuditLog[];
-        allLogs = allLogs.filter(l => {
-          if (l.action === 'PRODUCT_UPDATED' && (l.reason?.startsWith('Invoice #') || l.reason?.toLowerCase().includes('invoice #'))) {
-            return false;
-          }
-          return true;
-        });
-        setLocalData(LOCAL_STORAGE_KEY_AUDIT, allLogs);
-        return allLogs;
-      }
-    } catch (e) {
-      console.warn('Supabase audit logs fetch error:', e);
+    if (error) {
+      console.error('Supabase audit logs fetch error:', error);
+      throw error;
     }
 
-    return getLocalData<AuditLog[]>(LOCAL_STORAGE_KEY_AUDIT, []);
+    let allLogs = (data || []) as AuditLog[];
+    allLogs = allLogs.filter(l => {
+      if (l.action === 'PRODUCT_UPDATED' && (l.reason?.startsWith('Invoice #') || l.reason?.toLowerCase().includes('invoice #'))) {
+        return false;
+      }
+      return true;
+    });
+
+    return allLogs;
   },
 
   logAudit: async (
@@ -1094,42 +673,22 @@ export const dbService = {
       }
     } catch {}
 
-    const newLog: AuditLog = {
-      id,
-      user_id: userId,
-      user_email: userEmail,
-      action,
-      entity_type: entityType,
-      entity_id: entityId,
-      old_value: oldValue,
-      new_value: newValue,
-      reason,
-      timestamp: now
-    };
+    const { error } = await supabase
+      .from('audit_logs')
+      .insert({
+        id,
+        user_id: userId,
+        action,
+        entity_type: entityType,
+        entity_id: validEntityId,
+        old_value: oldValue,
+        new_value: newValue,
+        reason,
+        timestamp: now
+      });
 
-    // Synchronous local state write to prevent concurrent race conditions
-    const currentLogs = getLocalData<AuditLog[]>(LOCAL_STORAGE_KEY_AUDIT, []);
-    const updatedLogs = [newLog, ...currentLogs.filter(l => l.id !== id)];
-    setLocalData(LOCAL_STORAGE_KEY_AUDIT, updatedLogs);
-
-    try {
-      const { error } = await supabase
-        .from('audit_logs')
-        .insert({
-          id,
-          action,
-          entity_type: entityType,
-          entity_id: validEntityId,
-          old_value: oldValue,
-          new_value: newValue,
-          reason,
-          timestamp: now
-        });
-      if (error) {
-        console.warn('Audit log remote insert note:', error.message);
-      }
-    } catch (e) {
-      console.warn('Audit log sync note:', e);
+    if (error) {
+      console.warn('Audit log remote insert note:', error.message);
     }
   }
 };

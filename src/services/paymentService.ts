@@ -2,7 +2,8 @@
  * Payment Service — Cash & Cheque Partial Payment Management
  * ---------------------------------------------------------------------------
  * Handles all partial payment calculations, ledger tracking, cheque clearance/bounce
- * lifecycle, and invoice status recalculations.
+ * lifecycle, and invoice status recalculations directly against the database (Supabase).
+ * No payment data is stored in the frontend or localStorage.
  *
  * Supported payment methods: strictly 'CASH' and 'CHEQUE'.
  * Supported payment statuses: 'PENDING', 'CLEARED', 'BOUNCED', 'CANCELLED'.
@@ -20,36 +21,12 @@ import {
 } from '../types';
 import { getTodayIST } from '../utils/dateUtils';
 
-const LOCAL_STORAGE_KEY_PAYMENTS = 'ramachandran_invoice_payments_v1';
-const LOCAL_STORAGE_KEY_OFFLINE_QUEUE = 'ramachandran_payments_offline_queue_v1';
-
 // In-flight mutex locks per invoice to serialize concurrent client submissions
 const inFlightInvoiceLocks = new Set<string>();
-
-// Cache remote table availability so we don't spam 404 network requests if table is not yet migrated in Supabase
-let isRemotePaymentsTableAvailable: boolean | null = null;
 
 // Duplicate submission tracker: maps submission fingerprint to timestamp
 const recentSubmissions = new Map<string, number>();
 const DUPLICATE_WINDOW_MS = 3000;
-
-function getLocalPayments(): InvoicePayment[] {
-  try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_KEY_PAYMENTS);
-    return raw ? JSON.parse(raw) : [];
-  } catch (err) {
-    console.warn('Failed to read payments from localStorage:', err);
-    return [];
-  }
-}
-
-function setLocalPayments(payments: InvoicePayment[]): void {
-  try {
-    localStorage.setItem(LOCAL_STORAGE_KEY_PAYMENTS, JSON.stringify(payments));
-  } catch (err) {
-    console.warn('Failed to save payments to localStorage:', err);
-  }
-}
 
 /**
  * Calculate payment breakdown and invoice status from payments array
@@ -77,7 +54,6 @@ export function calculatePaymentBreakdown(
     } else if (p.payment_method === 'CHEQUE' && p.payment_status === 'PENDING') {
       totalPendingCheques += Number(p.amount) || 0;
     }
-    // Note: BOUNCED and CANCELLED cheques are not counted towards cleared or pending amounts
   }
 
   const clearedAmount = Number((totalCash + totalClearedCheques).toFixed(2));
@@ -92,7 +68,6 @@ export function calculatePaymentBreakdown(
   } else if (pendingChequeAmount > 0) {
     payment_status = 'CHEQUE_PENDING';
   } else {
-    // Check if overdue (>30 days old)
     if (invoiceDate) {
       const invDate = new Date(invoiceDate);
       const thirtyDaysAgo = new Date();
@@ -118,47 +93,40 @@ export function calculatePaymentBreakdown(
 
 export const paymentService = {
   /**
-   * Get all payments for a specific invoice
+   * Get all payments for a specific invoice from Supabase database
    */
   getPaymentsByInvoiceId: async (invoiceId: string, invoice?: PurchaseInvoice | null): Promise<InvoicePayment[]> => {
     if (!invoiceId) return [];
 
-    let localPayments = getLocalPayments().filter(p => p.invoice_id === invoiceId);
+    try {
+      const { data, error } = await supabase
+        .from('invoice_payments')
+        .select('*')
+        .eq('invoice_id', invoiceId)
+        .order('payment_date', { ascending: true });
 
-    if (isRemotePaymentsTableAvailable !== false) {
-      try {
-        const { data, error } = await supabase
-          .from('invoice_payments')
-          .select('*')
-          .eq('invoice_id', invoiceId)
-          .order('payment_date', { ascending: true });
-
-        if (!error && data) {
-          isRemotePaymentsTableAvailable = true;
-          const remotePayments = data as InvoicePayment[];
-          // Sync into local cache
-          const allLocal = getLocalPayments().filter(p => p.invoice_id !== invoiceId);
-          setLocalPayments([...allLocal, ...remotePayments]);
-          return remotePayments;
-        } else if (error) {
-          isRemotePaymentsTableAvailable = false;
-        }
-      } catch {
-        isRemotePaymentsTableAvailable = false;
+      if (!error && data && data.length > 0) {
+        return data as InvoicePayment[];
       }
+    } catch (err) {
+      console.warn('Supabase getPaymentsByInvoiceId error:', err);
     }
 
-    // If no payments exist in database or local storage, synthesize legacy payment from invoice if available
-    if (localPayments.length === 0 && invoice) {
+    // If no payments exist in database and invoice exists, synthesize legacy payment and persist it to DB
+    if (invoice) {
       const synthesized = paymentService.synthesizeLegacyPayment(invoice);
       if (synthesized) {
-        localPayments = [synthesized];
-        const allLocal = getLocalPayments();
-        setLocalPayments([...allLocal, synthesized]);
+        try {
+          await supabase.from('invoice_payments').insert(synthesized);
+          return [synthesized];
+        } catch (e) {
+          console.warn('Failed to persist synthesized legacy payment to database:', e);
+          return [synthesized];
+        }
       }
     }
 
-    return localPayments;
+    return [];
   },
 
   /**
@@ -171,7 +139,7 @@ export const paymentService = {
 
     if (isCheque) {
       return {
-        id: `legacy-${invoice.id}`,
+        id: generateUUID(),
         invoice_id: invoice.id,
         payment_method: 'CHEQUE',
         amount: Number(invoice.cheque_amount ?? invoice.grand_total) || 0,
@@ -186,10 +154,9 @@ export const paymentService = {
         updated_at: invoice.updated_at || now
       };
     } else {
-      // CASH payment
       if (invoice.payment_status === 'PAID') {
         return {
-          id: `legacy-${invoice.id}`,
+          id: generateUUID(),
           invoice_id: invoice.id,
           payment_method: 'CASH',
           amount: Number(invoice.grand_total) || 0,
@@ -205,7 +172,7 @@ export const paymentService = {
   },
 
   /**
-   * Get payment summary for an invoice
+   * Get payment summary for an invoice directly from database
    */
   getPaymentSummary: async (invoice: PurchaseInvoice): Promise<InvoicePaymentSummary> => {
     const payments = await paymentService.getPaymentsByInvoiceId(invoice.id, invoice);
@@ -219,7 +186,7 @@ export const paymentService = {
   },
 
   /**
-   * Add a new payment (CASH or CHEQUE) with concurrency and duplicate guards
+   * Add a new payment (CASH or CHEQUE) and persist directly to Supabase database
    */
   addPayment: async (
     invoice: PurchaseInvoice,
@@ -238,14 +205,12 @@ export const paymentService = {
       throw new Error('Payment amount must be greater than zero.');
     }
 
-    // Guard 1: Concurrency Mutex Lock per Invoice
     if (inFlightInvoiceLocks.has(invoice.id)) {
       throw new Error('Another payment transaction is in progress for this invoice. Please wait.');
     }
     inFlightInvoiceLocks.add(invoice.id);
 
     try {
-      // Guard 2: Duplicate Submission Guard
       const fingerprint = `${invoice.id}-${data.payment_method}-${data.amount.toFixed(2)}-${(data.cheque_number || '').trim().toLowerCase()}`;
       const nowMs = Date.now();
       const lastSubmitted = recentSubmissions.get(fingerprint);
@@ -254,14 +219,12 @@ export const paymentService = {
       }
       recentSubmissions.set(fingerprint, nowMs);
 
-      // Clean up old submission fingerprints
       for (const [key, ts] of recentSubmissions.entries()) {
         if (nowMs - ts > DUPLICATE_WINDOW_MS * 2) {
           recentSubmissions.delete(key);
         }
       }
 
-      // Guard 3: Validate available balance against current state
       const existingPayments = await paymentService.getPaymentsByInvoiceId(invoice.id, invoice);
       const currentSummary = calculatePaymentBreakdown(invoice.grand_total, existingPayments, invoice.invoice_date);
 
@@ -294,44 +257,20 @@ export const paymentService = {
         updated_at: now
       };
 
-      // Update local cache atomically
-      const updatedPayments = [...existingPayments, newPayment];
-      const allLocal = getLocalPayments().filter(p => p.invoice_id !== invoice.id);
-      setLocalPayments([...allLocal, ...updatedPayments]);
+      // Persist to Supabase database
+      const { error: insertErr } = await supabase
+        .from('invoice_payments')
+        .insert(newPayment);
 
-      // Recalculate invoice status
-      const newBreakdown = calculatePaymentBreakdown(invoice.grand_total, updatedPayments, invoice.invoice_date);
-
-      // Sync to Supabase in parallel
-      if (isRemotePaymentsTableAvailable !== false) {
-        try {
-          const { error } = await supabase
-            .from('invoice_payments')
-            .insert({
-              id: newPayment.id,
-              invoice_id: newPayment.invoice_id,
-              payment_method: newPayment.payment_method,
-              amount: newPayment.amount,
-              payment_date: newPayment.payment_date,
-              payment_status: newPayment.payment_status,
-              cheque_number: newPayment.cheque_number,
-              bank_name: newPayment.bank_name,
-              cheque_date: newPayment.cheque_date,
-              clearance_date: newPayment.clearance_date,
-              notes: newPayment.notes
-            });
-
-          if (error) {
-            isRemotePaymentsTableAvailable = false;
-            console.warn('Supabase invoice_payments insert note:', error.message);
-          }
-        } catch (err) {
-          isRemotePaymentsTableAvailable = false;
-          console.warn('Supabase offline or table pending migration:', err);
-        }
+      if (insertErr) {
+        console.error('Supabase invoice_payments insert error:', insertErr);
+        throw insertErr;
       }
 
-      // Sync status back to invoice record
+      const updatedPayments = [...existingPayments, newPayment];
+      const newBreakdown = calculatePaymentBreakdown(invoice.grand_total, updatedPayments, invoice.invoice_date);
+
+      // Sync status to purchase_invoices table in database
       await paymentService.syncInvoiceStatus(invoice.id, newBreakdown.payment_status);
 
       return {
@@ -348,7 +287,7 @@ export const paymentService = {
   },
 
   /**
-   * Mark a cheque payment as CLEARED
+   * Mark a cheque payment as CLEARED in database
    */
   markChequeCleared: async (
     invoice: PurchaseInvoice,
@@ -371,6 +310,20 @@ export const paymentService = {
     const effectiveClearanceDate = clearanceDate || target.clearance_date || getTodayIST();
     const now = new Date().toISOString();
 
+    const { error } = await supabase
+      .from('invoice_payments')
+      .update({
+        payment_status: 'CLEARED',
+        clearance_date: effectiveClearanceDate,
+        updated_at: now
+      })
+      .eq('id', paymentId);
+
+    if (error) {
+      console.error('Supabase markChequeCleared error:', error);
+      throw error;
+    }
+
     const updatedPayments = existingPayments.map(p => {
       if (p.id === paymentId) {
         return {
@@ -383,28 +336,7 @@ export const paymentService = {
       return p;
     });
 
-    // Save locally
-    const allLocal = getLocalPayments().filter(p => p.invoice_id !== invoice.id);
-    setLocalPayments([...allLocal, ...updatedPayments]);
-
-    // Recalculate invoice status
     const newBreakdown = calculatePaymentBreakdown(invoice.grand_total, updatedPayments, invoice.invoice_date);
-
-    // Sync remote
-    try {
-      await supabase
-        .from('invoice_payments')
-        .update({
-          payment_status: 'CLEARED',
-          clearance_date: effectiveClearanceDate,
-          updated_at: now
-        })
-        .eq('id', paymentId);
-    } catch {
-      // Ignore fallback
-    }
-
-    // Sync status to invoice
     await paymentService.syncInvoiceStatus(invoice.id, newBreakdown.payment_status, 'CLEARED');
 
     return {
@@ -415,7 +347,7 @@ export const paymentService = {
   },
 
   /**
-   * Mark a cheque payment as BOUNCED
+   * Mark a cheque payment as BOUNCED in database
    */
   markChequeBounced: async (
     invoice: PurchaseInvoice,
@@ -436,40 +368,35 @@ export const paymentService = {
     }
 
     const now = new Date().toISOString();
+    const notes = reason ? `${target.notes ? target.notes + ' | ' : ''}Bounced: ${reason}` : target.notes;
+
+    const { error } = await supabase
+      .from('invoice_payments')
+      .update({
+        payment_status: 'BOUNCED',
+        notes,
+        updated_at: now
+      })
+      .eq('id', paymentId);
+
+    if (error) {
+      console.error('Supabase markChequeBounced error:', error);
+      throw error;
+    }
+
     const updatedPayments = existingPayments.map(p => {
       if (p.id === paymentId) {
         return {
           ...p,
           payment_status: 'BOUNCED' as PaymentRecordStatus,
-          notes: reason ? `${p.notes ? p.notes + ' | ' : ''}Bounced: ${reason}` : p.notes,
+          notes,
           updated_at: now
         };
       }
       return p;
     });
 
-    // Save locally
-    const allLocal = getLocalPayments().filter(p => p.invoice_id !== invoice.id);
-    setLocalPayments([...allLocal, ...updatedPayments]);
-
-    // Recalculate invoice status (bounced cheque no longer reduces outstanding and is not pending)
     const newBreakdown = calculatePaymentBreakdown(invoice.grand_total, updatedPayments, invoice.invoice_date);
-
-    // Sync remote
-    try {
-      await supabase
-        .from('invoice_payments')
-        .update({
-          payment_status: 'BOUNCED',
-          notes: reason ? `${target.notes ? target.notes + ' | ' : ''}Bounced: ${reason}` : target.notes,
-          updated_at: now
-        })
-        .eq('id', paymentId);
-    } catch {
-      // Ignore fallback
-    }
-
-    // Sync status to invoice
     await paymentService.syncInvoiceStatus(invoice.id, newBreakdown.payment_status);
 
     return {
@@ -480,28 +407,93 @@ export const paymentService = {
   },
 
   /**
-   * Sync new status to purchase_invoices table and local storage cache
+   * Cancel a payment record in database
    */
-  syncInvoiceStatus: async (invoiceId: string, newStatus: PaymentStatus, chequeStatus?: 'CLEARED' | 'PENDING'): Promise<void> => {
-    const invoices = await dbService.getInvoices();
-    const current = invoices.find(i => i.id === invoiceId);
-    if (!current) return;
+  cancelPayment: async (
+    invoice: PurchaseInvoice,
+    paymentId: string
+  ): Promise<InvoicePaymentSummary> => {
+    const existingPayments = await paymentService.getPaymentsByInvoiceId(invoice.id, invoice);
+    const target = existingPayments.find(p => p.id === paymentId);
 
-    const updatedInvoice: PurchaseInvoice = {
-      ...current,
-      payment_status: newStatus,
-      cheque_status: chequeStatus !== undefined ? chequeStatus : current.cheque_status,
-      updated_at: new Date().toISOString()
-    };
-
-    // Update in dbService cache
-    const updatedList = invoices.map(i => i.id === invoiceId ? updatedInvoice : i);
-    try {
-      localStorage.setItem('ramachandran_invoices_v1', JSON.stringify(updatedList));
-    } catch {
-      // Ignore
+    if (!target) {
+      throw new Error('Payment record not found.');
     }
 
+    const now = new Date().toISOString();
+    const { error } = await supabase
+      .from('invoice_payments')
+      .update({
+        payment_status: 'CANCELLED',
+        updated_at: now
+      })
+      .eq('id', paymentId);
+
+    if (error) {
+      console.error('Supabase cancelPayment error:', error);
+      throw error;
+    }
+
+    const updatedPayments = existingPayments.map(p => {
+      if (p.id === paymentId) {
+        return {
+          ...p,
+          payment_status: 'CANCELLED' as PaymentRecordStatus,
+          updated_at: now
+        };
+      }
+      return p;
+    });
+
+    const newBreakdown = calculatePaymentBreakdown(invoice.grand_total, updatedPayments, invoice.invoice_date);
+    await paymentService.syncInvoiceStatus(invoice.id, newBreakdown.payment_status);
+
+    return {
+      invoice_id: invoice.id,
+      payments: updatedPayments,
+      ...newBreakdown
+    };
+  },
+
+  /**
+   * Delete a payment record permanently from database
+   */
+  deletePayment: async (
+    invoice: PurchaseInvoice,
+    paymentId: string
+  ): Promise<InvoicePaymentSummary> => {
+    const existingPayments = await paymentService.getPaymentsByInvoiceId(invoice.id, invoice);
+    const target = existingPayments.find(p => p.id === paymentId);
+
+    if (!target) {
+      throw new Error('Payment record not found.');
+    }
+
+    const { error } = await supabase
+      .from('invoice_payments')
+      .delete()
+      .eq('id', paymentId);
+
+    if (error) {
+      console.error('Supabase deletePayment error:', error);
+      throw error;
+    }
+
+    const updatedPayments = existingPayments.filter(p => p.id !== paymentId);
+    const newBreakdown = calculatePaymentBreakdown(invoice.grand_total, updatedPayments, invoice.invoice_date);
+    await paymentService.syncInvoiceStatus(invoice.id, newBreakdown.payment_status);
+
+    return {
+      invoice_id: invoice.id,
+      payments: updatedPayments,
+      ...newBreakdown
+    };
+  },
+
+  /**
+   * Sync new status to purchase_invoices table in database
+   */
+  syncInvoiceStatus: async (invoiceId: string, newStatus: PaymentStatus, chequeStatus?: 'CLEARED' | 'PENDING'): Promise<void> => {
     try {
       await supabase
         .from('purchase_invoices')
@@ -511,13 +503,13 @@ export const paymentService = {
           updated_at: new Date().toISOString()
         })
         .eq('id', invoiceId);
-    } catch {
-      // Local fallback
+    } catch (e) {
+      console.error('Supabase syncInvoiceStatus error:', e);
     }
   },
 
   /**
-   * Compute aggregate metrics across all invoices for the Dashboard
+   * Compute aggregate metrics across all invoices from the database
    */
   getDashboardMetrics: async (invoices: PurchaseInvoice[]): Promise<{
     totalOutstanding: number;
@@ -530,43 +522,29 @@ export const paymentService = {
     let totalClearedCheques = 0;
     let totalCashPayments = 0;
 
-    // Batch load all local payments once
-    const allLocal = getLocalPayments();
-    const localMap = new Map<string, InvoicePayment[]>();
-    for (const p of allLocal) {
-      const list = localMap.get(p.invoice_id) || [];
-      list.push(p);
-      localMap.set(p.invoice_id, list);
+    let allPayments: InvoicePayment[] = [];
+    try {
+      const { data, error } = await supabase
+        .from('invoice_payments')
+        .select('*')
+        .order('payment_date', { ascending: true });
+
+      if (!error && data) {
+        allPayments = data as InvoicePayment[];
+      }
+    } catch (e) {
+      console.warn('Supabase getDashboardMetrics payment fetch note:', e);
     }
 
-    // Try batch fetching remote payments once if table is available
-    if (isRemotePaymentsTableAvailable !== false && invoices.length > 0) {
-      try {
-        const { data, error } = await supabase
-          .from('invoice_payments')
-          .select('*')
-          .order('payment_date', { ascending: true });
-
-        if (!error && data) {
-          isRemotePaymentsTableAvailable = true;
-          const remoteList = data as InvoicePayment[];
-          setLocalPayments(remoteList);
-          localMap.clear();
-          for (const p of remoteList) {
-            const list = localMap.get(p.invoice_id) || [];
-            list.push(p);
-            localMap.set(p.invoice_id, list);
-          }
-        } else if (error) {
-          isRemotePaymentsTableAvailable = false;
-        }
-      } catch {
-        isRemotePaymentsTableAvailable = false;
-      }
+    const paymentMap = new Map<string, InvoicePayment[]>();
+    for (const p of allPayments) {
+      const list = paymentMap.get(p.invoice_id) || [];
+      list.push(p);
+      paymentMap.set(p.invoice_id, list);
     }
 
     for (const inv of invoices) {
-      let payments = localMap.get(inv.id);
+      let payments = paymentMap.get(inv.id);
       if (!payments || payments.length === 0) {
         const syn = paymentService.synthesizeLegacyPayment(inv);
         payments = syn ? [syn] : [];
@@ -594,4 +572,3 @@ export const paymentService = {
     };
   }
 };
-

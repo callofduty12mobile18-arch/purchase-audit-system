@@ -14,6 +14,7 @@ import {
   X,
   PlusCircle,
   BookOpen,
+  TrendingUp,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { NetworkBanner } from '../components/ui/NetworkBanner';
@@ -32,6 +33,7 @@ const navItems: NavItem[] = [
   { label: 'New Invoice',  href: '/purchases/import', icon: PlusCircle },
   { label: 'Suppliers',   href: '/suppliers',       icon: Building2 },
   { label: 'Products',    href: '/products',        icon: Package },
+  { label: 'Revenue & Profit', href: '/revenue',    icon: TrendingUp },
   { label: 'Analytics',   href: '/analytics',       icon: LineChart },
   { label: 'Order Planner', href: '/order-planner', icon: ShoppingCart },
   { label: 'Audit Logs',  href: '/audit-log',       icon: ClipboardList },
