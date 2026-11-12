@@ -32,6 +32,16 @@ import { getTodayIST } from '../utils/dateUtils';
 const LOCAL_STORAGE_KEY_SALES = 'ramachandran_sales_v1';
 const LOCAL_STORAGE_KEY_SELLING_OVERRIDES = 'ramachandran_selling_price_overrides_v1';
 
+// In-memory caching to eliminate sequential database request thrashing
+let cachedInvoices: { data: PurchaseInvoice[]; timestamp: number } | null = null;
+let cachedProducts: { data: Product[]; timestamp: number } | null = null;
+const CACHE_TTL_MS = 30000; // 30s in-memory cache
+
+export function invalidateRevenueCache() {
+  cachedInvoices = null;
+  cachedProducts = null;
+}
+
 // Mutex locks to serialize concurrent sales creation per product
 const productSaleLocks = new Set<string>();
 
@@ -96,12 +106,45 @@ export function generateSaleNumber(dateStr: string = getTodayIST()): string {
 
 export const revenueService = {
   /**
-   * Fetch all sales: Combines manual sales + all purchased items from invoices
-   * so the user sees every purchased inventory item and can manually set/adjust selling prices.
+   * Cached invoices retrieval
    */
-  getSales: async (): Promise<SaleTransaction[]> => {
-    // 1. Fetch manual sales from database (with local fallback)
-    let manualSales: SaleTransaction[] = [];
+  getCachedInvoices: async (forceRefresh = false): Promise<PurchaseInvoice[]> => {
+    const now = Date.now();
+    if (!forceRefresh && cachedInvoices && (now - cachedInvoices.timestamp < CACHE_TTL_MS)) {
+      return cachedInvoices.data;
+    }
+    try {
+      const invoices = await dbService.getInvoices();
+      cachedInvoices = { data: invoices, timestamp: now };
+      return invoices;
+    } catch (e) {
+      console.warn('Could not load invoices for revenue calculation:', e);
+      return cachedInvoices?.data || [];
+    }
+  },
+
+  /**
+   * Cached products retrieval
+   */
+  getCachedProducts: async (forceRefresh = false): Promise<Product[]> => {
+    const now = Date.now();
+    if (!forceRefresh && cachedProducts && (now - cachedProducts.timestamp < CACHE_TTL_MS)) {
+      return cachedProducts.data;
+    }
+    try {
+      const products = await dbService.getProducts();
+      cachedProducts = { data: products, timestamp: now };
+      return products;
+    } catch (e) {
+      console.warn('Could not load products for revenue calculation:', e);
+      return cachedProducts?.data || [];
+    }
+  },
+
+  /**
+   * Fetch manual sales directly from DB (or fallback to local cache)
+   */
+  getManualSales: async (): Promise<SaleTransaction[]> => {
     try {
       const { data, error } = await supabase
         .from('sales')
@@ -110,30 +153,22 @@ export const revenueService = {
         .order('created_at', { ascending: false });
 
       if (!error && data) {
-        manualSales = data as SaleTransaction[];
-        setLocalSales(manualSales);
-      } else {
-        manualSales = getLocalSales();
+        const manual = data as SaleTransaction[];
+        setLocalSales(manual);
+        return manual;
       }
     } catch {
-      manualSales = getLocalSales();
+      // Fallback
     }
+    return getLocalSales();
+  },
 
-    // 2. Fetch all verified purchase invoices with items & products
-    let invoices: PurchaseInvoice[] = [];
-    try {
-      invoices = await dbService.getInvoices();
-    } catch (e) {
-      console.warn('Could not load invoices for purchase items synthesis:', e);
-    }
-
-    // 3. Load user-entered selling price overrides
+  /**
+   * Fast in-memory synthesis of sales (combining manual sales + all purchased items from invoices)
+   */
+  synthesizeSales: (manualSales: SaleTransaction[], invoices: PurchaseInvoice[]): SaleTransaction[] => {
     const overrides = getSellingPriceOverrides();
-
-    // Set of IDs already covered by manual sales to avoid duplicate entries
     const manualSaleIds = new Set(manualSales.map(s => s.id));
-
-    // 4. Transform purchased items into SalesTransaction records
     const purchasedItemSales: SaleTransaction[] = [];
 
     for (const inv of invoices) {
@@ -148,7 +183,6 @@ export const revenueService = {
         const unitCost = Number(item.purchase_rate) || item.product.current_purchase_ref_price || 0;
         const totalCost = Number((item.total || (qty * unitCost)).toFixed(2));
 
-        // Use manually entered selling price if overridden, else catalog selling price, else 0
         let sellPrice = 0;
         if (overrides[item.id] !== undefined) {
           sellPrice = overrides[item.id];
@@ -201,12 +235,157 @@ export const revenueService = {
       }
     }
 
-    // Combine manual sales + purchased item sales, sorted by date DESC
-    const combined = [...manualSales, ...purchasedItemSales].sort(
+    return [...manualSales, ...purchasedItemSales].sort(
       (a, b) => b.sale_date.localeCompare(a.sale_date) || b.created_at.localeCompare(a.created_at)
     );
+  },
 
-    return combined;
+  /**
+   * Fast in-memory stock & FIFO calculation across all products (O(N) with 0 network roundtrips)
+   */
+  computeAllProductsStock: (
+    products: Product[],
+    invoices: PurchaseInvoice[],
+    manualSales: SaleTransaction[]
+  ): ProductStockInfo[] => {
+    const activeProducts = products.filter(p => p.is_active);
+
+    // Sort invoices chronologically once
+    const sortedInvoices = [...invoices].sort(
+      (a, b) => a.invoice_date.localeCompare(b.invoice_date) || a.created_at.localeCompare(b.created_at)
+    );
+
+    // Group purchase batches by product id & name
+    const batchesByProductId = new Map<string, PurchaseBatch[]>();
+    const batchesByName = new Map<string, PurchaseBatch[]>();
+
+    for (const inv of sortedInvoices) {
+      if (!inv.items) continue;
+      for (const item of inv.items) {
+        const qty = Number(item.quantity) || 0;
+        if (qty <= 0) continue;
+        const unitCost = Number(item.purchase_rate) || item.product?.current_purchase_ref_price || 0;
+
+        const batch: PurchaseBatch = {
+          purchase_item_id: item.id,
+          invoice_id: inv.id,
+          invoice_number: inv.invoice_number,
+          invoice_date: inv.invoice_date,
+          original_qty: qty,
+          remaining_qty: qty,
+          unit_cost: Number(unitCost.toFixed(2))
+        };
+
+        if (item.product_id) {
+          if (!batchesByProductId.has(item.product_id)) {
+            batchesByProductId.set(item.product_id, []);
+          }
+          batchesByProductId.get(item.product_id)!.push({ ...batch });
+        }
+        if (item.supplier_item_name_snapshot) {
+          const key = item.supplier_item_name_snapshot.trim().toLowerCase();
+          if (!batchesByName.has(key)) {
+            batchesByName.set(key, []);
+          }
+          batchesByName.get(key)!.push({ ...batch });
+        }
+      }
+    }
+
+    // Group manual sales by product
+    const manualSalesByProduct = new Map<string, SaleTransaction[]>();
+    for (const s of manualSales) {
+      if (s.status === 'COMPLETED') {
+        if (!manualSalesByProduct.has(s.product_id)) {
+          manualSalesByProduct.set(s.product_id, []);
+        }
+        manualSalesByProduct.get(s.product_id)!.push(s);
+      }
+    }
+
+    const stockInfos: ProductStockInfo[] = [];
+
+    for (const p of activeProducts) {
+      let pBatches = batchesByProductId.get(p.id);
+      if (!pBatches && p.supplier_item_name) {
+        pBatches = batchesByName.get(p.supplier_item_name.trim().toLowerCase());
+      }
+      const batches: PurchaseBatch[] = pBatches ? pBatches.map(b => ({ ...b })) : [];
+
+      const totalPurchased = batches.reduce((sum, b) => sum + b.original_qty, 0);
+
+      // Consume with manual sales
+      const pSales = manualSalesByProduct.get(p.id) || [];
+      const sortedSales = [...pSales].sort((a, b) => a.sale_date.localeCompare(b.sale_date) || a.created_at.localeCompare(b.created_at));
+
+      let totalSold = 0;
+      for (const sale of sortedSales) {
+        let needed = Number(sale.quantity) || 0;
+        totalSold += needed;
+
+        for (const batch of batches) {
+          if (needed <= 0) break;
+          if (batch.remaining_qty <= 0) continue;
+
+          const take = Math.min(batch.remaining_qty, needed);
+          batch.remaining_qty = Number((batch.remaining_qty - take).toFixed(3));
+          needed = Number((needed - take).toFixed(3));
+        }
+      }
+
+      const unconsumed = batches.filter(b => b.remaining_qty > 0.0001);
+      const availableStock = Number(unconsumed.reduce((sum, b) => sum + b.remaining_qty, 0).toFixed(3));
+      const stockVal = unconsumed.reduce((sum, b) => sum + (b.remaining_qty * b.unit_cost), 0);
+
+      let nextUnitPurchaseCost = 0;
+      if (unconsumed.length > 0) {
+        nextUnitPurchaseCost = unconsumed[0].unit_cost;
+      } else if (p.current_purchase_ref_price > 0) {
+        nextUnitPurchaseCost = p.current_purchase_ref_price;
+      }
+
+      stockInfos.push({
+        product: p,
+        totalPurchased: Number(totalPurchased.toFixed(3)),
+        totalSold: Number(totalSold.toFixed(3)),
+        currentStock: availableStock,
+        stockValue: Number(stockVal.toFixed(2)),
+        nextUnitPurchaseCost: Number(nextUnitPurchaseCost.toFixed(2)),
+        hasMissingCost: nextUnitPurchaseCost <= 0
+      });
+    }
+
+    return stockInfos.sort((a, b) => a.product.nickname.localeCompare(b.product.nickname));
+  },
+
+  /**
+   * Fast unified loader for Revenue Page: fetches everything in parallel in 1 roundtrip
+   */
+  getRevenuePageData: async (forceRefresh = false): Promise<{
+    sales: SaleTransaction[];
+    stockInfos: ProductStockInfo[];
+  }> => {
+    const [invoices, products, manualSales] = await Promise.all([
+      revenueService.getCachedInvoices(forceRefresh),
+      revenueService.getCachedProducts(forceRefresh),
+      revenueService.getManualSales()
+    ]);
+
+    const sales = revenueService.synthesizeSales(manualSales, invoices);
+    const stockInfos = revenueService.computeAllProductsStock(products, invoices, manualSales);
+
+    return { sales, stockInfos };
+  },
+
+  /**
+   * Fetch all sales: Combines manual sales + all purchased items from invoices
+   */
+  getSales: async (forceRefresh = false): Promise<SaleTransaction[]> => {
+    const [manualSales, invoices] = await Promise.all([
+      revenueService.getManualSales(),
+      revenueService.getCachedInvoices(forceRefresh)
+    ]);
+    return revenueService.synthesizeSales(manualSales, invoices);
   },
 
   /**
@@ -238,6 +417,7 @@ export const revenueService = {
     const overrides = getSellingPriceOverrides();
     overrides[id] = Number(newSellingPrice.toFixed(2));
     setSellingPriceOverrides(overrides);
+    invalidateRevenueCache();
 
     // Fetch the updated synthesized sale
     const updated = await revenueService.getSaleById(id);
@@ -273,11 +453,13 @@ export const revenueService = {
     nextUnitPurchaseCost: number;
     hasMissingCost: boolean;
   }> => {
-    const [product, invoices, allSales] = await Promise.all([
-      dbService.getProductById(productId),
-      dbService.getInvoices(),
-      revenueService.getSales()
+    const [products, invoices, manualSales] = await Promise.all([
+      revenueService.getCachedProducts(),
+      revenueService.getCachedInvoices(),
+      revenueService.getManualSales()
     ]);
+
+    const product = products.find(p => p.id === productId) || await dbService.getProductById(productId);
 
     if (!product) {
       return {
@@ -325,7 +507,6 @@ export const revenueService = {
     const totalPurchased = batches.reduce((sum, b) => sum + b.original_qty, 0);
 
     // Filter to manual sales only for stock reduction calculation
-    const manualSales = getLocalSales();
     const productSales = manualSales.filter(
       s => s.product_id === productId && s.status === 'COMPLETED' && s.id !== excludeSaleId
     ).sort((a, b) => a.sale_date.localeCompare(b.sale_date) || a.created_at.localeCompare(b.created_at));
@@ -535,6 +716,7 @@ export const revenueService = {
 
       const currentSales = getLocalSales();
       setLocalSales([saleRecord, ...currentSales.filter(s => s.id !== saleId)]);
+      invalidateRevenueCache();
 
       try {
         await supabase.from('stock_transactions').insert({
@@ -667,9 +849,11 @@ export const revenueService = {
 
       const currentSales = getLocalSales();
       setLocalSales(currentSales.map(s => s.id === id ? updatedSale : s));
+      invalidateRevenueCache();
     } else {
       overrides[id] = Number(effectiveSellingPrice.toFixed(2));
       setSellingPriceOverrides(overrides);
+      invalidateRevenueCache();
     }
 
     await dbService.logAudit(
@@ -725,6 +909,7 @@ export const revenueService = {
       delete overrides[id];
       setSellingPriceOverrides(overrides);
     }
+    invalidateRevenueCache();
 
     await dbService.logAudit(
       'SALE_DELETED',
@@ -744,30 +929,13 @@ export const revenueService = {
   /**
    * Get complete stock info across all catalog products
    */
-  getAllProductsStockInfo: async (): Promise<ProductStockInfo[]> => {
-    const products = await dbService.getProducts();
-    const activeProducts = products.filter(p => p.is_active);
-
-    const stockInfos: ProductStockInfo[] = [];
-    for (const p of activeProducts) {
-      const fifo = await revenueService.calculateProductFIFO(p.id);
-      const stockVal = fifo.unconsumedBatches.reduce(
-        (sum, b) => sum + (b.remaining_qty * b.unit_cost),
-        0
-      );
-
-      stockInfos.push({
-        product: p,
-        totalPurchased: fifo.totalPurchased,
-        totalSold: fifo.totalSold,
-        currentStock: fifo.availableStock,
-        stockValue: Number(stockVal.toFixed(2)),
-        nextUnitPurchaseCost: fifo.nextUnitPurchaseCost,
-        hasMissingCost: fifo.hasMissingCost
-      });
-    }
-
-    return stockInfos.sort((a, b) => a.product.nickname.localeCompare(b.product.nickname));
+  getAllProductsStockInfo: async (forceRefresh = false): Promise<ProductStockInfo[]> => {
+    const [invoices, products, manualSales] = await Promise.all([
+      revenueService.getCachedInvoices(forceRefresh),
+      revenueService.getCachedProducts(forceRefresh),
+      revenueService.getManualSales()
+    ]);
+    return revenueService.computeAllProductsStock(products, invoices, manualSales);
   },
 
   /**
