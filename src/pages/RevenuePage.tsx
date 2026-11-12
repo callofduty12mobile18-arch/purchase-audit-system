@@ -63,29 +63,22 @@ import { useToast } from '../context/ToastContext';
 interface RevenueKpiCardProps {
   title: string;
   value: string | number;
-  subtitle: string;
   icon: React.ReactNode;
   iconBg: string;
   iconColor: string;
   valueColor?: string;
-  badge?: {
-    text: string;
-    variant: 'positive' | 'negative' | 'neutral' | 'brand' | 'amber';
-  };
 }
 
 const RevenueKpiCard: React.FC<RevenueKpiCardProps> = ({
   title,
   value,
-  subtitle,
   icon,
   iconBg,
   iconColor,
-  valueColor = 'text-slate-900',
-  badge
+  valueColor = 'text-slate-900'
 }) => {
   return (
-    <div className="bg-white rounded-xl border border-slate-200/90 shadow-card hover:shadow-card-hover transition-all duration-200 p-5 flex flex-col justify-between min-h-[148px]">
+    <div className="bg-white rounded-xl border border-slate-200/90 shadow-card hover:shadow-card-hover transition-all duration-200 p-5 flex flex-col justify-between">
       {/* Top Header */}
       <div className="flex items-center justify-between gap-3">
         <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 truncate">
@@ -96,8 +89,8 @@ const RevenueKpiCard: React.FC<RevenueKpiCardProps> = ({
         </div>
       </div>
 
-      {/* Primary Value - Guaranteed 100% full width row, no wrap/clipping */}
-      <div className="my-2 min-w-0">
+      {/* Primary Value */}
+      <div className="mt-3 min-w-0">
         <p
           className={`text-2xl sm:text-3xl font-bold font-mono tracking-tight tabular-nums truncate ${valueColor}`}
           title={String(value)}
@@ -105,45 +98,17 @@ const RevenueKpiCard: React.FC<RevenueKpiCardProps> = ({
           {value}
         </p>
       </div>
-
-      {/* Footer / Subtitle & Badge */}
-      <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 text-xs">
-        <span className="text-slate-500 truncate text-[11px] font-medium" title={subtitle}>
-          {subtitle}
-        </span>
-        {badge && (
-          <span
-            className={`shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${
-              badge.variant === 'positive'
-                ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20'
-                : badge.variant === 'negative'
-                ? 'bg-rose-50 text-rose-700 ring-1 ring-rose-600/20'
-                : badge.variant === 'brand'
-                ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20'
-                : badge.variant === 'amber'
-                ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20'
-                : 'bg-slate-100 text-slate-600'
-            }`}
-          >
-            {badge.text}
-          </span>
-        )}
-      </div>
     </div>
   );
 };
 
 const KpiCardSkeleton: React.FC = () => (
-  <div className="bg-white rounded-xl border border-slate-200 p-5 flex flex-col justify-between min-h-[148px] animate-pulse">
+  <div className="bg-white rounded-xl border border-slate-200 p-5 flex flex-col justify-between animate-pulse">
     <div className="flex items-center justify-between">
       <div className="h-3.5 bg-slate-200 rounded w-24" />
       <div className="w-9 h-9 bg-slate-200 rounded-lg" />
     </div>
-    <div className="h-8 bg-slate-200 rounded w-36 my-2" />
-    <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-      <div className="h-3 bg-slate-200 rounded w-28" />
-      <div className="h-4 bg-slate-200 rounded-full w-16" />
-    </div>
+    <div className="h-8 bg-slate-200 rounded w-36 mt-3" />
   </div>
 );
 
@@ -482,39 +447,30 @@ export const RevenuePage: React.FC = () => {
             <RevenueKpiCard
               title="Total Purchased"
               value={`₹${formatINR(metrics.totalCogs)}`}
-              subtitle="Cost spent on purchased items"
               icon={<Boxes className="h-5 w-5" />}
               iconBg="bg-amber-50"
               iconColor="text-amber-700"
               valueColor="text-slate-900"
-              badge={{ text: 'Purchase Cost', variant: 'amber' }}
             />
 
             {/* 2. How Much I Sold */}
             <RevenueKpiCard
               title="Total Sold"
               value={`₹${formatINR(metrics.totalRevenue)}`}
-              subtitle="Total selling revenue earned"
               icon={<DollarSign className="h-5 w-5" />}
               iconBg="bg-blue-50"
               iconColor="text-blue-700"
               valueColor="text-blue-700"
-              badge={{ text: 'Sales Revenue', variant: 'brand' }}
             />
 
             {/* 3. What Is My Profit */}
             <RevenueKpiCard
               title="My Profit"
               value={`${metrics.grossProfit >= 0 ? '+' : '-'} ₹${formatINR(Math.abs(metrics.grossProfit))}`}
-              subtitle={`Profit = Sold (₹${formatINR(metrics.totalRevenue)}) − Purchased (₹${formatINR(metrics.totalCogs)})`}
               icon={metrics.grossProfit >= 0 ? <TrendingUp className="h-5 w-5" /> : <TrendingDown className="h-5 w-5" />}
               iconBg={metrics.grossProfit >= 0 ? 'bg-emerald-50' : 'bg-rose-50'}
               iconColor={metrics.grossProfit >= 0 ? 'text-emerald-700' : 'text-rose-700'}
               valueColor={metrics.grossProfit >= 0 ? 'text-emerald-700' : 'text-rose-700'}
-              badge={{
-                text: metrics.grossProfit >= 0 ? `+${metrics.grossProfitMargin.toFixed(1)}% Profit` : `${metrics.grossProfitMargin.toFixed(1)}% Loss`,
-                variant: metrics.grossProfit >= 0 ? 'positive' : 'negative'
-              }}
             />
           </>
         )}
