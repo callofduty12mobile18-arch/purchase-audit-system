@@ -160,7 +160,6 @@ export const RevenuePage: React.FC = () => {
   const [customStart, setCustomStart] = useState<string>('');
   const [customEnd, setCustomEnd] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState<string>('ALL');
 
   // Modals
   const [isAddOpen, setIsAddOpen] = useState<boolean>(false);
@@ -219,19 +218,18 @@ export const RevenuePage: React.FC = () => {
     return revenueService.getRevenueAnalytics(dateFilteredSales, sales);
   }, [dateFilteredSales, sales]);
 
-  // Table filtered sales (search + status)
+  // Table filtered sales (search query)
   const tableFilteredSales = useMemo(() => {
+    if (!searchQuery.trim()) return dateFilteredSales;
+    const q = searchQuery.toLowerCase();
     return dateFilteredSales.filter(s => {
-      if (statusFilter !== 'ALL' && s.status !== statusFilter) return false;
-      if (!searchQuery.trim()) return true;
-      const q = searchQuery.toLowerCase();
       const numMatch = s.sale_number.toLowerCase().includes(q);
       const prodMatch = (s.product?.nickname || '').toLowerCase().includes(q) ||
         (s.product?.supplier_item_name || '').toLowerCase().includes(q);
       const custMatch = (s.customer_name || '').toLowerCase().includes(q);
       return numMatch || prodMatch || custMatch;
     });
-  }, [dateFilteredSales, statusFilter, searchQuery]);
+  }, [dateFilteredSales, searchQuery]);
 
   // Pagination slicing
   const paginatedSales = useMemo(() => {
@@ -261,15 +259,9 @@ export const RevenuePage: React.FC = () => {
     {
       header: 'Item Code',
       cell: (row) => (
-        <button
-          type="button"
-          onClick={() => setSelectedSaleToView(row)}
-          className="text-xs font-mono font-bold text-brand-700 hover:text-brand-800 hover:underline flex items-center gap-1 text-left"
-        >
-          <span className="p-1 rounded bg-brand-50 border border-brand-200">
-            {row.sale_number}
-          </span>
-        </button>
+        <span className="p-1 rounded bg-brand-50 border border-brand-200 text-xs font-mono font-bold text-brand-700">
+          {row.sale_number}
+        </span>
       )
     },
     {
@@ -379,23 +371,6 @@ export const RevenuePage: React.FC = () => {
           </div>
         );
       }
-    },
-    {
-      header: 'Actions',
-      headerClassName: 'text-right',
-      className: 'text-right',
-      cell: (row) => (
-        <div className="flex items-center justify-end gap-1">
-          <button
-            type="button"
-            onClick={() => setSelectedSaleToView(row)}
-            className="p-1.5 rounded text-slate-400 hover:text-brand-600 hover:bg-slate-100 transition-colors"
-            title="View purchase breakdown & invoice allocations"
-          >
-            <Eye className="h-4 w-4" />
-          </button>
-        </div>
-      )
     }
   ];
 
@@ -837,35 +812,18 @@ export const RevenuePage: React.FC = () => {
         title="Sales Transaction History"
         subtitle="Product catalog items in alphabetical order with total purchase amounts, quantities, and editable selling prices"
         action={
-          <div className="flex items-center gap-3">
-            <div className="relative w-52 sm:w-64">
-              <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search product, sale #, cust..."
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="h-8 w-full rounded-md border border-slate-200 bg-white pl-8 pr-3 text-xs text-slate-900 placeholder:text-slate-400 focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"
-              />
-            </div>
-            <div className="w-32">
-              <Select
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value);
-                  setCurrentPage(1);
-                }}
-                options={[
-                  { value: 'ALL', label: 'All Status' },
-                  { value: 'COMPLETED', label: 'Completed' },
-                  { value: 'RETURNED', label: 'Returned' },
-                  { value: 'CANCELLED', label: 'Cancelled' }
-                ]}
-              />
-            </div>
+          <div className="relative w-64 sm:w-80">
+            <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search product name or code..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="h-8 w-full rounded-md border border-slate-200 bg-white pl-8 pr-3 text-xs text-slate-900 placeholder:text-slate-400 focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"
+            />
           </div>
         }
       >
@@ -873,11 +831,12 @@ export const RevenuePage: React.FC = () => {
           columns={columns}
           data={paginatedSales}
           keyExtractor={(row) => row.id}
+          onRowClick={(row) => setSelectedSaleToView(row)}
           isLoading={loading}
-          emptyTitle="No sales recorded"
+          emptyTitle="No items found"
           emptyText={
-            searchQuery || statusFilter !== 'ALL' || dateFilter !== 'ALL'
-              ? 'No transactions matched the selected filters.'
+            searchQuery || dateFilter !== 'ALL'
+              ? 'No items matched the selected filters.'
               : 'Click "Add Sale" to record your first sale transaction.'
           }
         />
