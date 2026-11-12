@@ -471,94 +471,53 @@ export const RevenuePage: React.FC = () => {
         </div>
       )}
 
-      {/* Section 2: Summary Dashboard Cards (2 Balanced Rows of 3 Spacious Cards) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+      {/* Section 2: Summary Dashboard Cards (Simple 3 Cards: How much I Purchased, How much I Sold, What is my Profit) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         {loading ? (
           <>
-            <KpiCardSkeleton />
-            <KpiCardSkeleton />
-            <KpiCardSkeleton />
             <KpiCardSkeleton />
             <KpiCardSkeleton />
             <KpiCardSkeleton />
           </>
         ) : (
           <>
-            {/* 1. Total Sales Revenue */}
+            {/* 1. How Much I Purchased */}
             <RevenueKpiCard
-              title="Sales Revenue"
-              value={`₹${formatINR(metrics.totalRevenue)}`}
-              subtitle="Selling price × quantity sold"
-              icon={<DollarSign className="h-5 w-5" />}
-              iconBg="bg-blue-50"
-              iconColor="text-blue-700"
-              valueColor="text-blue-700"
-              badge={{ text: 'Gross Inflow', variant: 'brand' }}
-            />
-
-            {/* 2. Total Cost of Goods Sold (COGS) */}
-            <RevenueKpiCard
-              title="Total Cost (COGS)"
+              title="Total Purchased"
               value={`₹${formatINR(metrics.totalCogs)}`}
-              subtitle="FIFO purchase cost allocated"
+              subtitle="Cost spent on purchased items"
               icon={<Boxes className="h-5 w-5" />}
               iconBg="bg-amber-50"
               iconColor="text-amber-700"
               valueColor="text-slate-900"
-              badge={{ text: 'Inventory Cost', variant: 'amber' }}
+              badge={{ text: 'Purchase Cost', variant: 'amber' }}
             />
 
-            {/* 3. Gross Profit */}
+            {/* 2. How Much I Sold */}
             <RevenueKpiCard
-              title="Gross Profit"
-              value={`₹${formatINR(metrics.grossProfit)}`}
-              subtitle="Sales Revenue − COGS"
+              title="Total Sold"
+              value={`₹${formatINR(metrics.totalRevenue)}`}
+              subtitle="Total selling revenue earned"
+              icon={<DollarSign className="h-5 w-5" />}
+              iconBg="bg-blue-50"
+              iconColor="text-blue-700"
+              valueColor="text-blue-700"
+              badge={{ text: 'Sales Revenue', variant: 'brand' }}
+            />
+
+            {/* 3. What Is My Profit */}
+            <RevenueKpiCard
+              title="My Profit"
+              value={`${metrics.grossProfit >= 0 ? '+' : '-'} ₹${formatINR(Math.abs(metrics.grossProfit))}`}
+              subtitle={`Profit = Sold (₹${formatINR(metrics.totalRevenue)}) − Purchased (₹${formatINR(metrics.totalCogs)})`}
               icon={metrics.grossProfit >= 0 ? <TrendingUp className="h-5 w-5" /> : <TrendingDown className="h-5 w-5" />}
               iconBg={metrics.grossProfit >= 0 ? 'bg-emerald-50' : 'bg-rose-50'}
               iconColor={metrics.grossProfit >= 0 ? 'text-emerald-700' : 'text-rose-700'}
               valueColor={metrics.grossProfit >= 0 ? 'text-emerald-700' : 'text-rose-700'}
               badge={{
-                text: metrics.grossProfit >= 0 ? 'Profitable' : 'Gross Loss',
+                text: metrics.grossProfit >= 0 ? `+${metrics.grossProfitMargin.toFixed(1)}% Profit` : `${metrics.grossProfitMargin.toFixed(1)}% Loss`,
                 variant: metrics.grossProfit >= 0 ? 'positive' : 'negative'
               }}
-            />
-
-            {/* 4. Gross Profit Margin */}
-            <RevenueKpiCard
-              title="Profit Margin"
-              value={`${metrics.grossProfitMargin.toFixed(1)}%`}
-              subtitle="(Gross Profit / Revenue) × 100"
-              icon={<Percent className="h-5 w-5" />}
-              iconBg="bg-teal-50"
-              iconColor="text-teal-700"
-              valueColor={metrics.grossProfitMargin >= 0 ? 'text-slate-900' : 'text-rose-700'}
-              badge={{
-                text: metrics.grossProfitMargin >= 25 ? 'Strong Margin' : metrics.grossProfitMargin > 0 ? 'Healthy' : 'Zero Margin',
-                variant: metrics.grossProfitMargin > 0 ? 'positive' : 'neutral'
-              }}
-            />
-
-            {/* 5. Total Items Sold */}
-            <RevenueKpiCard
-              title="Items Sold"
-              value={`${metrics.totalItemsSold} Units`}
-              subtitle={`${metrics.totalTransactions} recorded sales transactions`}
-              icon={<ShoppingBag className="h-5 w-5" />}
-              iconBg="bg-violet-50"
-              iconColor="text-violet-700"
-              badge={{ text: 'Volume', variant: 'neutral' }}
-            />
-
-            {/* 6. Current Stock Value */}
-            <RevenueKpiCard
-              title="Stock Value"
-              value={`₹${formatINR(metrics.currentStockValue)}`}
-              subtitle="Unsold catalog inventory at cost"
-              icon={<Package className="h-5 w-5" />}
-              iconBg="bg-purple-50"
-              iconColor="text-purple-700"
-              valueColor="text-purple-700"
-              badge={{ text: 'Asset Valuation', variant: 'neutral' }}
             />
           </>
         )}
