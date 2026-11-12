@@ -346,7 +346,6 @@ export const RevenuePage: React.FC = () => {
         <div>
           <div className="flex items-center gap-2.5 flex-wrap">
             <h1 className="page-title">Revenue & Profit Analytics</h1>
-            <Badge variant="blue">FIFO Costing</Badge>
           </div>
           <p className="page-subtitle mt-0.5">
             Track sales performance, cost of goods sold (COGS), gross margins, and inventory valuation in real time.

@@ -113,7 +113,6 @@ export const ViewSaleModal: React.FC<ViewSaleModalProps> = ({
             <Badge variant={sale.status === 'COMPLETED' ? 'success' : 'default'}>
               {sale.status}
             </Badge>
-            <Badge variant="blue">FIFO Costed</Badge>
           </div>
         </div>
 
@@ -203,7 +202,7 @@ export const ViewSaleModal: React.FC<ViewSaleModalProps> = ({
             <div className="flex items-center gap-2">
               <Layers className="h-4 w-4 text-brand-600" />
               <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                FIFO Inventory Batch Allocation
+                Inventory Batch Allocation
               </h4>
             </div>
             <span className="text-[11px] text-slate-500">

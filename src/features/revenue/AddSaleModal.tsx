@@ -264,7 +264,6 @@ export const AddSaleModal: React.FC<AddSaleModalProps> = ({
             </label>
             <div className="h-9 px-3 rounded-md bg-slate-100 border border-slate-200 flex items-center justify-between text-sm font-mono text-slate-700">
               <span>₹{formatINR(unitCost)}</span>
-              <span className="text-[10px] text-slate-400 uppercase font-sans font-medium">FIFO</span>
             </div>
             <span className="text-[11px] text-slate-400 mt-0.5 block">
               Auto from purchases
