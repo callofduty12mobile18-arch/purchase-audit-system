@@ -10,6 +10,27 @@
 --   6. Strict RLS policies and grants
 
 -- ---------------------------------------------------------------------------
+-- 0. PREREQUISITES & IDEMPOTENT TYPE CHECKS
+-- ---------------------------------------------------------------------------
+DO $$ BEGIN
+    CREATE TYPE cheque_status_enum AS ENUM ('PENDING', 'CLEARED');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+ALTER TABLE public.purchase_invoices
+    ADD COLUMN IF NOT EXISTS cheque_status cheque_status_enum;
+
+ALTER TABLE public.purchase_invoices
+    ADD COLUMN IF NOT EXISTS cheque_presentation_date DATE;
+
+ALTER TABLE public.purchase_invoices
+    ADD COLUMN IF NOT EXISTS cheque_amount NUMERIC(12, 2);
+
+ALTER TABLE public.purchase_invoices
+    ADD COLUMN IF NOT EXISTS bank_name TEXT;
+
+-- ---------------------------------------------------------------------------
 -- 1. CREATE INVOICE PAYMENTS TABLE
 --    Only CASH and CHEQUE payment methods are supported.
 -- ---------------------------------------------------------------------------
@@ -127,24 +148,22 @@ BEGIN
     -- Determine Invoice Payment Status:
     -- 1. Full settled -> PAID
     -- 2. Partial cleared -> PARTIALLY_PAID
-    -- 3. No cleared payments, but cheques pending -> CHEQUE_PENDING
-    -- 4. No cleared payments and no cheques pending -> OVERDUE (if >30 days past) or UNPAID
+    -- 3. Unsettled / Cheque pending clearance -> UNPAID
     IF v_cleared_amount >= (v_grand_total - 0.01) THEN
         v_new_status := 'PAID';
     ELSIF v_cleared_amount > 0 THEN
         v_new_status := 'PARTIALLY_PAID';
-    ELSIF v_pending_cheque_amount > 0 THEN
-        v_new_status := 'CHEQUE_PENDING';
     ELSE
-        IF v_invoice_date < (CURRENT_DATE - INTERVAL '30 days') THEN
-            v_new_status := 'OVERDUE';
-        ELSE
-            v_new_status := 'UNPAID';
-        END IF;
+        v_new_status := 'UNPAID';
     END IF;
 
     UPDATE public.purchase_invoices
     SET payment_status = v_new_status,
+        cheque_status = CASE 
+            WHEN v_cleared_amount >= (v_grand_total - 0.01) AND cheque_status = 'PENDING' THEN 'CLEARED'::cheque_status_enum
+            WHEN v_pending_cheque_amount > 0 THEN 'PENDING'::cheque_status_enum
+            ELSE cheque_status
+        END,
         updated_at = NOW()
     WHERE id = p_invoice_id;
 END;
