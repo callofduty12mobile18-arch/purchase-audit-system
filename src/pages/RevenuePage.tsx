@@ -259,7 +259,7 @@ export const RevenuePage: React.FC = () => {
   // Table columns
   const columns: TableColumn<SaleTransaction>[] = [
     {
-      header: 'Transaction ID',
+      header: 'Item Code',
       cell: (row) => (
         <button
           type="button"
@@ -273,28 +273,20 @@ export const RevenuePage: React.FC = () => {
       )
     },
     {
-      header: 'Date',
-      cell: (row) => (
-        <span className="text-xs font-mono text-slate-700">
-          {formatDisplayDate(row.sale_date)}
-        </span>
-      )
-    },
-    {
-      header: 'Product Name',
+      header: 'Product Name (A-Z)',
       cell: (row) => (
         <div>
           <p className="text-xs font-semibold text-slate-900">
             {row.product?.nickname || 'Unknown Item'}
           </p>
-          <p className="text-[10px] text-slate-400 font-mono truncate max-w-[150px]">
-            {row.customer_name ? `Cust: ${row.customer_name}` : row.product?.supplier_item_name}
+          <p className="text-[10px] text-slate-400 font-mono truncate max-w-[170px]" title={row.product?.supplier_item_name}>
+            {row.product?.supplier_item_name}
           </p>
         </div>
       )
     },
     {
-      header: 'Qty Sold',
+      header: 'Total Quantity',
       headerClassName: 'text-right',
       className: 'text-right',
       cell: (row) => (
@@ -361,11 +353,11 @@ export const RevenuePage: React.FC = () => {
       )
     },
     {
-      header: 'Total COGS',
+      header: 'Total Purchase Amount',
       headerClassName: 'text-right',
       className: 'text-right',
       cell: (row) => (
-        <span className="text-xs font-mono text-slate-700 tabular-nums">
+        <span className="text-xs font-mono font-bold text-slate-800 tabular-nums">
           ₹{formatINR(row.total_cogs)}
         </span>
       )
@@ -397,26 +389,10 @@ export const RevenuePage: React.FC = () => {
           <button
             type="button"
             onClick={() => setSelectedSaleToView(row)}
-            className="p-1 rounded text-slate-400 hover:text-brand-600 hover:bg-slate-100 transition-colors"
-            title="View sale details & FIFO batch breakdown"
+            className="p-1.5 rounded text-slate-400 hover:text-brand-600 hover:bg-slate-100 transition-colors"
+            title="View purchase breakdown & invoice allocations"
           >
             <Eye className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setSelectedSaleToEdit(row)}
-            className="p-1 rounded text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
-            title="Edit sale transaction"
-          >
-            <Pencil className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setSaleToDelete(row)}
-            className="p-1 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-            title="Delete sale (Restores stock)"
-          >
-            <Trash2 className="h-4 w-4" />
           </button>
         </div>
       )
@@ -859,7 +835,7 @@ export const RevenuePage: React.FC = () => {
       {/* Section 5: Sales History Table */}
       <Card
         title="Sales Transaction History"
-        subtitle="Complete record of fulfilled sales with FIFO inventory allocations"
+        subtitle="Product catalog items in alphabetical order with total purchase amounts, quantities, and editable selling prices"
         action={
           <div className="flex items-center gap-3">
             <div className="relative w-52 sm:w-64">

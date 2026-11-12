@@ -164,79 +164,164 @@ export const revenueService = {
   },
 
   /**
-   * Fast in-memory synthesis of sales (combining manual sales + all purchased items from invoices)
+   * Fast in-memory synthesis of sales per Product Catalog Item in alphabetical order (A to Z)
+   * Aggregates total purchase amount and quantity across all invoices per catalog product item.
    */
-  synthesizeSales: (manualSales: SaleTransaction[], invoices: PurchaseInvoice[]): SaleTransaction[] => {
+  synthesizeProductCatalogSales: (
+    products: Product[],
+    invoices: PurchaseInvoice[],
+    _manualSales: SaleTransaction[] = []
+  ): SaleTransaction[] => {
     const overrides = getSellingPriceOverrides();
-    const manualSaleIds = new Set(manualSales.map(s => s.id));
-    const purchasedItemSales: SaleTransaction[] = [];
+
+    // 1. Pre-group invoice purchase items by product_id and normalized supplier_item_name
+    const itemsByProductId = new Map<string, {
+      totalQty: number;
+      totalCost: number;
+      latestDate: string;
+      items: Array<{
+        purchase_item_id: string;
+        invoice_id: string;
+        invoice_number: string;
+        invoice_date: string;
+        quantity: number;
+        unit_cost: number;
+        total_cost: number;
+      }>;
+    }>();
+
+    const itemsByName = new Map<string, {
+      totalQty: number;
+      totalCost: number;
+      latestDate: string;
+      items: Array<{
+        purchase_item_id: string;
+        invoice_id: string;
+        invoice_number: string;
+        invoice_date: string;
+        quantity: number;
+        unit_cost: number;
+        total_cost: number;
+      }>;
+    }>();
 
     for (const inv of invoices) {
       if (!inv.items) continue;
       for (const item of inv.items) {
-        if (!item.product) continue;
-        if (manualSaleIds.has(item.id)) continue;
-
         const qty = Number(item.quantity) || 0;
         if (qty <= 0) continue;
 
-        const unitCost = Number(item.purchase_rate) || item.product.current_purchase_ref_price || 0;
+        const unitCost = Number(item.purchase_rate) || item.product?.current_purchase_ref_price || 0;
         const totalCost = Number((item.total || (qty * unitCost)).toFixed(2));
+        const invDate = inv.invoice_date || item.created_at?.slice(0, 10) || getTodayIST();
 
-        let sellPrice = 0;
-        if (overrides[item.id] !== undefined) {
-          sellPrice = overrides[item.id];
-        } else if (item.product.current_selling_price > 0) {
-          sellPrice = item.product.current_selling_price;
-        } else {
-          sellPrice = Math.round(unitCost * 1.25);
+        const record = {
+          purchase_item_id: item.id,
+          invoice_id: inv.id,
+          invoice_number: inv.invoice_number,
+          invoice_date: inv.invoice_date,
+          quantity: qty,
+          unit_cost: unitCost,
+          total_cost: totalCost
+        };
+
+        if (item.product_id) {
+          if (!itemsByProductId.has(item.product_id)) {
+            itemsByProductId.set(item.product_id, { totalQty: 0, totalCost: 0, latestDate: invDate, items: [] });
+          }
+          const group = itemsByProductId.get(item.product_id)!;
+          group.totalQty += qty;
+          group.totalCost += totalCost;
+          if (invDate > group.latestDate) group.latestDate = invDate;
+          group.items.push(record);
         }
 
-        const totalRevenue = Number((qty * sellPrice).toFixed(2));
-        const grossProfit = Number((totalRevenue - totalCost).toFixed(2));
-        const profitMargin = totalRevenue > 0
-          ? Number(((grossProfit / totalRevenue) * 100).toFixed(2))
-          : 0;
-
-        const saleNum = `SL-${inv.invoice_number.replace(/^INV-/, '')}-${item.id.slice(0, 4).toUpperCase()}`;
-        const saleDate = inv.invoice_date || item.created_at.slice(0, 10);
-
-        purchasedItemSales.push({
-          id: item.id,
-          sale_number: saleNum,
-          product_id: item.product_id || item.product.id,
-          product: item.product,
-          quantity: qty,
-          purchase_price: unitCost,
-          selling_price: sellPrice,
-          total_revenue: totalRevenue,
-          total_cogs: totalCost,
-          gross_profit: grossProfit,
-          profit_margin: profitMargin,
-          sale_date: saleDate,
-          customer_name: null,
-          notes: `Purchased via Invoice #${inv.invoice_number}`,
-          status: 'COMPLETED',
-          costing_method: 'FIFO',
-          cogs_breakdown: [
-            {
-              purchase_item_id: item.id,
-              invoice_id: inv.id,
-              invoice_number: inv.invoice_number,
-              invoice_date: inv.invoice_date,
-              quantity: qty,
-              unit_cost: unitCost,
-              total_cost: totalCost
-            }
-          ],
-          created_at: item.created_at || new Date().toISOString(),
-          updated_at: item.created_at || new Date().toISOString()
-        });
+        if (item.supplier_item_name_snapshot) {
+          const key = item.supplier_item_name_snapshot.trim().toLowerCase();
+          if (!itemsByName.has(key)) {
+            itemsByName.set(key, { totalQty: 0, totalCost: 0, latestDate: invDate, items: [] });
+          }
+          const group = itemsByName.get(key)!;
+          group.totalQty += qty;
+          group.totalCost += totalCost;
+          if (invDate > group.latestDate) group.latestDate = invDate;
+          group.items.push(record);
+        }
       }
     }
 
-    return [...manualSales, ...purchasedItemSales].sort(
-      (a, b) => b.sale_date.localeCompare(a.sale_date) || b.created_at.localeCompare(a.created_at)
+    // 2. Sort all catalog products alphabetically (A to Z) by nickname or name
+    const sortedProducts = [...products].sort((a, b) =>
+      (a.nickname || a.supplier_item_name || '').localeCompare(b.nickname || b.supplier_item_name || '')
+    );
+
+    const catalogSales: SaleTransaction[] = [];
+
+    for (const p of sortedProducts) {
+      // Find matching purchases
+      let pData = itemsByProductId.get(p.id);
+      if (!pData && p.supplier_item_name) {
+        pData = itemsByName.get(p.supplier_item_name.trim().toLowerCase());
+      }
+
+      const totalQty = pData ? Number(pData.totalQty.toFixed(3)) : 0;
+      const totalPurchaseAmount = pData ? Number(pData.totalCost.toFixed(2)) : 0;
+      const unitCost = totalQty > 0
+        ? Number((totalPurchaseAmount / totalQty).toFixed(2))
+        : (p.current_purchase_ref_price || 0);
+
+      // Determine selling price: check override first, then product selling price, else 25% markup
+      let sellPrice = 0;
+      if (overrides[p.id] !== undefined) {
+        sellPrice = overrides[p.id];
+      } else if (p.current_selling_price > 0) {
+        sellPrice = p.current_selling_price;
+      } else if (unitCost > 0) {
+        sellPrice = Math.round(unitCost * 1.25);
+      }
+
+      const totalRevenue = Number((totalQty * sellPrice).toFixed(2));
+      const grossProfit = Number((totalRevenue - totalPurchaseAmount).toFixed(2));
+      const profitMargin = totalRevenue > 0
+        ? Number(((grossProfit / totalRevenue) * 100).toFixed(2))
+        : 0;
+
+      const cleanCode = `PRD-${(p.nickname || 'ITEM').slice(0, 4).toUpperCase().replace(/[^A-Z0-9]/g, '')}-${p.id.slice(0, 4).toUpperCase()}`;
+
+      catalogSales.push({
+        id: p.id,
+        sale_number: cleanCode,
+        product_id: p.id,
+        product: p,
+        quantity: totalQty,
+        purchase_price: unitCost,
+        selling_price: sellPrice,
+        total_revenue: totalRevenue,
+        total_cogs: totalPurchaseAmount,
+        gross_profit: grossProfit,
+        profit_margin: profitMargin,
+        sale_date: pData?.latestDate || p.created_at?.slice(0, 10) || getTodayIST(),
+        customer_name: null,
+        notes: pData ? `${pData.items.length} invoice purchase(s)` : 'No purchase invoices yet',
+        status: 'COMPLETED',
+        costing_method: 'FIFO',
+        cogs_breakdown: pData?.items || [],
+        created_at: p.created_at || new Date().toISOString(),
+        updated_at: p.updated_at || new Date().toISOString()
+      });
+    }
+
+    return catalogSales;
+  },
+
+  /**
+   * Fast in-memory synthesis of sales (kept for backward compatibility)
+   */
+  synthesizeSales: (manualSales: SaleTransaction[], invoices: PurchaseInvoice[]): SaleTransaction[] => {
+    return revenueService.synthesizeProductCatalogSales(
+      cachedProducts?.data || [],
+      invoices,
+      manualSales
     );
   },
 
@@ -371,21 +456,22 @@ export const revenueService = {
       revenueService.getManualSales()
     ]);
 
-    const sales = revenueService.synthesizeSales(manualSales, invoices);
+    const sales = revenueService.synthesizeProductCatalogSales(products, invoices, manualSales);
     const stockInfos = revenueService.computeAllProductsStock(products, invoices, manualSales);
 
     return { sales, stockInfos };
   },
 
   /**
-   * Fetch all sales: Combines manual sales + all purchased items from invoices
+   * Fetch all sales as product catalog items in alphabetical order with total purchase amount & quantity
    */
   getSales: async (forceRefresh = false): Promise<SaleTransaction[]> => {
-    const [manualSales, invoices] = await Promise.all([
-      revenueService.getManualSales(),
-      revenueService.getCachedInvoices(forceRefresh)
+    const [products, invoices, manualSales] = await Promise.all([
+      revenueService.getCachedProducts(forceRefresh),
+      revenueService.getCachedInvoices(forceRefresh),
+      revenueService.getManualSales()
     ]);
-    return revenueService.synthesizeSales(manualSales, invoices);
+    return revenueService.synthesizeProductCatalogSales(products, invoices, manualSales);
   },
 
   /**
@@ -413,11 +499,20 @@ export const revenueService = {
       return await revenueService.updateSale(id, { selling_price: newSellingPrice });
     }
 
-    // Otherwise it's a purchased item: persist in overrides map
+    // Otherwise it's a catalog product item: persist in overrides map & database
     const overrides = getSellingPriceOverrides();
     overrides[id] = Number(newSellingPrice.toFixed(2));
     setSellingPriceOverrides(overrides);
     invalidateRevenueCache();
+
+    try {
+      await supabase.from('products').update({
+        current_selling_price: Number(newSellingPrice.toFixed(2)),
+        updated_at: new Date().toISOString()
+      }).eq('id', id);
+    } catch {
+      // Non-blocking
+    }
 
     // Fetch the updated synthesized sale
     const updated = await revenueService.getSaleById(id);
