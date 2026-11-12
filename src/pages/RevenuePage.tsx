@@ -112,6 +112,17 @@ const KpiCardSkeleton: React.FC = () => (
   </div>
 );
 
+// Human-friendly Indian currency formatter for chart axes (e.g. ₹32 L instead of ₹3200k)
+const formatIndianAxis = (v: number): string => {
+  if (v === 0) return '₹0';
+  const abs = Math.abs(v);
+  const sign = v < 0 ? '-' : '';
+  if (abs >= 10000000) return `${sign}₹${(abs / 10000000).toFixed(1)} Cr`;
+  if (abs >= 100000) return `${sign}₹${(abs / 100000).toFixed(1)} L`;
+  if (abs >= 1000) return `${sign}₹${(abs / 1000).toFixed(0)} k`;
+  return `${sign}₹${abs}`;
+};
+
 export const RevenuePage: React.FC = () => {
   const { success: toastSuccess, error: toastError } = useToast();
 
@@ -137,6 +148,7 @@ export const RevenuePage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const pageSize = 10;
   const [downloadingPdf, setDownloadingPdf] = useState<boolean>(false);
+  const [chartViewMode, setChartViewMode] = useState<'comparison' | 'profit'>('comparison');
 
   const loadData = async (background = false) => {
     if (!background) setLoading(true);
@@ -514,11 +526,41 @@ export const RevenuePage: React.FC = () => {
 
       {/* Section 4: Analytics and Graphs */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Monthly Revenue vs COGS vs Gross Profit */}
+        {/* Monthly Purchased vs Sold / Profit */}
         <div className="lg:col-span-2">
           <Card
-            title="Monthly Revenue vs Cost vs Gross Profit"
-            subtitle="Comparing sales income, cost of goods sold, and gross profitability"
+            title={chartViewMode === 'comparison' ? 'Monthly Purchased vs Sold' : 'Monthly Profit Earned'}
+            subtitle={
+              chartViewMode === 'comparison'
+                ? 'Compare what you bought against what you sold. When the Blue bar is higher than Orange, you made profit.'
+                : 'Net profit earned each month (Total Sold minus Total Purchased)'
+            }
+            action={
+              <div className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setChartViewMode('comparison')}
+                  className={`px-2.5 py-1 rounded-md font-medium transition-all ${
+                    chartViewMode === 'comparison'
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Purchased vs Sold
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChartViewMode('profit')}
+                  className={`px-2.5 py-1 rounded-md font-medium transition-all ${
+                    chartViewMode === 'profit'
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  My Profit Only
+                </button>
+              </div>
+            }
           >
             {loading ? (
               <div className="h-72 rounded-lg bg-slate-100 animate-pulse" />
@@ -529,7 +571,7 @@ export const RevenuePage: React.FC = () => {
                 </div>
                 <h4 className="text-sm font-semibold text-slate-800 mb-1">No sales recorded for this period</h4>
                 <p className="text-xs text-slate-500 max-w-sm mb-4">
-                  Record customer sales to see your monthly revenue trends, inventory cost (COGS), and gross margins.
+                  Record customer sales to see your monthly revenue trends, inventory cost, and profit margins.
                 </p>
                 <Button
                   variant="primary"
@@ -545,7 +587,7 @@ export const RevenuePage: React.FC = () => {
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={analyticsData.monthlyTimeline}
-                    margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
+                    margin={{ top: 12, right: 10, left: -10, bottom: 0 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                     <XAxis
@@ -559,26 +601,58 @@ export const RevenuePage: React.FC = () => {
                     <YAxis
                       stroke="#94a3b8"
                       fontSize={10}
-                      width={44}
+                      width={48}
                       tickLine={false}
                       axisLine={false}
-                      tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`}
+                      tickFormatter={formatIndianAxis}
                     />
                     <Tooltip
-                      formatter={(val: number, name: string) => [`₹${formatINR(val)}`, name]}
-                      labelFormatter={formatDisplayMonthYear}
-                      contentStyle={{
-                        backgroundColor: '#fff',
-                        border: '1px solid #e2e8f0',
-                        borderRadius: '8px',
-                        fontSize: '12px',
-                        boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
+                      content={({ active, payload, label }) => {
+                        if (!active || !payload || !payload.length) return null;
+                        const d = payload[0].payload;
+                        const isProf = d.profit >= 0;
+                        return (
+                          <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-lg text-xs space-y-1.5 min-w-[200px]">
+                            <p className="font-bold text-slate-800 border-b border-slate-100 pb-1 text-xs">
+                              {formatDisplayMonthYear(label)}
+                            </p>
+                            <div className="flex items-center justify-between text-slate-600">
+                              <span className="flex items-center gap-1.5">
+                                <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                                Total Purchased:
+                              </span>
+                              <span className="font-mono font-bold text-slate-900">₹{formatINR(d.cogs)}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-slate-600">
+                              <span className="flex items-center gap-1.5">
+                                <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
+                                Total Sold:
+                              </span>
+                              <span className="font-mono font-bold text-blue-700">₹{formatINR(d.revenue)}</span>
+                            </div>
+                            <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+                              <span className="font-semibold text-slate-700">My Profit:</span>
+                              <span className={`font-mono font-bold ${isProf ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                {isProf ? '+' : ''}₹{formatINR(d.profit)} ({d.margin}%)
+                              </span>
+                            </div>
+                          </div>
+                        );
                       }}
                     />
                     <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '8px' }} />
-                    <Bar dataKey="revenue" name="Sales Revenue" fill="#2563EB" radius={[4, 4, 0, 0]} maxBarSize={32} />
-                    <Bar dataKey="cogs" name="Cost (COGS)" fill="#F59E0B" radius={[4, 4, 0, 0]} maxBarSize={32} />
-                    <Bar dataKey="profit" name="Gross Profit" fill="#10B981" radius={[4, 4, 0, 0]} maxBarSize={32} />
+                    {chartViewMode === 'comparison' ? (
+                      <>
+                        <Bar dataKey="cogs" name="Total Purchased" fill="#F59E0B" radius={[4, 4, 0, 0]} maxBarSize={36} />
+                        <Bar dataKey="revenue" name="Total Sold" fill="#2563EB" radius={[4, 4, 0, 0]} maxBarSize={36} />
+                      </>
+                    ) : (
+                      <Bar dataKey="profit" name="My Profit" radius={[4, 4, 0, 0]} maxBarSize={48}>
+                        {analyticsData.monthlyTimeline.map((entry, index) => (
+                          <Cell key={`profit-cell-${index}`} fill={entry.profit >= 0 ? '#10B981' : '#EF4444'} />
+                        ))}
+                      </Bar>
+                    )}
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -663,10 +737,10 @@ export const RevenuePage: React.FC = () => {
                   <YAxis
                     stroke="#94a3b8"
                     fontSize={10}
-                    width={44}
+                    width={46}
                     tickLine={false}
                     axisLine={false}
-                    tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`}
+                    tickFormatter={formatIndianAxis}
                   />
                   <Tooltip
                     formatter={(val: number, name: string) => [`₹${formatINR(val)}`, name]}
