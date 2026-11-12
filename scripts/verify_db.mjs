@@ -42,6 +42,7 @@ async function verify() {
     'purchase_items',
     'price_history',
     'stock_transactions',
+    'sales',
     'audit_logs'
   ];
 
