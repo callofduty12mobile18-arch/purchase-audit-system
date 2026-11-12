@@ -34,9 +34,7 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  Cell,
-  AreaChart,
-  Area
+  Cell
 } from 'recharts';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -591,133 +589,63 @@ export const RevenuePage: React.FC = () => {
         </Card>
       </div>
 
-      {/* Daily Revenue Trend & Product-wise Profit */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Daily Revenue Trend Chart */}
-        <Card
-          title="Daily Revenue Trend"
-          subtitle="Sales performance day by day across selected period"
-        >
-          {loading ? (
-            <div className="h-64 rounded-lg bg-slate-100 animate-pulse" />
-          ) : analyticsData.dailyTrend.length === 0 ? (
-            <div className="h-64 flex flex-col items-center justify-center text-center p-6 bg-slate-50/60 rounded-xl border border-dashed border-slate-200">
-              <Calendar className="h-8 w-8 text-slate-300 mb-2" />
-              <p className="text-sm font-medium text-slate-700">No daily sales in selected timeframe</p>
-              <p className="text-xs text-slate-400 mt-1">Adjust your date filter to view past daily trajectories.</p>
-            </div>
-          ) : (
-            <div className="h-64 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart
-                  data={analyticsData.dailyTrend}
-                  margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-                >
-                  <defs>
-                    <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#2563EB" stopOpacity={0.2} />
-                      <stop offset="95%" stopColor="#2563EB" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis
-                    dataKey="date"
-                    stroke="#94a3b8"
-                    fontSize={11}
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={formatDisplayDate}
-                  />
-                  <YAxis
-                    stroke="#94a3b8"
-                    fontSize={11}
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`}
-                  />
-                  <Tooltip
-                    formatter={(val: number, name: string) => [`₹${formatINR(val)}`, name === 'revenue' ? 'Revenue' : 'Profit']}
-                    labelFormatter={formatDisplayDate}
-                    contentStyle={{
-                      backgroundColor: '#fff',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '8px',
-                      fontSize: '12px'
-                    }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="revenue"
-                    name="Daily Revenue"
-                    stroke="#2563EB"
-                    strokeWidth={2}
-                    fillOpacity={1}
-                    fill="url(#colorRev)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </Card>
-
-        {/* Product-wise Profit Breakdown */}
-        <Card
-          title="Product-wise Gross Profit"
-          subtitle="Gross profit earned by individual product (Green = profit, Red = loss)"
-        >
-          {loading ? (
-            <div className="h-64 rounded-lg bg-slate-100 animate-pulse" />
-          ) : analyticsData.productBreakdown.length === 0 ? (
-            <div className="h-64 flex flex-col items-center justify-center text-center p-6 bg-slate-50/60 rounded-xl border border-dashed border-slate-200">
-              <Boxes className="h-8 w-8 text-slate-300 mb-2" />
-              <p className="text-sm font-medium text-slate-700">No product profit data available</p>
-              <p className="text-xs text-slate-400 mt-1">Product profitability will render here as sales are made.</p>
-            </div>
-          ) : (
-            <div className="h-64 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={analyticsData.productBreakdown.slice(0, 8)}
-                  margin={{ top: 10, right: 10, left: 0, bottom: 20 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis
-                    dataKey="name"
-                    stroke="#94a3b8"
-                    fontSize={10}
-                    tickLine={false}
-                    axisLine={false}
-                    interval={0}
-                    angle={-25}
-                    textAnchor="end"
-                  />
-                  <YAxis
-                    stroke="#94a3b8"
-                    fontSize={11}
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`}
-                  />
-                  <Tooltip
-                    formatter={(val: number, name: string) => [`₹${formatINR(val)}`, name]}
-                    contentStyle={{
-                      backgroundColor: '#fff',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '8px',
-                      fontSize: '12px'
-                    }}
-                  />
-                  <Bar dataKey="profit" name="Gross Profit" radius={[4, 4, 0, 0]}>
-                    {analyticsData.productBreakdown.slice(0, 8).map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.profit >= 0 ? '#10B981' : '#EF4444'} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </Card>
-      </div>
+      {/* Product-wise Profit Breakdown */}
+      <Card
+        title="Product-wise Gross Profit"
+        subtitle="Gross profit earned by individual product (Green = profit, Red = loss)"
+      >
+        {loading ? (
+          <div className="h-64 rounded-lg bg-slate-100 animate-pulse" />
+        ) : analyticsData.productBreakdown.length === 0 ? (
+          <div className="h-64 flex flex-col items-center justify-center text-center p-6 bg-slate-50/60 rounded-xl border border-dashed border-slate-200">
+            <Boxes className="h-8 w-8 text-slate-300 mb-2" />
+            <p className="text-sm font-medium text-slate-700">No product profit data available</p>
+            <p className="text-xs text-slate-400 mt-1">Product profitability will render here as sales are made.</p>
+          </div>
+        ) : (
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={analyticsData.productBreakdown.slice(0, 12)}
+                margin={{ top: 10, right: 10, left: 0, bottom: 20 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis
+                  dataKey="name"
+                  stroke="#94a3b8"
+                  fontSize={10}
+                  tickLine={false}
+                  axisLine={false}
+                  interval={0}
+                  angle={-25}
+                  textAnchor="end"
+                />
+                <YAxis
+                  stroke="#94a3b8"
+                  fontSize={11}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`}
+                />
+                <Tooltip
+                  formatter={(val: number, name: string) => [`₹${formatINR(val)}`, name]}
+                  contentStyle={{
+                    backgroundColor: '#fff',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    fontSize: '12px'
+                  }}
+                />
+                <Bar dataKey="profit" name="Gross Profit" radius={[4, 4, 0, 0]}>
+                  {analyticsData.productBreakdown.slice(0, 12).map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.profit >= 0 ? '#10B981' : '#EF4444'} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </Card>
 
       {/* Section 5: Sales History Table */}
       <Card
