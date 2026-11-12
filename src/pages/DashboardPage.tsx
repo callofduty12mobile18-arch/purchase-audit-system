@@ -7,8 +7,7 @@ import {
   Wallet,
   Banknote,
   Clock,
-  CheckCircle2,
-  AlertCircle
+  CheckCircle2
 } from 'lucide-react';
 import { StatCard } from '../components/ui/StatCard';
 import { Card } from '../components/ui/Card';
@@ -221,25 +220,15 @@ export const DashboardPage: React.FC = () => {
       </div>
 
       {/* Settlement & Cash/Cheque KPI Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {loading ? (
           <>
-            <StatCardSkeleton />
             <StatCardSkeleton />
             <StatCardSkeleton />
             <StatCardSkeleton />
           </>
         ) : (
           <>
-            <StatCard
-              color="amber"
-              title="Total Outstanding"
-              value={`₹${formatINR(paymentMetrics.totalOutstanding)}`}
-              subtitle="Unsettled invoice balance"
-              change={paymentMetrics.totalOutstanding > 0 ? 'Pending payment' : 'All settled'}
-              changeType={paymentMetrics.totalOutstanding > 0 ? 'negative' : 'positive'}
-              icon={<AlertCircle className="h-5 w-5" />}
-            />
             <StatCard
               color="blue"
               title="Total Pending Cheques"
