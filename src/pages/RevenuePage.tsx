@@ -19,7 +19,9 @@ import {
   ShieldCheck,
   ShoppingBag,
   Boxes,
-  Percent
+  Percent,
+  Sparkles,
+  ArrowUpRight
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -37,14 +39,13 @@ import {
   Area
 } from 'recharts';
 import { Card } from '../components/ui/Card';
-import { StatCard } from '../components/ui/StatCard';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Table, TableColumn } from '../components/ui/Table';
 import { Badge } from '../components/ui/Badge';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
-import { StatCardSkeleton, CardSkeleton } from '../components/ui/LoadingSkeleton';
+import { CardSkeleton } from '../components/ui/LoadingSkeleton';
 import { ErrorState } from '../components/ui/ErrorState';
 import { AddSaleModal } from '../features/revenue/AddSaleModal';
 import { ViewSaleModal } from '../features/revenue/ViewSaleModal';
@@ -58,6 +59,93 @@ import {
 import { revenueService } from '../services/revenueService';
 import { formatINR, formatDisplayDate, getTodayIST, formatDisplayMonthYear } from '../utils/dateUtils';
 import { useToast } from '../context/ToastContext';
+
+interface RevenueKpiCardProps {
+  title: string;
+  value: string | number;
+  subtitle: string;
+  icon: React.ReactNode;
+  iconBg: string;
+  iconColor: string;
+  valueColor?: string;
+  badge?: {
+    text: string;
+    variant: 'positive' | 'negative' | 'neutral' | 'brand' | 'amber';
+  };
+}
+
+const RevenueKpiCard: React.FC<RevenueKpiCardProps> = ({
+  title,
+  value,
+  subtitle,
+  icon,
+  iconBg,
+  iconColor,
+  valueColor = 'text-slate-900',
+  badge
+}) => {
+  return (
+    <div className="bg-white rounded-xl border border-slate-200/90 shadow-card hover:shadow-card-hover transition-all duration-200 p-5 flex flex-col justify-between min-h-[148px]">
+      {/* Top Header */}
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 truncate">
+          {title}
+        </span>
+        <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${iconBg} ${iconColor}`}>
+          {icon}
+        </div>
+      </div>
+
+      {/* Primary Value - Guaranteed 100% full width row, no wrap/clipping */}
+      <div className="my-2 min-w-0">
+        <p
+          className={`text-2xl sm:text-3xl font-bold font-mono tracking-tight tabular-nums truncate ${valueColor}`}
+          title={String(value)}
+        >
+          {value}
+        </p>
+      </div>
+
+      {/* Footer / Subtitle & Badge */}
+      <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 text-xs">
+        <span className="text-slate-500 truncate text-[11px] font-medium" title={subtitle}>
+          {subtitle}
+        </span>
+        {badge && (
+          <span
+            className={`shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+              badge.variant === 'positive'
+                ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20'
+                : badge.variant === 'negative'
+                ? 'bg-rose-50 text-rose-700 ring-1 ring-rose-600/20'
+                : badge.variant === 'brand'
+                ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20'
+                : badge.variant === 'amber'
+                ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20'
+                : 'bg-slate-100 text-slate-600'
+            }`}
+          >
+            {badge.text}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const KpiCardSkeleton: React.FC = () => (
+  <div className="bg-white rounded-xl border border-slate-200 p-5 flex flex-col justify-between min-h-[148px] animate-pulse">
+    <div className="flex items-center justify-between">
+      <div className="h-3.5 bg-slate-200 rounded w-24" />
+      <div className="w-9 h-9 bg-slate-200 rounded-lg" />
+    </div>
+    <div className="h-8 bg-slate-200 rounded w-36 my-2" />
+    <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+      <div className="h-3 bg-slate-200 rounded w-28" />
+      <div className="h-4 bg-slate-200 rounded-full w-16" />
+    </div>
+  </div>
+);
 
 export const RevenuePage: React.FC = () => {
   const { success: toastSuccess, error: toastError } = useToast();
@@ -320,20 +408,20 @@ export const RevenuePage: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 flex-wrap">
             <h1 className="page-title">Revenue & Profit Analytics</h1>
             <Badge variant="blue">FIFO Costing</Badge>
           </div>
-          <p className="page-subtitle">
+          <p className="page-subtitle mt-0.5">
             Track sales performance, cost of goods sold (COGS), gross margins, and inventory valuation in real time.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-3 self-start sm:self-auto shrink-0">
           {/* Date Filter */}
-          <div className="w-44">
+          <div className="w-40 sm:w-44">
             <Select
               value={dateFilter}
               onChange={(e) => {
@@ -404,74 +492,94 @@ export const RevenuePage: React.FC = () => {
         </div>
       )}
 
-      {/* Section 2: Summary Dashboard Cards (6 Cards) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+      {/* Section 2: Summary Dashboard Cards (2 Balanced Rows of 3 Spacious Cards) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
         {loading ? (
           <>
-            <StatCardSkeleton />
-            <StatCardSkeleton />
-            <StatCardSkeleton />
-            <StatCardSkeleton />
-            <StatCardSkeleton />
-            <StatCardSkeleton />
+            <KpiCardSkeleton />
+            <KpiCardSkeleton />
+            <KpiCardSkeleton />
+            <KpiCardSkeleton />
+            <KpiCardSkeleton />
+            <KpiCardSkeleton />
           </>
         ) : (
           <>
             {/* 1. Total Sales Revenue */}
-            <StatCard
+            <RevenueKpiCard
               title="Sales Revenue"
               value={`₹${formatINR(metrics.totalRevenue)}`}
-              subtitle="Sum of selling price × qty"
-              color="blue"
+              subtitle="Selling price × quantity sold"
               icon={<DollarSign className="h-5 w-5" />}
+              iconBg="bg-blue-50"
+              iconColor="text-blue-700"
+              valueColor="text-blue-700"
+              badge={{ text: 'Gross Inflow', variant: 'brand' }}
             />
 
-            {/* 2. Total COGS */}
-            <StatCard
+            {/* 2. Total Cost of Goods Sold (COGS) */}
+            <RevenueKpiCard
               title="Total Cost (COGS)"
               value={`₹${formatINR(metrics.totalCogs)}`}
               subtitle="FIFO purchase cost allocated"
-              color="amber"
               icon={<Boxes className="h-5 w-5" />}
+              iconBg="bg-amber-50"
+              iconColor="text-amber-700"
+              valueColor="text-slate-900"
+              badge={{ text: 'Inventory Cost', variant: 'amber' }}
             />
 
             {/* 3. Gross Profit */}
-            <StatCard
+            <RevenueKpiCard
               title="Gross Profit"
               value={`₹${formatINR(metrics.grossProfit)}`}
-              subtitle="Revenue − COGS"
-              color={metrics.grossProfit >= 0 ? 'green' : 'coral'}
-              changeType={metrics.grossProfit >= 0 ? 'positive' : 'negative'}
-              change={metrics.grossProfit >= 0 ? 'Profitable' : 'Gross Loss'}
+              subtitle="Sales Revenue − COGS"
               icon={metrics.grossProfit >= 0 ? <TrendingUp className="h-5 w-5" /> : <TrendingDown className="h-5 w-5" />}
+              iconBg={metrics.grossProfit >= 0 ? 'bg-emerald-50' : 'bg-rose-50'}
+              iconColor={metrics.grossProfit >= 0 ? 'text-emerald-700' : 'text-rose-700'}
+              valueColor={metrics.grossProfit >= 0 ? 'text-emerald-700' : 'text-rose-700'}
+              badge={{
+                text: metrics.grossProfit >= 0 ? 'Profitable' : 'Gross Loss',
+                variant: metrics.grossProfit >= 0 ? 'positive' : 'negative'
+              }}
             />
 
             {/* 4. Gross Profit Margin */}
-            <StatCard
+            <RevenueKpiCard
               title="Profit Margin"
               value={`${metrics.grossProfitMargin.toFixed(1)}%`}
               subtitle="(Gross Profit / Revenue) × 100"
-              color={metrics.grossProfitMargin >= 0 ? 'green' : 'coral'}
-              changeType={metrics.grossProfitMargin >= 0 ? 'positive' : 'negative'}
               icon={<Percent className="h-5 w-5" />}
+              iconBg="bg-teal-50"
+              iconColor="text-teal-700"
+              valueColor={metrics.grossProfitMargin >= 0 ? 'text-slate-900' : 'text-rose-700'}
+              badge={{
+                text: metrics.grossProfitMargin >= 25 ? 'Strong Margin' : metrics.grossProfitMargin > 0 ? 'Healthy' : 'Zero Margin',
+                variant: metrics.grossProfitMargin > 0 ? 'positive' : 'neutral'
+              }}
             />
 
             {/* 5. Total Items Sold */}
-            <StatCard
+            <RevenueKpiCard
               title="Items Sold"
-              value={metrics.totalItemsSold}
-              subtitle={`${metrics.totalTransactions} transactions`}
-              color="violet"
+              value={`${metrics.totalItemsSold} Units`}
+              subtitle={`${metrics.totalTransactions} recorded sales transactions`}
               icon={<ShoppingBag className="h-5 w-5" />}
+              iconBg="bg-violet-50"
+              iconColor="text-violet-700"
+              badge={{ text: 'Volume', variant: 'neutral' }}
             />
 
             {/* 6. Current Stock Value */}
-            <StatCard
+            <RevenueKpiCard
               title="Stock Value"
               value={`₹${formatINR(metrics.currentStockValue)}`}
-              subtitle="Unsold inventory valuation"
-              color="purple"
+              subtitle="Unsold catalog inventory at cost"
               icon={<Package className="h-5 w-5" />}
+              iconBg="bg-purple-50"
+              iconColor="text-purple-700"
+              valueColor="text-purple-700"
+              badge={{ text: 'Asset Valuation', variant: 'neutral' }}
             />
           </>
         )}
@@ -488,9 +596,22 @@ export const RevenuePage: React.FC = () => {
             {loading ? (
               <div className="h-72 rounded-lg bg-slate-100 animate-pulse" />
             ) : analyticsData.monthlyTimeline.length === 0 ? (
-              <div className="h-72 flex flex-col items-center justify-center text-sm text-slate-400">
-                <BarChart3 className="h-8 w-8 text-slate-300 mb-2" />
-                No sales records found for this period. Click "Add Sale" to record transactions.
+              <div className="h-72 flex flex-col items-center justify-center text-center p-6 bg-slate-50/60 rounded-xl border border-dashed border-slate-200">
+                <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 mb-3">
+                  <BarChart3 className="h-6 w-6" />
+                </div>
+                <h4 className="text-sm font-semibold text-slate-800 mb-1">No sales recorded for this period</h4>
+                <p className="text-xs text-slate-500 max-w-sm mb-4">
+                  Record customer sales to see your monthly revenue trends, inventory cost (COGS), and gross margins.
+                </p>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => setIsAddOpen(true)}
+                  icon={<Plus className="h-3.5 w-3.5" />}
+                >
+                  Record First Sale
+                </Button>
               </div>
             ) : (
               <div className="h-72 w-full">
@@ -545,8 +666,14 @@ export const RevenuePage: React.FC = () => {
           {loading ? (
             <div className="h-72 rounded-lg bg-slate-100 animate-pulse" />
           ) : analyticsData.bestSelling.length === 0 ? (
-            <div className="h-72 flex items-center justify-center text-sm text-slate-400">
-              No sales logged yet.
+            <div className="h-72 flex flex-col items-center justify-center text-center p-6 bg-slate-50/60 rounded-xl border border-dashed border-slate-200">
+              <div className="w-12 h-12 rounded-xl bg-violet-50 border border-violet-100 flex items-center justify-center text-violet-600 mb-3">
+                <Package className="h-6 w-6" />
+              </div>
+              <h4 className="text-sm font-semibold text-slate-800 mb-1">No product sales yet</h4>
+              <p className="text-xs text-slate-500 max-w-xs">
+                Products will appear here ranked by sales volume and profitability once transactions are logged.
+              </p>
             </div>
           ) : (
             <div className="space-y-3.5 pt-1">
@@ -583,8 +710,10 @@ export const RevenuePage: React.FC = () => {
           {loading ? (
             <div className="h-64 rounded-lg bg-slate-100 animate-pulse" />
           ) : analyticsData.dailyTrend.length === 0 ? (
-            <div className="h-64 flex items-center justify-center text-sm text-slate-400">
-              No daily sales data for this date filter.
+            <div className="h-64 flex flex-col items-center justify-center text-center p-6 bg-slate-50/60 rounded-xl border border-dashed border-slate-200">
+              <Calendar className="h-8 w-8 text-slate-300 mb-2" />
+              <p className="text-sm font-medium text-slate-700">No daily sales in selected timeframe</p>
+              <p className="text-xs text-slate-400 mt-1">Adjust your date filter to view past daily trajectories.</p>
             </div>
           ) : (
             <div className="h-64 w-full">
@@ -648,8 +777,10 @@ export const RevenuePage: React.FC = () => {
           {loading ? (
             <div className="h-64 rounded-lg bg-slate-100 animate-pulse" />
           ) : analyticsData.productBreakdown.length === 0 ? (
-            <div className="h-64 flex items-center justify-center text-sm text-slate-400">
-              No product sales data available.
+            <div className="h-64 flex flex-col items-center justify-center text-center p-6 bg-slate-50/60 rounded-xl border border-dashed border-slate-200">
+              <Boxes className="h-8 w-8 text-slate-300 mb-2" />
+              <p className="text-sm font-medium text-slate-700">No product profit data available</p>
+              <p className="text-xs text-slate-400 mt-1">Product profitability will render here as sales are made.</p>
             </div>
           ) : (
             <div className="h-64 w-full">
