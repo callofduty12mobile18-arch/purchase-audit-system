@@ -66,7 +66,10 @@ const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, onClick }) => {
   return (
     <NavLink
       to={item.href}
-      onClick={onClick}
+      onClick={(e) => {
+        (e.currentTarget as HTMLElement).blur();
+        onClick?.();
+      }}
       aria-current={isActive ? 'page' : undefined}
       className={[
         'group flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors min-h-[40px]',
@@ -203,9 +206,10 @@ export const AppLayout: React.FC = () => {
           className={[
             'no-print lg:hidden fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-slate-200',
             'transition-transform duration-250 ease-out',
-            mobileOpen ? 'translate-x-0 shadow-xl' : '-translate-x-full',
+            mobileOpen ? 'translate-x-0 shadow-xl' : '-translate-x-full pointer-events-none',
           ].join(' ')}
           aria-hidden={!mobileOpen}
+          {...(!mobileOpen ? { inert: '' } : {})}
         >
           <div className="flex items-center justify-between px-4 pt-4 pb-2">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Navigation</span>

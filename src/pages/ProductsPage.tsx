@@ -98,23 +98,21 @@ export const ProductsPage: React.FC = () => {
     },
     {
       header: 'HSN',
+      headerClassName: 'hidden sm:table-cell',
+      className: 'hidden sm:table-cell',
       cell: (row) => <span className="text-xs font-mono text-slate-600">{row.hsn || '24022090'}</span>,
     },
     {
-      header: 'Purchase ref rate',
-      headerClassName: 'text-right',
-      className: 'text-right',
-      cell: (row) => (
-        <span className="font-mono font-semibold text-brand-700 tabular-nums">₹{formatINR(row.current_purchase_ref_price)}</span>
-      ),
+      header: 'Purchase rate',
+      headerClassName: 'text-right whitespace-nowrap',
+      className: 'text-right whitespace-nowrap font-mono font-semibold text-brand-700 tabular-nums',
+      cell: (row) => `₹${formatINR(row.current_purchase_ref_price)}`,
     },
     {
       header: 'Selling price',
-      headerClassName: 'text-right',
-      className: 'text-right',
-      cell: (row) => (
-        <span className="font-mono text-slate-700 tabular-nums">₹{formatINR(row.current_selling_price)}</span>
-      ),
+      headerClassName: 'text-right whitespace-nowrap hidden sm:table-cell',
+      className: 'text-right whitespace-nowrap hidden sm:table-cell font-mono text-slate-700 tabular-nums',
+      cell: (row) => `₹${formatINR(row.current_selling_price)}`,
     },
   ];
 
