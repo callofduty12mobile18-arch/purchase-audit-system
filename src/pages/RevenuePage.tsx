@@ -409,9 +409,6 @@ export const RevenuePage: React.FC = () => {
               }}
               options={[
                 { value: 'ALL', label: 'All Time' },
-                { value: 'TODAY', label: 'Today' },
-                { value: 'YESTERDAY', label: 'Yesterday' },
-                { value: 'THIS_WEEK', label: 'This Week' },
                 { value: 'THIS_MONTH', label: 'This Month' },
                 { value: 'LAST_MONTH', label: 'Last Month' },
                 { value: 'THIS_YEAR', label: 'This Year' },
