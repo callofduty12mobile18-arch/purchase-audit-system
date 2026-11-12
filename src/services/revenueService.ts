@@ -104,6 +104,68 @@ export function generateSaleNumber(dateStr: string = getTodayIST()): string {
   return `SL-${compact}-${randomSuffix}`;
 }
 
+/**
+ * Check if a given date string (YYYY-MM-DD) falls within the selected date filter
+ */
+export function isDateInFilter(
+  dateStr: string,
+  filter: RevenueDateFilter,
+  customStart?: string,
+  customEnd?: string
+): boolean {
+  if (filter === 'ALL') return true;
+  if (!dateStr) return false;
+
+  const s = dateStr.slice(0, 10);
+  const todayStr = getTodayIST();
+  const today = new Date(todayStr);
+
+  if (filter === 'TODAY') {
+    return s === todayStr;
+  }
+
+  if (filter === 'YESTERDAY') {
+    const yDate = new Date(today);
+    yDate.setDate(yDate.getDate() - 1);
+    const yStr = getTodayIST(yDate);
+    return s === yStr;
+  }
+
+  if (filter === 'THIS_WEEK') {
+    const curDay = today.getDay();
+    const diffToMon = (curDay + 6) % 7;
+    const mon = new Date(today);
+    mon.setDate(today.getDate() - diffToMon);
+    const monStr = getTodayIST(mon);
+    return s >= monStr && s <= todayStr;
+  }
+
+  if (filter === 'THIS_MONTH') {
+    return s.slice(0, 7) === todayStr.slice(0, 7);
+  }
+
+  if (filter === 'LAST_MONTH') {
+    const prevMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const prevMonthStr = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, '0')}`;
+    return s.slice(0, 7) === prevMonthStr;
+  }
+
+  if (filter === 'THIS_YEAR') {
+    return s.slice(0, 4) === todayStr.slice(0, 4);
+  }
+
+  if (filter === 'CUSTOM') {
+    if (customStart && customEnd) {
+      return s >= customStart && s <= customEnd;
+    }
+    if (customStart) return s >= customStart;
+    if (customEnd) return s <= customEnd;
+    return true;
+  }
+
+  return true;
+}
+
 export const revenueService = {
   /**
    * Cached invoices retrieval
@@ -1035,6 +1097,8 @@ export const revenueService = {
 
   /**
    * Filter sales by date filter preset or custom range
+   * When filter is NOT 'ALL', re-aggregates each product's purchases/revenue to strictly include
+   * ONLY the activity from that selected period, excluding products with zero activity in that period.
    */
   filterSalesByDate: (
     sales: SaleTransaction[],
@@ -1044,58 +1108,58 @@ export const revenueService = {
   ): SaleTransaction[] => {
     if (filter === 'ALL') return sales;
 
-    const todayStr = getTodayIST();
-    const today = new Date(todayStr);
+    const filtered: SaleTransaction[] = [];
 
-    return sales.filter(s => {
-      const dateStr = (s.sale_date || '').slice(0, 10);
-      if (!dateStr) return false;
+    for (const s of sales) {
+      // If this transaction has purchase batches in cogs_breakdown (e.g. catalog product item)
+      if (s.cogs_breakdown && s.cogs_breakdown.length > 0) {
+        const matchingBatches = s.cogs_breakdown.filter(b =>
+          isDateInFilter(b.invoice_date || s.sale_date, filter, customStart, customEnd)
+        );
 
-      if (filter === 'TODAY') {
-        return dateStr === todayStr;
-      }
-
-      if (filter === 'YESTERDAY') {
-        const yDate = new Date(today);
-        yDate.setDate(yDate.getDate() - 1);
-        const yStr = getTodayIST(yDate);
-        return dateStr === yStr;
-      }
-
-      if (filter === 'THIS_WEEK') {
-        const curDay = today.getDay();
-        const diffToMon = (curDay + 6) % 7;
-        const mon = new Date(today);
-        mon.setDate(today.getDate() - diffToMon);
-        const monStr = getTodayIST(mon);
-        return dateStr >= monStr && dateStr <= todayStr;
-      }
-
-      if (filter === 'THIS_MONTH') {
-        return dateStr.slice(0, 7) === todayStr.slice(0, 7);
-      }
-
-      if (filter === 'LAST_MONTH') {
-        const lDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-        const lStr = getTodayIST(lDate).slice(0, 7);
-        return dateStr.slice(0, 7) === lStr;
-      }
-
-      if (filter === 'THIS_YEAR') {
-        return dateStr.slice(0, 4) === todayStr.slice(0, 4);
-      }
-
-      if (filter === 'CUSTOM') {
-        if (customStart && customEnd) {
-          return dateStr >= customStart && dateStr <= customEnd;
+        // If no purchases/invoices occurred in this date period, skip this product
+        if (matchingBatches.length === 0) {
+          continue;
         }
-        if (customStart) return dateStr >= customStart;
-        if (customEnd) return dateStr <= customEnd;
-        return true;
-      }
 
-      return true;
-    });
+        const periodQty = Number(matchingBatches.reduce((sum, b) => sum + b.quantity, 0).toFixed(3));
+        const periodCost = Number(matchingBatches.reduce((sum, b) => sum + b.total_cost, 0).toFixed(2));
+        const unitCost = periodQty > 0 ? Number((periodCost / periodQty).toFixed(2)) : s.purchase_price;
+        const sellPrice = s.selling_price;
+        const totalRevenue = Number((periodQty * sellPrice).toFixed(2));
+        const grossProfit = Number((totalRevenue - periodCost).toFixed(2));
+        const profitMargin = totalRevenue > 0
+          ? Number(((grossProfit / totalRevenue) * 100).toFixed(2))
+          : 0;
+
+        // Find latest invoice date in this period
+        const initialDate = matchingBatches[0]?.invoice_date || s.sale_date;
+        const latestMatchingDate: string = matchingBatches.reduce<string>(
+          (latest, b) => ((b.invoice_date && b.invoice_date > latest) ? b.invoice_date : latest),
+          initialDate
+        );
+
+        filtered.push({
+          ...s,
+          quantity: periodQty,
+          purchase_price: unitCost,
+          total_revenue: totalRevenue,
+          total_cogs: periodCost,
+          gross_profit: grossProfit,
+          profit_margin: profitMargin,
+          sale_date: latestMatchingDate,
+          cogs_breakdown: matchingBatches,
+          notes: `${matchingBatches.length} invoice purchase(s) in selected period`
+        });
+      } else {
+        // Individual manual sale transaction
+        if (isDateInFilter(s.sale_date, filter, customStart, customEnd)) {
+          filtered.push(s);
+        }
+      }
+    }
+
+    return filtered;
   },
 
   /**
