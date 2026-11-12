@@ -59,9 +59,13 @@ export function calculatePaymentBreakdown(
   let totalCash = 0;
   let totalClearedCheques = 0;
   let totalPendingCheques = 0;
+  const today = getTodayIST();
 
   for (const p of payments) {
-    if (p.payment_status === 'CLEARED') {
+    const isChequePassed = p.payment_method === 'CHEQUE' && p.payment_status === 'PENDING' && p.clearance_date && p.clearance_date <= today;
+    const isCleared = p.payment_status === 'CLEARED' || isChequePassed;
+
+    if (isCleared) {
       if (p.payment_method === 'CASH') {
         totalCash += Number(p.amount) || 0;
       } else if (p.payment_method === 'CHEQUE') {

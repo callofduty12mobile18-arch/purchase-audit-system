@@ -333,20 +333,15 @@ export const BillUploadWorkflow: React.FC = () => {
 
     // Partial payment validation
     if (formData.payment_status === 'PARTIALLY_PAID') {
-      const partialAmt = Number(formData.partial_amount) || 0;
-      if (partialAmt <= 0) {
-        errors.push('Partial payment amount must be greater than ₹0.');
+      const cashAmt = Number(formData.partial_amount) || 0;
+      if (cashAmt <= 0) {
+        errors.push('Please enter the cash amount paid manually.');
       }
-      if (formData.grand_total > 0 && partialAmt > formData.grand_total) {
-        errors.push('Partial payment amount cannot exceed the invoice total.');
+      if (formData.grand_total > 0 && cashAmt >= formData.grand_total) {
+        errors.push('Cash amount paid upfront must be less than the total bill. For 100% full payment, set status to Paid.');
       }
-      if (formData.partial_payment_method === 'CHEQUE') {
-        if (!formData.partial_cheque_number?.trim()) {
-          errors.push('Cheque number is required for partial cheque payment.');
-        }
-        if (!formData.partial_bank_name?.trim()) {
-          errors.push('Bank name is required for partial cheque payment.');
-        }
+      if (formData.partial_cheque_number?.trim() && !formData.partial_bank_name?.trim()) {
+        errors.push('Bank name is required for the remaining balance cheque.');
       }
     }
 
@@ -434,27 +429,45 @@ export const BillUploadWorkflow: React.FC = () => {
         );
       }
 
-      // ── Record partial payment to ledger ─────────────────────────────────────
+      // ── Record partial payments to ledger (Cash upfront + Cheque for remaining) ──
       if (data.payment_status === 'PARTIALLY_PAID') {
-        const partialAmt = Number(data.partial_amount) || 0;
-        if (partialAmt > 0) {
-          try {
-            const currentPayments = await paymentService.getPaymentsByInvoiceId(saved.id, saved);
-            if (currentPayments.length === 0) {
+        const cashAmt = Number(data.partial_amount) || 0;
+        const grandTotal = Number(saved.grand_total) || 0;
+        const remainingChequeAmt = Number(Math.max(0, grandTotal - cashAmt).toFixed(2));
+        const presentationDate = data.cheque_presentation_date || data.partial_clearance_date || saved.invoice_date || getTodayIST();
+
+        try {
+          const currentPayments = await paymentService.getPaymentsByInvoiceId(saved.id, saved);
+          if (currentPayments.length === 0) {
+            // 1. Record Cash paid upfront (status = CLEARED)
+            if (cashAmt > 0) {
               await paymentService.addPayment(saved, {
-                payment_method: data.partial_payment_method === 'CHEQUE' ? 'CHEQUE' : 'CASH',
-                amount: partialAmt,
+                payment_method: 'CASH',
+                amount: cashAmt,
                 payment_date: data.partial_payment_date || saved.invoice_date || getTodayIST(),
-                cheque_number: data.partial_payment_method === 'CHEQUE' ? (data.partial_cheque_number || null) : null,
-                bank_name: data.partial_payment_method === 'CHEQUE' ? (data.partial_bank_name || null) : null,
-                cheque_date: data.partial_payment_method === 'CHEQUE' ? (data.partial_cheque_date || null) : null,
-                clearance_date: data.partial_payment_method === 'CHEQUE' ? (data.partial_clearance_date || null) : null,
-                notes: data.partial_notes?.trim() || 'Initial partial payment',
+                notes: 'Cash paid upfront',
               });
             }
-          } catch (payErr) {
-            console.warn('Could not record partial payment to ledger:', payErr);
+
+            // 2. Record remaining balance Cheque (status = PENDING, auto-clears on presentationDate)
+            if (remainingChequeAmt > 0 && data.partial_cheque_number?.trim()) {
+              await paymentService.addPayment(saved, {
+                payment_method: 'CHEQUE',
+                amount: remainingChequeAmt,
+                payment_date: data.partial_payment_date || saved.invoice_date || getTodayIST(),
+                cheque_number: data.partial_cheque_number.trim(),
+                bank_name: data.partial_bank_name?.trim() || 'Bank',
+                cheque_date: data.invoice_date || getTodayIST(),
+                clearance_date: presentationDate,
+                notes: `Cheque #${data.partial_cheque_number.trim()} for remaining balance`,
+              });
+
+              // Ensure invoice record has cheque metadata for automated clearance
+              await paymentService.syncInvoiceStatus(saved.id, 'PARTIALLY_PAID', 'PENDING');
+            }
           }
+        } catch (payErr) {
+          console.warn('Could not record partial payments to ledger:', payErr);
         }
       }
 
@@ -641,11 +654,6 @@ export const BillUploadWorkflow: React.FC = () => {
                 onChange={(e) => {
                   const newStatus = e.target.value as PaymentStatus;
                   handleHeaderChange('payment_status', newStatus);
-                  if (newStatus === 'PARTIALLY_PAID') {
-                    if (!formData.partial_amount && formData.grand_total > 0) {
-                      handleHeaderChange('partial_amount', Math.round(formData.grand_total / 2));
-                    }
-                  }
                 }}
                 className={inputCls + ' appearance-none pr-8 cursor-pointer'}
               >
