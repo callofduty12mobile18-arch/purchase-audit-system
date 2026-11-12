@@ -4,21 +4,27 @@ import {
   CreditCard,
   Calendar,
   AlertCircle,
-  CheckCircle2,
-  Clock,
-  ArrowRight,
   Receipt,
-  Sparkles
+  Building
 } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge';
 import { InvoiceFormData, InvoicePayment } from '../../types';
 import { formatDisplayDate, formatINR, getTodayIST } from '../../utils/dateUtils';
+import { ChequeReminderSection, resolveReminderEmail } from './ChequeReminderSection';
+
+export const BANK_OPTIONS = [
+  { value: 'IOB', label: 'IOB - Indian Overseas Bank' },
+  { value: 'KVB', label: 'KVB - Karur Vysya Bank' },
+  { value: 'TMB', label: 'TMB - Tamilnad Mercantile Bank' },
+  { value: 'SBI', label: 'SBI - State Bank of India' },
+] as const;
 
 interface PartialPaymentSectionProps {
   formData: InvoiceFormData;
   onChange: (field: keyof InvoiceFormData, value: string | number | boolean) => void;
   showErrors?: boolean;
   existingPayments?: InvoicePayment[];
+  adminEmail?: string;
 }
 
 const inputCls =
@@ -30,6 +36,7 @@ export const PartialPaymentSection: React.FC<PartialPaymentSectionProps> = ({
   onChange,
   showErrors = false,
   existingPayments = [],
+  adminEmail = '',
 }) => {
   const grandTotal = Number(formData.grand_total) || 0;
   const cashPaid = Number(formData.partial_amount) || 0;
@@ -37,10 +44,9 @@ export const PartialPaymentSection: React.FC<PartialPaymentSectionProps> = ({
   const paidPercent = grandTotal > 0 ? Math.min(100, Math.max(0, Math.round((cashPaid / grandTotal) * 100))) : 0;
 
   const presentationDate = formData.cheque_presentation_date || formData.partial_clearance_date || formData.invoice_date || getTodayIST();
+  const selectedBank = formData.partial_bank_name || 'IOB';
 
   const hasCashError = showErrors && (cashPaid <= 0 || (grandTotal > 0 && cashPaid >= grandTotal));
-  const hasChequeNumError = showErrors && !formData.partial_cheque_number?.trim();
-  const hasBankError = showErrors && !formData.partial_bank_name?.trim();
 
   return (
     <div className="pt-5 mt-5 border-t border-slate-200 space-y-5 animate-in fade-in duration-200">
@@ -159,7 +165,7 @@ export const PartialPaymentSection: React.FC<PartialPaymentSectionProps> = ({
                   const val = e.target.value === '' ? null : parseFloat(e.target.value);
                   onChange('partial_amount', val ?? 0);
                 }}
-                placeholder="Enter cash amount (e.g. 50000)"
+                placeholder="Enter cash amount (e.g. 5000)"
                 className={`${inputCls} pl-7 font-semibold text-slate-900 ${
                   hasCashError ? 'border-red-400 focus:border-red-500 focus:ring-red-500/20' : ''
                 }`}
@@ -191,82 +197,79 @@ export const PartialPaymentSection: React.FC<PartialPaymentSectionProps> = ({
         </div>
 
         {/* Right Column: Cheque for Remaining Balance */}
-        <div className="bg-white p-4 rounded-xl border border-blue-200/90 shadow-sm space-y-4">
-          <div className="flex items-center justify-between pb-2 border-b border-blue-100">
-            <h4 className="text-sm font-semibold text-blue-900 flex items-center gap-2">
-              <CreditCard className="h-4 w-4 text-blue-600" />
-              Cheque for Remaining Balance
-            </h4>
-            <span className="font-mono font-bold text-sm text-blue-700">
-              ₹{formatINR(remainingBalance)}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label htmlFor="partial_cheque_number" className="block text-xs font-medium text-slate-700 mb-1">
-                Cheque number <span className="text-red-500">*</span>
-              </label>
-              <input
-                id="partial_cheque_number"
-                type="text"
-                placeholder="e.g. 048291"
-                value={formData.partial_cheque_number || ''}
-                onChange={(e) => onChange('partial_cheque_number', e.target.value)}
-                className={`${inputCls} ${hasChequeNumError ? 'border-red-400' : ''}`}
-              />
-              {hasChequeNumError && (
-                <p className="text-xs text-red-600 mt-1">Cheque number is required.</p>
-              )}
+        <div className="bg-white p-4 rounded-xl border border-blue-200/90 shadow-sm space-y-4 flex flex-col justify-between">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-blue-100">
+              <h4 className="text-sm font-semibold text-blue-900 flex items-center gap-2">
+                <CreditCard className="h-4 w-4 text-blue-600" />
+                Cheque for Remaining Balance
+              </h4>
+              <span className="font-mono font-bold text-sm text-blue-700">
+                ₹{formatINR(remainingBalance)}
+              </span>
             </div>
 
+            {/* Bank Name Dropdown */}
             <div>
-              <label htmlFor="partial_bank_name" className="block text-xs font-medium text-slate-700 mb-1">
+              <label htmlFor="partial_bank_name" className="block text-xs font-medium text-slate-700 mb-1 flex items-center gap-1.5">
+                <Building className="h-3.5 w-3.5 text-blue-600" />
                 Bank name <span className="text-red-500">*</span>
               </label>
-              <input
-                id="partial_bank_name"
-                type="text"
-                placeholder="e.g. State Bank of India, HDFC"
-                value={formData.partial_bank_name || ''}
-                onChange={(e) => onChange('partial_bank_name', e.target.value)}
-                className={`${inputCls} ${hasBankError ? 'border-red-400' : ''}`}
-              />
-              {hasBankError && (
-                <p className="text-xs text-red-600 mt-1">Bank name is required.</p>
-              )}
+              <div className="relative">
+                <select
+                  id="partial_bank_name"
+                  value={selectedBank}
+                  onChange={(e) => onChange('partial_bank_name', e.target.value)}
+                  className={`${inputCls} appearance-none pr-8 cursor-pointer font-medium text-slate-900`}
+                >
+                  {BANK_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400" aria-hidden="true">
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
             </div>
-          </div>
 
-          <div>
-            <label htmlFor="cheque_presentation_date" className="block text-xs font-medium text-slate-700 mb-1 flex items-center gap-1.5">
-              <Calendar className="h-3.5 w-3.5 text-blue-600" />
-              Cheque presentation date (Automatic pass date) <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="cheque_presentation_date"
-              type="date"
-              value={presentationDate}
-              onChange={(e) => {
-                onChange('cheque_presentation_date', e.target.value);
-                onChange('partial_clearance_date', e.target.value);
-              }}
-              className={inputCls}
-            />
-          </div>
-
-          {/* Automatic Clearance Notice */}
-          <div className="p-2.5 rounded-lg bg-blue-50/80 border border-blue-200 text-xs text-blue-800 flex items-start gap-2">
-            <Sparkles className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
+            {/* Cheque Presentation Date */}
             <div>
-              <p className="font-semibold">Automatic Clearance on Presentation Date</p>
-              <p className="mt-0.5 text-blue-700">
-                On <strong>{formatDisplayDate(presentationDate)}</strong>, this cheque of{' '}
-                <strong>₹{formatINR(remainingBalance)}</strong> will automatically pass and clear, marking this invoice as 100% <strong>PAID</strong>.
-              </p>
+              <label htmlFor="cheque_presentation_date" className="block text-xs font-medium text-slate-700 mb-1 flex items-center gap-1.5">
+                <Calendar className="h-3.5 w-3.5 text-blue-600" />
+                Cheque presentation date <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="cheque_presentation_date"
+                type="date"
+                value={presentationDate}
+                onChange={(e) => {
+                  onChange('cheque_presentation_date', e.target.value);
+                  onChange('partial_clearance_date', e.target.value);
+                }}
+                className={inputCls}
+              />
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Cheque Email Reminder Features */}
+      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <ChequeReminderSection
+          enabled={Boolean(formData.reminder_enabled)}
+          onEnabledChange={(v) => onChange('reminder_enabled', v)}
+          reminderDate={formData.reminder_date || ''}
+          reminderTime={formData.reminder_time || ''}
+          onDateChange={(v) => onChange('reminder_date', v)}
+          onTimeChange={(v) => onChange('reminder_time', v)}
+          email={resolveReminderEmail(formData.reminder_email || adminEmail)}
+          onEmailChange={(v) => onChange('reminder_email', v)}
+          showErrors={showErrors}
+        />
       </div>
 
       {/* Existing Recorded Payments (if in edit mode and has payments) */}
@@ -292,7 +295,7 @@ export const PartialPaymentSection: React.FC<PartialPaymentSectionProps> = ({
                     <CreditCard className="h-3.5 w-3.5 text-blue-600" />
                   )}
                   <span className="font-medium text-slate-800">
-                    {p.payment_method === 'CHEQUE' ? `Cheque #${p.cheque_number || 'N/A'}` : 'Cash'}
+                    {p.payment_method === 'CHEQUE' ? `Cheque (${p.bank_name || 'Bank'})` : 'Cash'}
                   </span>
                   <span className="text-slate-400">·</span>
                   <span className="text-slate-500 font-mono">{formatDisplayDate(p.payment_date)}</span>

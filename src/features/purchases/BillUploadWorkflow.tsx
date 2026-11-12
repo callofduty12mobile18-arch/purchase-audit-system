@@ -323,9 +323,9 @@ export const BillUploadWorkflow: React.FC = () => {
     if (formData.items.some((it) => !it.pack_qty || it.pack_qty <= 0)) errors.push('All line items must have pack quantity > 0.');
     if (formData.items.some((it) => !it.invoice_amount || it.invoice_amount <= 0)) errors.push('All line items must have a bill amount > 0.');
 
-    // Cheque email reminder validation (only relevant for cheque payments)
-    const isCheque = formData.payment_mode === 'CHEQUE';
-    if (isCheque && formData.reminder_enabled) {
+    // Cheque email reminder validation (relevant for cheque payments and partially paid with remaining cheque)
+    const hasCheque = formData.payment_mode === 'CHEQUE' || formData.payment_status === 'PARTIALLY_PAID';
+    if (hasCheque && formData.reminder_enabled) {
       if (!formData.reminder_date) errors.push('Reminder date is required when the email reminder is enabled.');
       if (!formData.reminder_time) errors.push('Reminder time is required when the email reminder is enabled.');
       if (!resolveReminderEmail(formData.reminder_email || adminEmail)) errors.push('Recipient email is required when the email reminder is enabled.');
@@ -339,9 +339,6 @@ export const BillUploadWorkflow: React.FC = () => {
       }
       if (formData.grand_total > 0 && cashAmt >= formData.grand_total) {
         errors.push('Cash amount paid upfront must be less than the total bill. For 100% full payment, set status to Paid.');
-      }
-      if (formData.partial_cheque_number?.trim() && !formData.partial_bank_name?.trim()) {
-        errors.push('Bank name is required for the remaining balance cheque.');
       }
     }
 
@@ -374,21 +371,31 @@ export const BillUploadWorkflow: React.FC = () => {
       const saved = await dbService.confirmAndSaveInvoice(data, undefined, id);
 
       // ── Cheque email reminder sync ──────────────────────────────────────────
-      // The reminder is only relevant for cheque invoices with reminder_enabled.
+      // The reminder is relevant for cheque invoices and partially paid invoices with remaining balance cheque.
       // A reminder failure must NEVER block or reverse the invoice save — the
       // invoice is already persisted at this point. We surface the error as a
       // warning so the user knows to re-enable the reminder manually.
-      const isCheque = saved.payment_mode === 'CHEQUE' || data.payment_mode === 'CHEQUE';
-      const reminderEnabled = isCheque && Boolean(data.reminder_enabled);
+      const isPartial = data.payment_status === 'PARTIALLY_PAID';
+      const hasCheque = saved.payment_mode === 'CHEQUE' || data.payment_mode === 'CHEQUE' || isPartial;
+      const reminderEnabled = hasCheque && Boolean(data.reminder_enabled);
 
-      if (isCheque) {
+      if (hasCheque) {
         try {
+          const cashAmt = Number(data.partial_amount) || 0;
+          const grandTotal = Number(saved.grand_total) || 0;
+          const reminderAmount = isPartial
+            ? Number(Math.max(0, grandTotal - cashAmt).toFixed(2))
+            : grandTotal;
+          const presentationDate = isPartial
+            ? (data.cheque_presentation_date || data.partial_clearance_date || saved.invoice_date || getTodayIST())
+            : (data.cheque_presentation_date || saved.invoice_date);
+
           await chequeReminderService.syncForInvoice(reminderEnabled, {
             invoiceId: saved.id,
             invoiceNumber: saved.invoice_number,
             supplierName: saved.supplier?.name || data.supplier_name,
-            amount: Number(saved.grand_total) || 0,
-            chequePresentationDate: data.cheque_presentation_date || saved.invoice_date,
+            amount: reminderAmount,
+            chequePresentationDate: presentationDate,
             recipientEmail: resolveReminderEmail(data.reminder_email || adminEmail),
             reminderDate: data.reminder_date || '',
             reminderTime: data.reminder_time || '',
@@ -435,6 +442,7 @@ export const BillUploadWorkflow: React.FC = () => {
         const grandTotal = Number(saved.grand_total) || 0;
         const remainingChequeAmt = Number(Math.max(0, grandTotal - cashAmt).toFixed(2));
         const presentationDate = data.cheque_presentation_date || data.partial_clearance_date || saved.invoice_date || getTodayIST();
+        const bankName = data.partial_bank_name?.trim() || 'IOB';
 
         try {
           const currentPayments = await paymentService.getPaymentsByInvoiceId(saved.id, saved);
@@ -450,16 +458,16 @@ export const BillUploadWorkflow: React.FC = () => {
             }
 
             // 2. Record remaining balance Cheque (status = PENDING, auto-clears on presentationDate)
-            if (remainingChequeAmt > 0 && data.partial_cheque_number?.trim()) {
+            if (remainingChequeAmt > 0) {
               await paymentService.addPayment(saved, {
                 payment_method: 'CHEQUE',
                 amount: remainingChequeAmt,
                 payment_date: data.partial_payment_date || saved.invoice_date || getTodayIST(),
-                cheque_number: data.partial_cheque_number.trim(),
-                bank_name: data.partial_bank_name?.trim() || 'Bank',
+                cheque_number: data.partial_cheque_number?.trim() || undefined,
+                bank_name: bankName,
                 cheque_date: data.invoice_date || getTodayIST(),
                 clearance_date: presentationDate,
-                notes: `Cheque #${data.partial_cheque_number.trim()} for remaining balance`,
+                notes: `Cheque (${bankName}) for remaining balance`,
               });
 
               // Ensure invoice record has cheque metadata for automated clearance
@@ -675,6 +683,7 @@ export const BillUploadWorkflow: React.FC = () => {
             onChange={handleHeaderChange}
             showErrors={formValidationErrors.length > 0}
             existingPayments={existingPayments}
+            adminEmail={adminEmail}
           />
         )}
 
