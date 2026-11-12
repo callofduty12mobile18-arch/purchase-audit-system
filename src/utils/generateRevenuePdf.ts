@@ -35,43 +35,43 @@ export function generateRevenuePdf(payload: RevenuePdfPayload): void {
   const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' });
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
-  const margin = 14;
+  const margin = 12;
 
   // ---------------------------------------------------------------------------
-  // 1. TOP HEADER BANNER
+  // 1. TOP HEADER BANNER (Compact & Clean: 22mm)
   // ---------------------------------------------------------------------------
   doc.setFillColor(...NAVY);
-  doc.rect(0, 0, pageW, 26, 'F');
+  doc.rect(0, 0, pageW, 22, 'F');
 
   // Business Name & Title
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(15);
-  doc.text(business, margin, 11);
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8.5);
-  doc.setTextColor(203, 213, 225); // Slate 300
-  doc.text('REVENUE & PROFIT ANALYTICS REPORT', margin, 18);
-
-  // Period Badge & Date on the right
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.setTextColor(255, 255, 255);
-  doc.text(`Period: ${payload.periodLabel}`, pageW - margin, 11, { align: 'right' });
+  doc.setFontSize(14);
+  doc.text(business, margin, 9.5);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
+  doc.setTextColor(203, 213, 225); // Slate 300
+  doc.text('REVENUE & PROFIT ANALYTICS REPORT', margin, 16.5);
+
+  // Period Badge & Date on the right
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(255, 255, 255);
+  doc.text(`Period: ${payload.periodLabel}`, pageW - margin, 9.5, { align: 'right' });
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
   doc.setTextColor(203, 213, 225);
-  doc.text(`Generated: ${dateLabel} (IST)`, pageW - margin, 18, { align: 'right' });
+  doc.text(`Generated: ${dateLabel} (IST)`, pageW - margin, 16.5, { align: 'right' });
 
   // ---------------------------------------------------------------------------
-  // 2. EXECUTIVE SUMMARY CARDS (3 CARDS)
+  // 2. EXECUTIVE SUMMARY CARDS (3 CARDS: 18mm height)
   // ---------------------------------------------------------------------------
-  const cardY = 32;
-  const cardH = 22;
+  const cardY = 26;
+  const cardH = 17;
   const totalCardsW = pageW - margin * 2;
-  const cardGap = 6;
+  const cardGap = 5;
   const cardW = (totalCardsW - cardGap * 2) / 3;
 
   // Card 1: Total Purchased
@@ -79,56 +79,56 @@ export function generateRevenuePdf(payload: RevenuePdfPayload): void {
   doc.setFillColor(248, 250, 252);
   doc.setDrawColor(...BORDER_COLOR);
   doc.setLineWidth(0.3);
-  doc.roundedRect(c1X, cardY, cardW, cardH, 2, 2, 'FD');
+  doc.roundedRect(c1X, cardY, cardW, cardH, 1.5, 1.5, 'FD');
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.setTextColor(...TEXT_MUTED);
-  doc.text('TOTAL PURCHASED', c1X + 5, cardY + 7);
+  doc.text('TOTAL PURCHASED', c1X + 4.5, cardY + 5.5);
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(13);
+  doc.setFontSize(11.5);
   doc.setTextColor(...TEXT_SLATE);
-  doc.text(rupee(payload.totalPurchased), c1X + 5, cardY + 16);
+  doc.text(rupee(payload.totalPurchased), c1X + 4.5, cardY + 13);
 
   // Card 2: Total Sold
   const c2X = c1X + cardW + cardGap;
   doc.setFillColor(248, 250, 252);
-  doc.roundedRect(c2X, cardY, cardW, cardH, 2, 2, 'FD');
+  doc.roundedRect(c2X, cardY, cardW, cardH, 1.5, 1.5, 'FD');
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.setTextColor(...TEXT_MUTED);
-  doc.text('TOTAL SOLD (REVENUE)', c2X + 5, cardY + 7);
+  doc.text('TOTAL SOLD (REVENUE)', c2X + 4.5, cardY + 5.5);
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(13);
+  doc.setFontSize(11.5);
   doc.setTextColor(...BRAND_BLUE);
-  doc.text(rupee(payload.totalSold), c2X + 5, cardY + 16);
+  doc.text(rupee(payload.totalSold), c2X + 4.5, cardY + 13);
 
   // Card 3: My Profit
   const c3X = c2X + cardW + cardGap;
   doc.setFillColor(248, 250, 252);
-  doc.roundedRect(c3X, cardY, cardW, cardH, 2, 2, 'FD');
+  doc.roundedRect(c3X, cardY, cardW, cardH, 1.5, 1.5, 'FD');
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.setTextColor(...TEXT_MUTED);
-  doc.text('MY PROFIT', c3X + 5, cardY + 7);
+  doc.text('MY PROFIT', c3X + 4.5, cardY + 5.5);
 
   const isProfitable = payload.grossProfit >= 0;
   const profitColor = isProfitable ? PROFIT_GREEN : LOSS_RED;
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(13);
+  doc.setFontSize(11.5);
   doc.setTextColor(...profitColor);
   const profitSign = isProfitable ? '+ ' : '- ';
   const profitText = `${profitSign}${rupee(Math.abs(payload.grossProfit))} (${payload.profitMargin.toFixed(1)}%)`;
-  doc.text(profitText, c3X + 5, cardY + 16);
+  doc.text(profitText, c3X + 4.5, cardY + 13);
 
   // ---------------------------------------------------------------------------
   // 3. PRODUCT-WISE BREAKDOWN TABLE
   // ---------------------------------------------------------------------------
-  const tableStartY = cardY + cardH + 7;
+  const tableStartY = cardY + cardH + 5;
 
   // Compute Totals
   const totalQuantity = payload.items.reduce((s, it) => s + (Number(it.quantity) || 0), 0);
@@ -139,7 +139,10 @@ export function generateRevenuePdf(payload: RevenuePdfPayload): void {
 
   autoTable(doc, {
     startY: tableStartY,
-    margin: { left: margin, right: margin, bottom: 15 },
+    margin: { left: margin, right: margin, bottom: 12 },
+    showHead: 'everyPage',
+    showFoot: 'lastPage', // CRITICAL: Only print TOTALS row ONCE on the last page!
+    rowPageBreak: 'avoid', // CRITICAL: Never split a row or multi-line product cell across pages!
     head: [[
       '#',
       'Product Name (A-Z)',
@@ -179,40 +182,41 @@ export function generateRevenuePdf(payload: RevenuePdfPayload): void {
     ]],
     styles: {
       font: 'helvetica',
-      fontSize: 8,
-      cellPadding: { top: 2.5, bottom: 2.5, left: 2.5, right: 2.5 },
+      fontSize: 7.5,
+      cellPadding: { top: 1.5, bottom: 1.5, left: 2, right: 2 },
       textColor: TEXT_SLATE,
       lineColor: BORDER_COLOR,
       lineWidth: 0.15,
-      valign: 'middle'
+      valign: 'middle',
+      overflow: 'linebreak'
     },
     headStyles: {
       fillColor: NAVY,
       textColor: [255, 255, 255],
       fontStyle: 'bold',
-      fontSize: 8,
-      cellPadding: { top: 3, bottom: 3, left: 2.5, right: 2.5 }
+      fontSize: 7.5,
+      cellPadding: { top: 2.5, bottom: 2.5, left: 2, right: 2 }
     },
     footStyles: {
       fillColor: [241, 245, 249], // Slate 100
       textColor: NAVY,
       fontStyle: 'bold',
-      fontSize: 8.5,
-      cellPadding: { top: 3, bottom: 3, left: 2.5, right: 2.5 },
+      fontSize: 8,
+      cellPadding: { top: 2.5, bottom: 2.5, left: 2, right: 2 },
       lineColor: [203, 213, 225],
-      lineWidth: 0.3
+      lineWidth: 0.25
     },
     alternateRowStyles: {
       fillColor: [248, 250, 252]
     },
     columnStyles: {
-      0: { cellWidth: 10, halign: 'center', fontStyle: 'bold', textColor: TEXT_MUTED },
-      1: { cellWidth: 75, halign: 'left', textColor: NAVY, fontStyle: 'bold' },
+      0: { cellWidth: 9, halign: 'center', fontStyle: 'bold', textColor: TEXT_MUTED },
+      1: { cellWidth: 78, halign: 'left', textColor: NAVY, fontStyle: 'bold' },
       2: { cellWidth: 24, halign: 'right', fontStyle: 'bold' },
       3: { cellWidth: 28, halign: 'right' },
       4: { cellWidth: 28, halign: 'right' },
-      5: { cellWidth: 34, halign: 'right', fontStyle: 'bold', textColor: TEXT_SLATE },
-      6: { cellWidth: 34, halign: 'right', fontStyle: 'bold', textColor: BRAND_BLUE },
+      5: { cellWidth: 35, halign: 'right', fontStyle: 'bold', textColor: TEXT_SLATE },
+      6: { cellWidth: 35, halign: 'right', fontStyle: 'bold', textColor: BRAND_BLUE },
       7: { cellWidth: 36, halign: 'right', fontStyle: 'bold' }
     },
     didParseCell: (data) => {
@@ -237,10 +241,10 @@ export function generateRevenuePdf(payload: RevenuePdfPayload): void {
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.5);
+    doc.setFontSize(7);
     doc.setTextColor(...TEXT_MUTED);
 
-    const footerY = pageH - 7;
+    const footerY = pageH - 5.5;
     doc.text(
       `Confidential — ${business} Purchase & Revenue Intelligence`,
       margin,
@@ -259,4 +263,3 @@ export function generateRevenuePdf(payload: RevenuePdfPayload): void {
   const filename = `Revenue_Profit_Report_${cleanPeriod}_${todayStr}.pdf`;
   doc.save(filename);
 }
-
