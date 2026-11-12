@@ -158,7 +158,7 @@ export const AppLayout: React.FC = () => {
               {profile?.full_name || 'Administrator'}
             </p>
             <p className="text-xs text-slate-500 truncate font-mono">
-              {profile?.email || 'admin@audit.local'}
+              {profile?.email || 'polonium84r@gmail.com'}
             </p>
           </div>
           <button

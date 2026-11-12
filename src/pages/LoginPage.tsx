@@ -8,7 +8,7 @@ import { Input } from '../components/ui/Input';
 export const LoginPage: React.FC = () => {
   const { signIn, user } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState('admin@audit.local');
+  const [email, setEmail] = useState('polonium84r@gmail.com');
   const [password, setPassword] = useState('admin123');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -71,7 +71,7 @@ export const LoginPage: React.FC = () => {
               onChange={(e) => setEmail(e.target.value)}
               autoComplete="email"
               required
-              placeholder="admin@audit.local"
+              placeholder="polonium84r@gmail.com"
             />
             <Input
               label="Password"

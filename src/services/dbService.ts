@@ -783,11 +783,11 @@ export const dbService = {
     // it back to UNPAID.
     const isChequeMode = safePaymentMode === 'CHEQUE';
     const wasCleared = oldInvoice?.cheque_status === 'CLEARED' || oldInvoice?.payment_status === 'PAID';
-    const safePaymentStatus: PaymentStatus = isChequeMode
-      ? (wasCleared ? 'PAID' : 'UNPAID')
-      : ((extractedData.payment_status === 'UNPAID' || extractedData.payment_status === 'PARTIALLY_PAID')
-        ? extractedData.payment_status
-        : 'PAID');
+    const safePaymentStatus: PaymentStatus = extractedData.payment_status === 'PARTIALLY_PAID'
+      ? 'PARTIALLY_PAID'
+      : isChequeMode
+        ? (wasCleared ? 'PAID' : 'UNPAID')
+        : (extractedData.payment_status === 'UNPAID' ? 'UNPAID' : 'PAID');
 
     const chequeStatus: ChequeStatus | null = isChequeMode
       ? (wasCleared ? 'CLEARED' : 'PENDING')
@@ -1083,7 +1083,7 @@ export const dbService = {
     const id = generateUUID();
     const validEntityId = (entityId && entityId.length === 36 && entityId.includes('-')) ? entityId : undefined;
 
-    let userEmail = 'admin@audit.local';
+    let userEmail = 'polonium84r@gmail.com';
     let userId: string | undefined = undefined;
     try {
       const { data } = await supabase.auth.getSession();

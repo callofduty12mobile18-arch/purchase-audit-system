@@ -263,6 +263,14 @@ export interface InvoiceFormData {
   reminder_date?: string;
   reminder_time?: string;
   reminder_email?: string;
+  partial_amount?: number | null;
+  partial_payment_method?: PaymentMethod;
+  partial_payment_date?: string;
+  partial_cheque_number?: string;
+  partial_bank_name?: string;
+  partial_cheque_date?: string;
+  partial_clearance_date?: string;
+  partial_notes?: string;
   items: InvoiceFormItem[];
   total_items?: number;
   total_packs?: number;

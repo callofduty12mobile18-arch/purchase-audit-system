@@ -30,6 +30,7 @@ export const PurchasesPage: React.FC = () => {
 
   const [search, setSearch] = useState('');
   const [memoFilter, setMemoFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState('ALL');
   const [dateFilter, setDateFilter] = useState('ALL');
   const [customDate, setCustomDate] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -99,7 +100,8 @@ export const PurchasesPage: React.FC = () => {
       (inv.supplier?.name?.toLowerCase().includes(q))
     );
     const matchMemo = memoFilter === 'ALL' || (inv.invoice_name || 'RAMACHANDRAN').toUpperCase() === memoFilter;
-    return matchSearch && matchDate(inv.invoice_date, dateFilter, customDate) && matchMemo;
+    const matchStatus = statusFilter === 'ALL' || inv.payment_status === statusFilter;
+    return matchSearch && matchDate(inv.invoice_date, dateFilter, customDate) && matchMemo && matchStatus;
   });
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE) || 1;
@@ -123,9 +125,9 @@ export const PurchasesPage: React.FC = () => {
   };
 
   const clearFilters = () => {
-    setSearch(''); setMemoFilter('ALL'); setDateFilter('ALL'); setCustomDate(''); setCurrentPage(1);
+    setSearch(''); setMemoFilter('ALL'); setStatusFilter('ALL'); setDateFilter('ALL'); setCustomDate(''); setCurrentPage(1);
   };
-  const hasFilters = search || memoFilter !== 'ALL' || dateFilter !== 'ALL' || customDate;
+  const hasFilters = search || memoFilter !== 'ALL' || statusFilter !== 'ALL' || dateFilter !== 'ALL' || customDate;
 
   const columns: TableColumn<PurchaseInvoice>[] = [
     {
@@ -260,6 +262,20 @@ export const PurchasesPage: React.FC = () => {
               value={memoFilter}
               onChange={(e) => { setMemoFilter(e.target.value); setCurrentPage(1); }}
               options={memoOptions}
+            />
+          </div>
+          <div className="w-full sm:w-44">
+            <Select
+              value={statusFilter}
+              onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
+              options={[
+                { value: 'ALL', label: 'All statuses' },
+                { value: 'PAID', label: 'Paid' },
+                { value: 'PARTIALLY_PAID', label: 'Partially Paid' },
+                { value: 'UNPAID', label: 'Unpaid' },
+                { value: 'CHEQUE_PENDING', label: 'Cheque Pending' },
+                { value: 'OVERDUE', label: 'Overdue' },
+              ]}
             />
           </div>
           <div className="w-full sm:w-44">

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { LineChart as LineChartIcon, TrendingUp, Receipt, Package, BarChart3, Layers, Wallet } from 'lucide-react';
+import { TrendingUp, Receipt, Package, BarChart3, Wallet } from 'lucide-react';
 import {
-  ResponsiveContainer, BarChart, Bar, LineChart, Line, AreaChart, Area,
+  ResponsiveContainer, BarChart, Bar,
   CartesianGrid, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, Legend,
 } from 'recharts';
 import { Card } from '../components/ui/Card';
@@ -13,9 +13,6 @@ import { ErrorState } from '../components/ui/ErrorState';
 import { PurchaseInvoice, Product } from '../types';
 import { dbService } from '../services/dbService';
 import { getTodayIST, formatDisplayMonthYear, formatINR } from '../utils/dateUtils';
-import { Button } from '../components/ui/Button';
-
-type ChartType = 'bar' | 'line' | 'area';
 
 const COLORS = ['#2563EB', '#7C3AED', '#16A34A', '#D97706', '#DC2626', '#0891B2'];
 
@@ -23,7 +20,6 @@ export const AnalyticsPage: React.FC = () => {
   const [invoices, setInvoices] = useState<PurchaseInvoice[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [timeFilter, setTimeFilter] = useState('ALL');
-  const [chartType, setChartType] = useState<ChartType>('bar');
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
@@ -177,25 +173,6 @@ export const AnalyticsPage: React.FC = () => {
           <Card
             title="Procurement spend timeline"
             subtitle="Monthly billed amount"
-            action={
-              <div className="flex items-center gap-0.5 p-0.5 bg-slate-100 rounded-lg">
-                {([['bar', BarChart3, 'Bar'], ['line', TrendingUp, 'Line'], ['area', Layers, 'Area']] as [ChartType, React.ElementType, string][]).map(([type, Icon, label]) => (
-                  <Button
-                    key={type}
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setChartType(type)}
-                    icon={<Icon className="h-3.5 w-3.5" />}
-                    className={[
-                      '!min-h-[32px] !h-8 px-2.5 text-xs rounded-md transition-all',
-                      chartType === type ? '!bg-white !text-brand-700 shadow-sm font-semibold' : '!text-slate-500 hover:!text-slate-700',
-                    ].join(' ')}
-                  >
-                    {label}
-                  </Button>
-                ))}
-              </div>
-            }
           >
             {loading ? (
               <div className="h-64 rounded-lg bg-slate-100 animate-pulse" />
@@ -206,37 +183,13 @@ export const AnalyticsPage: React.FC = () => {
             ) : (
               <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  {chartType === 'bar' ? (
-                    <BarChart data={timelineData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis dataKey="month" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} tickFormatter={formatDisplayMonthYear} />
-                      <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
-                      <Tooltip content={renderTooltip} cursor={{ fill: '#f8fafc' }} />
-                      <Bar dataKey="spend" fill="#2563EB" radius={[4, 4, 0, 0]} maxBarSize={48} />
-                    </BarChart>
-                  ) : chartType === 'line' ? (
-                    <LineChart data={timelineData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis dataKey="month" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} tickFormatter={formatDisplayMonthYear} />
-                      <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
-                      <Tooltip content={renderTooltip} />
-                      <Line type="monotone" dataKey="spend" stroke="#2563EB" strokeWidth={2.5} dot={{ r: 4, fill: '#2563EB', strokeWidth: 0 }} activeDot={{ r: 6 }} />
-                    </LineChart>
-                  ) : (
-                    <AreaChart data={timelineData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="spendGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#2563EB" stopOpacity={0.18} />
-                          <stop offset="100%" stopColor="#2563EB" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis dataKey="month" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} tickFormatter={formatDisplayMonthYear} />
-                      <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
-                      <Tooltip content={renderTooltip} />
-                      <Area type="monotone" dataKey="spend" stroke="#2563EB" strokeWidth={2.5} fill="url(#spendGrad)" />
-                    </AreaChart>
-                  )}
+                  <BarChart data={timelineData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis dataKey="month" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} tickFormatter={formatDisplayMonthYear} />
+                    <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
+                    <Tooltip content={renderTooltip} cursor={{ fill: '#f8fafc' }} />
+                    <Bar dataKey="spend" fill="#2563EB" radius={[4, 4, 0, 0]} maxBarSize={48} />
+                  </BarChart>
                 </ResponsiveContainer>
               </div>
             )}

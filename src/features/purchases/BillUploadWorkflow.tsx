@@ -7,11 +7,13 @@ import {
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
 import { CardSkeleton } from '../../components/ui/LoadingSkeleton';
-import { InvoiceFormData, InvoiceFormItem, PurchaseInvoice, Supplier, Product } from '../../types';
+import { InvoiceFormData, InvoiceFormItem, PurchaseInvoice, Supplier, Product, InvoicePayment, PaymentStatus } from '../../types';
 import { createBlankInvoice, createBlankInvoiceItem } from '../../services/invoiceService';
 import { dbService } from '../../services/dbService';
+import { paymentService } from '../../services/paymentService';
 import { chequeReminderService, utcIsoToIstParts } from '../../services/chequeReminderService';
 import { ChequeReminderSection, resolveReminderEmail } from './ChequeReminderSection';
+import { PartialPaymentSection } from './PartialPaymentSection';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../context/ToastContext';
 import { getTodayIST, generateISTInvoiceNumber, formatISTTimestamp, formatDisplayDate, formatINR } from '../../utils/dateUtils';
@@ -50,6 +52,7 @@ export const BillUploadWorkflow: React.FC = () => {
   const [existingDuplicate, setExistingDuplicate] = useState<PurchaseInvoice | null>(null);
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [formValidationErrors, setFormValidationErrors] = useState<string[]>([]);
+  const [existingPayments, setExistingPayments] = useState<InvoicePayment[]>([]);
 
   useEffect(() => { loadMetadata(); }, [id]);
 
@@ -94,6 +97,19 @@ export const BillUploadWorkflow: React.FC = () => {
           const reminderActive = Boolean(existingReminder && existingReminder.status !== 'CANCELLED');
           const reminderParts = existingReminder ? utcIsoToIstParts(existingReminder.reminder_at) : { date: '', time: '' };
 
+          let payments: InvoicePayment[] = [];
+          try {
+            payments = await paymentService.getPaymentsByInvoiceId(id, existingInv);
+            setExistingPayments(payments);
+          } catch (e) {
+            console.warn('Failed to load existing payments:', e);
+          }
+
+          const clearedOrPending = payments.reduce(
+            (sum, p) => sum + (p.payment_status === 'CLEARED' || p.payment_status === 'PENDING' ? Number(p.amount) || 0 : 0),
+            0
+          );
+
           setFormData({
             supplier_name: existingInv.supplier?.name || 'AYYAPPA ENTERPRISES',
             supplier_gstin: existingInv.supplier?.gstin || '33AABFA2949R1Z5',
@@ -109,6 +125,14 @@ export const BillUploadWorkflow: React.FC = () => {
             reminder_date: reminderActive ? reminderParts.date : '',
             reminder_time: reminderActive ? reminderParts.time : '',
             reminder_email: existingReminder?.recipient_email || '',
+            partial_amount: clearedOrPending > 0 ? clearedOrPending : null,
+            partial_payment_method: payments[0]?.payment_method || 'CASH',
+            partial_payment_date: payments[0]?.payment_date || existingInv.invoice_date || getTodayIST(),
+            partial_cheque_number: payments[0]?.cheque_number || '',
+            partial_bank_name: payments[0]?.bank_name || '',
+            partial_cheque_date: payments[0]?.cheque_date || getTodayIST(),
+            partial_clearance_date: payments[0]?.clearance_date || getTodayIST(),
+            partial_notes: payments[0]?.notes || '',
             items: mappedItems.length > 0 ? mappedItems : [createBlankInvoiceItem()],
             subtotal: existingInv.subtotal,
             taxable_amount: existingInv.taxable_amount,
@@ -307,6 +331,25 @@ export const BillUploadWorkflow: React.FC = () => {
       if (!resolveReminderEmail(formData.reminder_email || adminEmail)) errors.push('Recipient email is required when the email reminder is enabled.');
     }
 
+    // Partial payment validation
+    if (formData.payment_status === 'PARTIALLY_PAID') {
+      const partialAmt = Number(formData.partial_amount) || 0;
+      if (partialAmt <= 0) {
+        errors.push('Partial payment amount must be greater than ₹0.');
+      }
+      if (formData.grand_total > 0 && partialAmt > formData.grand_total) {
+        errors.push('Partial payment amount cannot exceed the invoice total.');
+      }
+      if (formData.partial_payment_method === 'CHEQUE') {
+        if (!formData.partial_cheque_number?.trim()) {
+          errors.push('Cheque number is required for partial cheque payment.');
+        }
+        if (!formData.partial_bank_name?.trim()) {
+          errors.push('Bank name is required for partial cheque payment.');
+        }
+      }
+    }
+
     setFormValidationErrors(errors);
     return errors.length === 0;
   };
@@ -389,6 +432,30 @@ export const BillUploadWorkflow: React.FC = () => {
           isEditMode ? 'Invoice updated' : 'Invoice saved',
           `#${saved.invoice_number} recorded.`
         );
+      }
+
+      // ── Record partial payment to ledger ─────────────────────────────────────
+      if (data.payment_status === 'PARTIALLY_PAID') {
+        const partialAmt = Number(data.partial_amount) || 0;
+        if (partialAmt > 0) {
+          try {
+            const currentPayments = await paymentService.getPaymentsByInvoiceId(saved.id, saved);
+            if (currentPayments.length === 0) {
+              await paymentService.addPayment(saved, {
+                payment_method: data.partial_payment_method === 'CHEQUE' ? 'CHEQUE' : 'CASH',
+                amount: partialAmt,
+                payment_date: data.partial_payment_date || saved.invoice_date || getTodayIST(),
+                cheque_number: data.partial_payment_method === 'CHEQUE' ? (data.partial_cheque_number || null) : null,
+                bank_name: data.partial_payment_method === 'CHEQUE' ? (data.partial_bank_name || null) : null,
+                cheque_date: data.partial_payment_method === 'CHEQUE' ? (data.partial_cheque_date || null) : null,
+                clearance_date: data.partial_payment_method === 'CHEQUE' ? (data.partial_clearance_date || null) : null,
+                notes: data.partial_notes?.trim() || 'Initial partial payment',
+              });
+            }
+          } catch (payErr) {
+            console.warn('Could not record partial payment to ledger:', payErr);
+          }
+        }
       }
 
       setSavedInvoice(saved);
@@ -570,11 +637,20 @@ export const BillUploadWorkflow: React.FC = () => {
             <div className="relative">
               <select
                 id="payment_status"
-                value={formData.payment_status === 'PAID' ? 'PAID' : 'UNPAID'}
-                onChange={(e) => handleHeaderChange('payment_status', e.target.value)}
+                value={formData.payment_status}
+                onChange={(e) => {
+                  const newStatus = e.target.value as PaymentStatus;
+                  handleHeaderChange('payment_status', newStatus);
+                  if (newStatus === 'PARTIALLY_PAID') {
+                    if (!formData.partial_amount && formData.grand_total > 0) {
+                      handleHeaderChange('partial_amount', Math.round(formData.grand_total / 2));
+                    }
+                  }
+                }}
                 className={inputCls + ' appearance-none pr-8 cursor-pointer'}
               >
                 <option value="PAID">Paid</option>
+                <option value="PARTIALLY_PAID">Partially Paid</option>
                 <option value="UNPAID">Unpaid</option>
               </select>
               <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400" aria-hidden="true">
@@ -584,8 +660,18 @@ export const BillUploadWorkflow: React.FC = () => {
           </div>
         </div>
 
+        {/* Partial payment features */}
+        {formData.payment_status === 'PARTIALLY_PAID' && (
+          <PartialPaymentSection
+            formData={formData}
+            onChange={handleHeaderChange}
+            showErrors={formValidationErrors.length > 0}
+            existingPayments={existingPayments}
+          />
+        )}
+
         {/* Cheque presentation date row */}
-        {chequeMode && (
+        {chequeMode && formData.payment_status !== 'PARTIALLY_PAID' && (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-slate-100">
               <div>

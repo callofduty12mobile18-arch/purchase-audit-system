@@ -10,13 +10,20 @@ interface AuthContextType {
   loading: boolean;
   signIn: (email: string, password?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
+  updateEmail: (newEmail: string) => void;
   isAdmin: boolean;
 }
 
+export const DEFAULT_ADMIN_EMAIL = 'polonium84r@gmail.com';
+
+const getCustomEmail = (): string => {
+  return localStorage.getItem('custom_auth_email') || DEFAULT_ADMIN_EMAIL;
+};
+
 const DEMO_USER: UserProfile = {
   id: '00000000-0000-0000-0000-000000000001',
-  email: 'admin@audit.local',
-  full_name: 'Administrator',
+  email: DEFAULT_ADMIN_EMAIL,
+  full_name: 'polonium84r',
   role: 'ADMIN',
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString()
@@ -29,6 +36,7 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   signIn: async () => ({ error: null }),
   signOut: async () => {},
+  updateEmail: () => {},
   isAdmin: true
 });
 
@@ -48,8 +56,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         const storedDemo = localStorage.getItem('demo_auth_logged_in');
         if (storedDemo === 'true') {
-          setProfile(DEMO_USER);
-          setUser({ id: DEMO_USER.id, email: DEMO_USER.email } as User);
+          const activeEmail = getCustomEmail();
+          const activeUser = { ...DEMO_USER, email: activeEmail, full_name: activeEmail.split('@')[0] };
+          setProfile(activeUser);
+          setUser({ id: activeUser.id, email: activeUser.email } as User);
         }
         setLoading(false);
       }
@@ -139,10 +149,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Fallback single-user session for local admin access
       localStorage.setItem('demo_auth_logged_in', 'true');
+      const activeEmail = email || getCustomEmail();
       const mockUser = {
         id: '00000000-0000-0000-0000-000000000001',
-        email: email || 'admin@audit.local',
-        full_name: email.split('@')[0] || 'Administrator',
+        email: activeEmail,
+        full_name: activeEmail.split('@')[0] || 'polonium84r',
         role: 'ADMIN' as const,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -155,6 +166,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     setLoading(false);
     return { error: null };
+  };
+
+  const updateEmail = (newEmail: string) => {
+    const trimmed = newEmail.trim().toLowerCase();
+    if (!trimmed) return;
+    localStorage.setItem('custom_auth_email', trimmed);
+    const updatedUser: UserProfile = {
+      id: profile?.id || '00000000-0000-0000-0000-000000000001',
+      email: trimmed,
+      full_name: trimmed.split('@')[0],
+      role: 'ADMIN',
+      created_at: profile?.created_at || new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    setProfile(updatedUser);
+    setUser({ id: updatedUser.id, email: trimmed } as User);
   };
 
   const signOut = async () => {
@@ -173,6 +200,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       loading,
       signIn,
       signOut,
+      updateEmail,
       isAdmin: profile?.role === 'ADMIN'
     }}>
       {children}
