@@ -9,7 +9,8 @@
  * - COGS = Sum of purchase cost allocated to sold quantities using FIFO
  * - Gross Profit = Sales Revenue - COGS
  * - Profit Margin = (Gross Profit / Sales Revenue) * 100
- * - Atomically synchronizes with Supabase database and audit logs.
+ * - Automatically loads all purchased items from invoices into the sales history.
+ * - Allows users to manually enter/edit selling prices per item.
  */
 
 import { supabase } from '../integrations/supabase/client';
@@ -27,8 +28,9 @@ import {
 } from '../types';
 import { getTodayIST } from '../utils/dateUtils';
 
-// Local storage key for persistent sales storage when table is pending migration
+// Local storage keys for persistent sales & selling price overrides
 const LOCAL_STORAGE_KEY_SALES = 'ramachandran_sales_v1';
+const LOCAL_STORAGE_KEY_SELLING_OVERRIDES = 'ramachandran_selling_price_overrides_v1';
 
 // Mutex locks to serialize concurrent sales creation per product
 const productSaleLocks = new Set<string>();
@@ -65,6 +67,24 @@ function setLocalSales(sales: SaleTransaction[]): void {
   }
 }
 
+function getSellingPriceOverrides(): Record<string, number> {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_KEY_SELLING_OVERRIDES);
+    if (!raw) return {};
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+
+function setSellingPriceOverrides(overrides: Record<string, number>): void {
+  try {
+    localStorage.setItem(LOCAL_STORAGE_KEY_SELLING_OVERRIDES, JSON.stringify(overrides));
+  } catch {
+    // Ignore
+  }
+}
+
 /**
  * Generate unique IST sale number: SL-YYYYMMDD-XXXX
  */
@@ -76,9 +96,12 @@ export function generateSaleNumber(dateStr: string = getTodayIST()): string {
 
 export const revenueService = {
   /**
-   * Fetch all sales from Supabase (with fallback to local sync cache)
+   * Fetch all sales: Combines manual sales + all purchased items from invoices
+   * so the user sees every purchased inventory item and can manually set/adjust selling prices.
    */
   getSales: async (): Promise<SaleTransaction[]> => {
+    // 1. Fetch manual sales from database (with local fallback)
+    let manualSales: SaleTransaction[] = [];
     try {
       const { data, error } = await supabase
         .from('sales')
@@ -87,26 +110,103 @@ export const revenueService = {
         .order('created_at', { ascending: false });
 
       if (!error && data) {
-        const sales = data as SaleTransaction[];
-        setLocalSales(sales);
-        return sales;
+        manualSales = data as SaleTransaction[];
+        setLocalSales(manualSales);
+      } else {
+        manualSales = getLocalSales();
       }
     } catch {
-      // Table may be unmigrated yet; fall through to local cache
+      manualSales = getLocalSales();
     }
 
-    // Fallback: load local sales and attach products
-    const local = getLocalSales();
+    // 2. Fetch all verified purchase invoices with items & products
+    let invoices: PurchaseInvoice[] = [];
     try {
-      const prods = await dbService.getProducts();
-      const prodMap = new Map(prods.map(p => [p.id, p]));
-      return local.map(s => ({
-        ...s,
-        product: s.product || prodMap.get(s.product_id)
-      })).sort((a, b) => b.sale_date.localeCompare(a.sale_date) || b.created_at.localeCompare(a.created_at));
-    } catch {
-      return local;
+      invoices = await dbService.getInvoices();
+    } catch (e) {
+      console.warn('Could not load invoices for purchase items synthesis:', e);
     }
+
+    // 3. Load user-entered selling price overrides
+    const overrides = getSellingPriceOverrides();
+
+    // Set of IDs already covered by manual sales to avoid duplicate entries
+    const manualSaleIds = new Set(manualSales.map(s => s.id));
+
+    // 4. Transform purchased items into SalesTransaction records
+    const purchasedItemSales: SaleTransaction[] = [];
+
+    for (const inv of invoices) {
+      if (!inv.items) continue;
+      for (const item of inv.items) {
+        if (!item.product) continue;
+        if (manualSaleIds.has(item.id)) continue;
+
+        const qty = Number(item.quantity) || 0;
+        if (qty <= 0) continue;
+
+        const unitCost = Number(item.purchase_rate) || item.product.current_purchase_ref_price || 0;
+        const totalCost = Number((item.total || (qty * unitCost)).toFixed(2));
+
+        // Use manually entered selling price if overridden, else catalog selling price, else 0
+        let sellPrice = 0;
+        if (overrides[item.id] !== undefined) {
+          sellPrice = overrides[item.id];
+        } else if (item.product.current_selling_price > 0) {
+          sellPrice = item.product.current_selling_price;
+        } else {
+          sellPrice = Math.round(unitCost * 1.25);
+        }
+
+        const totalRevenue = Number((qty * sellPrice).toFixed(2));
+        const grossProfit = Number((totalRevenue - totalCost).toFixed(2));
+        const profitMargin = totalRevenue > 0
+          ? Number(((grossProfit / totalRevenue) * 100).toFixed(2))
+          : 0;
+
+        const saleNum = `SL-${inv.invoice_number.replace(/^INV-/, '')}-${item.id.slice(0, 4).toUpperCase()}`;
+        const saleDate = inv.invoice_date || item.created_at.slice(0, 10);
+
+        purchasedItemSales.push({
+          id: item.id,
+          sale_number: saleNum,
+          product_id: item.product_id || item.product.id,
+          product: item.product,
+          quantity: qty,
+          purchase_price: unitCost,
+          selling_price: sellPrice,
+          total_revenue: totalRevenue,
+          total_cogs: totalCost,
+          gross_profit: grossProfit,
+          profit_margin: profitMargin,
+          sale_date: saleDate,
+          customer_name: null,
+          notes: `Purchased via Invoice #${inv.invoice_number}`,
+          status: 'COMPLETED',
+          costing_method: 'FIFO',
+          cogs_breakdown: [
+            {
+              purchase_item_id: item.id,
+              invoice_id: inv.id,
+              invoice_number: inv.invoice_number,
+              invoice_date: inv.invoice_date,
+              quantity: qty,
+              unit_cost: unitCost,
+              total_cost: totalCost
+            }
+          ],
+          created_at: item.created_at || new Date().toISOString(),
+          updated_at: item.created_at || new Date().toISOString()
+        });
+      }
+    }
+
+    // Combine manual sales + purchased item sales, sorted by date DESC
+    const combined = [...manualSales, ...purchasedItemSales].sort(
+      (a, b) => b.sale_date.localeCompare(a.sale_date) || b.created_at.localeCompare(a.created_at)
+    );
+
+    return combined;
   },
 
   /**
@@ -114,29 +214,48 @@ export const revenueService = {
    */
   getSaleById: async (id: string): Promise<SaleTransaction | null> => {
     if (!id) return null;
-    try {
-      const { data, error } = await supabase
-        .from('sales')
-        .select('*, product:products(*)')
-        .eq('id', id)
-        .maybeSingle();
+    const all = await revenueService.getSales();
+    return all.find(s => s.id === id) || null;
+  },
 
-      if (!error && data) {
-        return data as SaleTransaction;
-      }
-    } catch {
-      // Fallback
+  /**
+   * Manually update the selling price for a transaction (either a purchased item or manual sale)
+   */
+  updateSellingPrice: async (id: string, newSellingPrice: number): Promise<SaleTransaction> => {
+    if (newSellingPrice < 0) {
+      throw new Error('Selling price cannot be negative.');
     }
 
-    const local = getLocalSales();
-    const found = local.find(s => s.id === id);
-    if (!found) return null;
-    try {
-      const prod = await dbService.getProductById(found.product_id);
-      return { ...found, product: prod || found.product };
-    } catch {
-      return found;
+    // Check if this ID is a manual sale
+    const manualSales = getLocalSales();
+    const isManualSale = manualSales.some(s => s.id === id);
+
+    if (isManualSale) {
+      return await revenueService.updateSale(id, { selling_price: newSellingPrice });
     }
+
+    // Otherwise it's a purchased item: persist in overrides map
+    const overrides = getSellingPriceOverrides();
+    overrides[id] = Number(newSellingPrice.toFixed(2));
+    setSellingPriceOverrides(overrides);
+
+    // Fetch the updated synthesized sale
+    const updated = await revenueService.getSaleById(id);
+    if (!updated) {
+      throw new Error('Transaction not found.');
+    }
+
+    // Record audit log
+    await dbService.logAudit(
+      'SALE_UPDATED',
+      'sales',
+      id,
+      { selling_price: updated.selling_price },
+      { selling_price: newSellingPrice, total_revenue: updated.total_revenue, gross_profit: updated.gross_profit },
+      `Manually updated selling price for ${updated.product?.nickname || 'Item'} to ₹${newSellingPrice.toFixed(2)}`
+    );
+
+    return updated;
   },
 
   /**
@@ -205,8 +324,9 @@ export const revenueService = {
 
     const totalPurchased = batches.reduce((sum, b) => sum + b.original_qty, 0);
 
-    // 2. Consume batches according to existing COMPLETED sales (in FIFO order)
-    const productSales = allSales.filter(
+    // Filter to manual sales only for stock reduction calculation
+    const manualSales = getLocalSales();
+    const productSales = manualSales.filter(
       s => s.product_id === productId && s.status === 'COMPLETED' && s.id !== excludeSaleId
     ).sort((a, b) => a.sale_date.localeCompare(b.sale_date) || a.created_at.localeCompare(b.created_at));
 
@@ -303,7 +423,6 @@ export const revenueService = {
       remainingNeeded = Number((remainingNeeded - take).toFixed(3));
     }
 
-    // If there was no unconsumed purchase invoice batch (e.g. stock added manually), fallback to catalog ref price
     if (remainingNeeded > 0.0001) {
       const fallbackRate = fifoState.product.current_purchase_ref_price || 0;
       const costForSlice = Number((remainingNeeded * fallbackRate).toFixed(2));
@@ -328,7 +447,7 @@ export const revenueService = {
   },
 
   /**
-   * Create and record a new manual sale transaction
+   * Create and record a new manual sale transaction (without requiring customer name, date, notes)
    */
   createSale: async (input: CreateSaleInput): Promise<SaleTransaction> => {
     const { product_id, quantity, selling_price, sale_date, customer_name, notes } = input;
@@ -337,15 +456,13 @@ export const revenueService = {
     if (quantity <= 0) throw new Error('Quantity sold must be greater than zero.');
     if (selling_price < 0) throw new Error('Selling price cannot be negative.');
 
-    // Concurrency guard per product
     if (productSaleLocks.has(product_id)) {
       throw new Error('Another sale transaction is being processed for this product. Please wait a moment.');
     }
     productSaleLocks.add(product_id);
 
     try {
-      // Duplicate submission guard
-      const fingerprint = `${product_id}-${quantity}-${selling_price.toFixed(2)}-${sale_date || ''}`;
+      const fingerprint = `${product_id}-${quantity}-${selling_price.toFixed(2)}`;
       const nowMs = Date.now();
       const last = recentSaleSubmissions.get(fingerprint);
       if (last && nowMs - last < DUPLICATE_WINDOW_MS) {
@@ -353,7 +470,6 @@ export const revenueService = {
       }
       recentSaleSubmissions.set(fingerprint, nowMs);
 
-      // Perform FIFO cost allocation and stock validation
       const fifoResult = await revenueService.allocateFIFO(product_id, quantity);
 
       const saleId = generateUUID();
@@ -390,9 +506,8 @@ export const revenueService = {
         updated_at: now
       };
 
-      // 1. Persist to Supabase sales table (if migrated) or sync cache
       try {
-        const { error: insertErr } = await supabase
+        await supabase
           .from('sales')
           .insert({
             id: saleRecord.id,
@@ -414,35 +529,28 @@ export const revenueService = {
             created_at: saleRecord.created_at,
             updated_at: saleRecord.updated_at
           });
-
-        if (insertErr) {
-          console.warn('Supabase sales insert warning (falling back to sync storage):', insertErr.message);
-        }
       } catch (err) {
-        console.warn('Supabase sales table notice:', err);
+        console.warn('Supabase sales insert notice:', err);
       }
 
-      // Always maintain persistent local cache
       const currentSales = getLocalSales();
       setLocalSales([saleRecord, ...currentSales.filter(s => s.id !== saleId)]);
 
-      // 2. Record stock movement in stock_transactions
       try {
         await supabase.from('stock_transactions').insert({
           id: generateUUID(),
           product_id,
-          transaction_type: 'ADJUSTMENT', // Safe across all enum schemas
+          transaction_type: 'ADJUSTMENT',
           quantity: -Number(quantity.toFixed(3)),
           reference_id: saleId,
           reference_type: 'SALE',
-          notes: `Sold ${quantity} ${fifoResult.product.uom} via Sale #${saleNumber} to ${customer_name || 'Walk-in'}`,
+          notes: `Sold ${quantity} ${fifoResult.product.uom} via Sale #${saleNumber}`,
           created_at: now
         });
       } catch (stErr) {
         console.warn('Stock transaction log notice:', stErr);
       }
 
-      // 3. Record immutable audit log
       await dbService.logAudit(
         'SALE_CREATED',
         'sales',
@@ -456,7 +564,7 @@ export const revenueService = {
           total_revenue: saleRecord.total_revenue,
           gross_profit: saleRecord.gross_profit
         },
-        `Created Sale #${saleNumber} for ${quantity} ${fifoResult.product.uom} of ${fifoResult.product.nickname} (Revenue: ₹${totalRevenue.toLocaleString('en-IN')})`
+        `Created Sale #${saleNumber} for ${quantity} ${fifoResult.product.uom} of ${fifoResult.product.nickname}`
       );
 
       return saleRecord;
@@ -469,6 +577,17 @@ export const revenueService = {
    * Update an existing sale transaction
    */
   updateSale: async (id: string, input: UpdateSaleInput): Promise<SaleTransaction> => {
+    // Check if this is a purchased item
+    const overrides = getSellingPriceOverrides();
+    const manualSales = getLocalSales();
+    const isManualSale = manualSales.some(s => s.id === id);
+
+    if (!isManualSale) {
+      if (input.selling_price !== undefined) {
+        return await revenueService.updateSellingPrice(id, input.selling_price);
+      }
+    }
+
     const existing = await revenueService.getSaleById(id);
     if (!existing) throw new Error(`Sale with ID ${id} not found.`);
 
@@ -481,8 +600,22 @@ export const revenueService = {
     if (effectiveQty <= 0) throw new Error('Quantity sold must be greater than zero.');
     if (effectiveSellingPrice < 0) throw new Error('Selling price cannot be negative.');
 
-    // Re-run FIFO cost allocation excluding current sale ID
-    const fifoResult = await revenueService.allocateFIFO(productId, effectiveQty, id);
+    let fifoResult = {
+      product: existing.product!,
+      unitPurchasePrice: existing.purchase_price,
+      totalCogs: Number((effectiveQty * existing.purchase_price).toFixed(2)),
+      allocations: existing.cogs_breakdown || []
+    };
+
+    if (isManualSale) {
+      const res = await revenueService.allocateFIFO(productId, effectiveQty, id);
+      fifoResult = {
+        product: res.product,
+        unitPurchasePrice: res.unitPurchasePrice,
+        totalCogs: res.totalCogs,
+        allocations: res.allocations
+      };
+    }
 
     const now = new Date().toISOString();
     const totalRevenue = Number((effectiveQty * effectiveSellingPrice).toFixed(2));
@@ -503,94 +636,96 @@ export const revenueService = {
       gross_profit: grossProfit,
       profit_margin: profitMargin,
       sale_date: effectiveSaleDate,
-      customer_name: input.customer_name !== undefined ? (input.customer_name?.trim() || null) : existing.customer_name,
-      notes: input.notes !== undefined ? (input.notes?.trim() || null) : existing.notes,
+      customer_name: null,
+      notes: null,
       status: effectiveStatus,
       cogs_breakdown: fifoResult.allocations,
       updated_at: now
     };
 
-    // 1. Update in Supabase
-    try {
-      await supabase
-        .from('sales')
-        .update({
-          quantity: updatedSale.quantity,
-          purchase_price: updatedSale.purchase_price,
-          selling_price: updatedSale.selling_price,
-          total_revenue: updatedSale.total_revenue,
-          total_cogs: updatedSale.total_cogs,
-          gross_profit: updatedSale.gross_profit,
-          profit_margin: updatedSale.profit_margin,
-          sale_date: updatedSale.sale_date,
-          customer_name: updatedSale.customer_name,
-          notes: updatedSale.notes,
-          status: updatedSale.status,
-          cogs_breakdown: updatedSale.cogs_breakdown,
-          updated_at: updatedSale.updated_at
-        })
-        .eq('id', id);
-    } catch (e) {
-      console.warn('Supabase sales update notice:', e);
+    if (isManualSale) {
+      try {
+        await supabase
+          .from('sales')
+          .update({
+            quantity: updatedSale.quantity,
+            purchase_price: updatedSale.purchase_price,
+            selling_price: updatedSale.selling_price,
+            total_revenue: updatedSale.total_revenue,
+            total_cogs: updatedSale.total_cogs,
+            gross_profit: updatedSale.gross_profit,
+            profit_margin: updatedSale.profit_margin,
+            sale_date: updatedSale.sale_date,
+            status: updatedSale.status,
+            cogs_breakdown: updatedSale.cogs_breakdown,
+            updated_at: updatedSale.updated_at
+          })
+          .eq('id', id);
+      } catch (e) {
+        console.warn('Supabase sales update notice:', e);
+      }
+
+      const currentSales = getLocalSales();
+      setLocalSales(currentSales.map(s => s.id === id ? updatedSale : s));
+    } else {
+      overrides[id] = Number(effectiveSellingPrice.toFixed(2));
+      setSellingPriceOverrides(overrides);
     }
 
-    // Update local cache
-    const currentSales = getLocalSales();
-    setLocalSales(currentSales.map(s => s.id === id ? updatedSale : s));
-
-    // Audit log
     await dbService.logAudit(
       'SALE_UPDATED',
       'sales',
       id,
       {
-        quantity: existing.quantity,
         selling_price: existing.selling_price,
-        total_revenue: existing.total_revenue,
-        gross_profit: existing.gross_profit
+        total_revenue: existing.total_revenue
       },
       {
-        quantity: updatedSale.quantity,
         selling_price: updatedSale.selling_price,
         total_revenue: updatedSale.total_revenue,
         gross_profit: updatedSale.gross_profit
       },
-      `Updated Sale #${existing.sale_number} (${fifoResult.product.nickname})`
+      `Updated selling price for Sale #${existing.sale_number} to ₹${effectiveSellingPrice.toFixed(2)}`
     );
 
     return updatedSale;
   },
 
   /**
-   * Delete or void a sale transaction and restore inventory stock
+   * Delete or void a sale transaction
    */
   deleteSale: async (id: string, reason?: string): Promise<void> => {
     const existing = await revenueService.getSaleById(id);
     if (!existing) return;
 
-    // 1. Delete from Supabase
-    try {
-      await supabase.from('sales').delete().eq('id', id);
-    } catch (e) {
-      console.warn('Supabase sales delete notice:', e);
+    const manualSales = getLocalSales();
+    const isManualSale = manualSales.some(s => s.id === id);
+
+    if (isManualSale) {
+      try {
+        await supabase.from('sales').delete().eq('id', id);
+      } catch (e) {
+        console.warn('Supabase sales delete notice:', e);
+      }
+
+      setLocalSales(manualSales.filter(s => s.id !== id));
+
+      try {
+        await supabase
+          .from('stock_transactions')
+          .delete()
+          .eq('reference_id', id)
+          .eq('reference_type', 'SALE');
+      } catch (e) {
+        console.warn('Stock transaction delete notice:', e);
+      }
+    } else {
+      // If purchased item, reset its override
+      const overrides = getSellingPriceOverrides();
+      delete overrides[id];
+      setSellingPriceOverrides(overrides);
     }
 
-    // 2. Remove from local cache
-    const currentSales = getLocalSales();
-    setLocalSales(currentSales.filter(s => s.id !== id));
-
-    // 3. Remove/revert stock transactions
-    try {
-      await supabase
-        .from('stock_transactions')
-        .delete()
-        .eq('reference_id', id)
-        .eq('reference_type', 'SALE');
-    } catch (e) {
-      console.warn('Stock transaction delete notice:', e);
-    }
-
-    // 4. Audit log
     await dbService.logAudit(
       'SALE_DELETED',
       'sales',
@@ -602,7 +737,7 @@ export const revenueService = {
         total_revenue: existing.total_revenue
       },
       null,
-      `Deleted Sale #${existing.sale_number} (Restored ${existing.quantity} units to inventory). Reason: ${reason || 'User requested deletion'}`
+      `Removed Sale #${existing.sale_number}. Reason: ${reason || 'User requested reset'}`
     );
   },
 
@@ -616,7 +751,6 @@ export const revenueService = {
     const stockInfos: ProductStockInfo[] = [];
     for (const p of activeProducts) {
       const fifo = await revenueService.calculateProductFIFO(p.id);
-      // Stock value: remaining unconsumed batches multiplied by their purchase cost
       const stockVal = fifo.unconsumedBatches.reduce(
         (sum, b) => sum + (b.remaining_qty * b.unit_cost),
         0
@@ -666,8 +800,7 @@ export const revenueService = {
       }
 
       if (filter === 'THIS_WEEK') {
-        // Monday-to-Sunday current week
-        const curDay = today.getDay(); // 0 is Sunday
+        const curDay = today.getDay();
         const diffToMon = (curDay + 6) % 7;
         const mon = new Date(today);
         mon.setDate(today.getDate() - diffToMon);
@@ -740,10 +873,9 @@ export const revenueService = {
     allSales: SaleTransaction[]
   ) => {
     const completed = filteredSales.filter(s => s.status === 'COMPLETED');
-
-    // 1. Monthly Revenue vs COGS vs Gross Profit (all-time or filtered timeline)
-    const monthlyMap: Record<string, { month: string; revenue: number; cogs: number; profit: number; margin: number }> = {};
     const datasetForMonthly = completed.length > 0 ? completed : allSales.filter(s => s.status === 'COMPLETED');
+
+    const monthlyMap: Record<string, { month: string; revenue: number; cogs: number; profit: number; margin: number }> = {};
 
     datasetForMonthly.forEach(s => {
       const monthKey = s.sale_date.slice(0, 7);
@@ -765,7 +897,6 @@ export const revenueService = {
         margin: m.revenue > 0 ? Number(((m.profit / m.revenue) * 100).toFixed(1)) : 0
       }));
 
-    // 2. Daily Revenue Trend
     const dailyMap: Record<string, { date: string; revenue: number; profit: number; count: number }> = {};
     completed.forEach(s => {
       const dateKey = s.sale_date;
@@ -785,7 +916,6 @@ export const revenueService = {
         profit: Number(d.profit.toFixed(2))
       }));
 
-    // 3. Product-wise Revenue and Profit
     const productStatsMap: Record<string, {
       product_id: string;
       name: string;
@@ -827,7 +957,6 @@ export const revenueService = {
       }))
       .sort((a, b) => b.revenue - a.revenue);
 
-    // 4. Best-Selling Products (Ranked by quantity sold)
     const bestSelling = [...productBreakdown].sort((a, b) => b.quantitySold - a.quantitySold).slice(0, 5);
 
     return {
@@ -838,4 +967,3 @@ export const revenueService = {
     };
   }
 };
-

@@ -313,13 +313,40 @@ export const RevenuePage: React.FC = () => {
       )
     },
     {
-      header: 'Selling Price',
-      headerClassName: 'text-right',
-      className: 'text-right',
+      header: 'Selling Price (Manual Entry)',
+      headerClassName: 'text-right min-w-[130px]',
+      className: 'text-right min-w-[130px]',
       cell: (row) => (
-        <span className="text-xs font-mono text-slate-900 font-medium tabular-nums">
-          ₹{formatINR(row.selling_price)}
-        </span>
+        <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+          <span className="text-xs font-mono text-slate-400">₹</span>
+          <input
+            type="number"
+            step="any"
+            min="0"
+            key={`${row.id}-${row.selling_price}`}
+            defaultValue={row.selling_price || ''}
+            placeholder="0.00"
+            onBlur={async (e) => {
+              const val = parseFloat(e.target.value) || 0;
+              if (val !== row.selling_price) {
+                try {
+                  await revenueService.updateSellingPrice(row.id, val);
+                  toastSuccess('Price Updated', `Selling price for ${row.product?.nickname || 'Item'} set to ₹${formatINR(val)}`);
+                  loadData(true);
+                } catch (err: any) {
+                  toastError('Error', err.message);
+                }
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                (e.target as HTMLInputElement).blur();
+              }
+            }}
+            className="w-24 h-7 text-right text-xs font-mono font-semibold text-slate-900 bg-white border border-slate-200 hover:border-slate-300 focus:border-brand-600 focus:ring-1 focus:ring-brand-600 rounded px-1.5 transition-colors shadow-2xs"
+            title="Click to enter/update selling price"
+          />
+        </div>
       )
     },
     {

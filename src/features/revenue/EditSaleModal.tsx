@@ -2,16 +2,14 @@ import React, { useState, useEffect } from 'react';
 import {
   TrendingUp,
   TrendingDown,
-  AlertCircle,
   CheckCircle2,
   Package
 } from 'lucide-react';
 import { Modal } from '../../components/ui/Modal';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Select } from '../../components/ui/Select';
 import { Badge } from '../../components/ui/Badge';
-import { SaleTransaction, SaleStatus, ProductStockInfo, UpdateSaleInput } from '../../types';
+import { SaleTransaction, ProductStockInfo, UpdateSaleInput } from '../../types';
 import { revenueService } from '../../services/revenueService';
 import { formatINR } from '../../utils/dateUtils';
 import { useToast } from '../../context/ToastContext';
@@ -35,10 +33,6 @@ export const EditSaleModal: React.FC<EditSaleModalProps> = ({
 
   const [quantity, setQuantity] = useState<number>(1);
   const [sellingPrice, setSellingPrice] = useState<number>(0);
-  const [saleDate, setSaleDate] = useState<string>('');
-  const [customerName, setCustomerName] = useState<string>('');
-  const [notes, setNotes] = useState<string>('');
-  const [status, setStatus] = useState<SaleStatus>('COMPLETED');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [calculatingCogs, setCalculatingCogs] = useState<boolean>(false);
   const [availableStockExcludingCurrent, setAvailableStockExcludingCurrent] = useState<number>(0);
@@ -52,10 +46,6 @@ export const EditSaleModal: React.FC<EditSaleModalProps> = ({
     if (sale && isOpen) {
       setQuantity(sale.quantity);
       setSellingPrice(sale.selling_price);
-      setSaleDate(sale.sale_date);
-      setCustomerName(sale.customer_name || '');
-      setNotes(sale.notes || '');
-      setStatus(sale.status);
     }
   }, [sale, isOpen]);
 
@@ -133,15 +123,11 @@ export const EditSaleModal: React.FC<EditSaleModalProps> = ({
     try {
       const updateData: UpdateSaleInput = {
         quantity,
-        selling_price: sellingPrice,
-        sale_date: saleDate,
-        customer_name: customerName,
-        notes: notes,
-        status: status
+        selling_price: sellingPrice
       };
 
       await revenueService.updateSale(sale.id, updateData);
-      toastSuccess('Sale updated', `Sale #${sale.sale_number} has been updated.`);
+      toastSuccess('Sale updated', `Selling price for #${sale.sale_number} has been updated.`);
       onSuccess();
       onClose();
     } catch (err: any) {
@@ -155,10 +141,10 @@ export const EditSaleModal: React.FC<EditSaleModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={`Edit Sale: #${sale.sale_number}`}
-      size="lg"
+      title={`Enter Selling Price: #${sale.sale_number}`}
+      size="md"
     >
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-4">
         {/* Product static info */}
         <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs">
           <div className="flex items-center gap-2">
@@ -166,12 +152,12 @@ export const EditSaleModal: React.FC<EditSaleModalProps> = ({
             <span className="font-semibold text-slate-900">
               {sale.product?.nickname || 'Product Item'}
             </span>
-            <span className="text-slate-400 font-mono">
+            <span className="text-slate-400 font-mono text-[11px] truncate max-w-[120px]">
               ({sale.product?.supplier_item_name})
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-slate-500">Available Stock:</span>
+            <span className="text-slate-500">Available:</span>
             <Badge variant="blue">
               {availableStockExcludingCurrent} {sale.product?.uom || 'units'}
             </Badge>
@@ -179,9 +165,9 @@ export const EditSaleModal: React.FC<EditSaleModalProps> = ({
         </div>
 
         {/* Quantities & Pricing Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
               Quantity Sold <span className="text-red-500">*</span>
             </label>
             <Input
@@ -192,7 +178,7 @@ export const EditSaleModal: React.FC<EditSaleModalProps> = ({
               onChange={(e) => setQuantity(parseFloat(e.target.value) || 0)}
               error={
                 isExceedingStock
-                  ? `Exceeds stock (${availableStockExcludingCurrent} available)`
+                  ? `Exceeds stock (${availableStockExcludingCurrent})`
                   : quantity <= 0
                     ? 'Must be > 0'
                     : undefined
@@ -201,17 +187,17 @@ export const EditSaleModal: React.FC<EditSaleModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
               Unit Purchase Cost
             </label>
             <div className="h-9 px-3 rounded-md bg-slate-100 border border-slate-200 flex items-center justify-between text-sm font-mono text-slate-700">
               <span>₹{formatINR(unitCost)}</span>
-              <span className="text-[10px] text-slate-400 uppercase font-sans font-medium">FIFO auto</span>
+              <span className="text-[10px] text-slate-400 uppercase font-sans font-medium">FIFO</span>
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
+            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
               Selling Price / Unit <span className="text-red-500">*</span>
             </label>
             <div className="relative">
@@ -223,87 +209,37 @@ export const EditSaleModal: React.FC<EditSaleModalProps> = ({
                 className="pl-7"
                 value={sellingPrice || ''}
                 onChange={(e) => setSellingPrice(parseFloat(e.target.value) || 0)}
+                placeholder="0.00"
+                autoFocus
               />
             </div>
           </div>
         </div>
 
         {/* Financial calculation card */}
-        <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-3">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
-            <div className="p-2.5 rounded-lg bg-white border border-slate-200">
-              <p className="text-[11px] text-slate-500 uppercase font-medium">Revenue</p>
-              <p className="text-base font-bold font-mono text-brand-700 mt-0.5">₹{formatINR(totalRevenue)}</p>
+        <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 space-y-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center">
+            <div className="p-2 rounded-lg bg-white border border-slate-200">
+              <p className="text-[10px] text-slate-500 uppercase font-medium">Revenue</p>
+              <p className="text-sm font-bold font-mono text-brand-700 mt-0.5">₹{formatINR(totalRevenue)}</p>
             </div>
-            <div className="p-2.5 rounded-lg bg-white border border-slate-200">
-              <p className="text-[11px] text-slate-500 uppercase font-medium">COGS</p>
-              <p className="text-base font-bold font-mono text-slate-800 mt-0.5">₹{formatINR(totalCogs)}</p>
+            <div className="p-2 rounded-lg bg-white border border-slate-200">
+              <p className="text-[10px] text-slate-500 uppercase font-medium">COGS</p>
+              <p className="text-sm font-bold font-mono text-slate-800 mt-0.5">₹{formatINR(totalCogs)}</p>
             </div>
-            <div className={`p-2.5 rounded-lg border ${isProfit ? 'bg-emerald-50/50 border-emerald-200' : 'bg-rose-50/50 border-rose-200'}`}>
-              <p className={`text-[11px] uppercase font-medium ${isProfit ? 'text-emerald-700' : 'text-rose-700'}`}>Gross Profit</p>
-              <p className={`text-base font-bold font-mono mt-0.5 ${isProfit ? 'text-emerald-700' : 'text-rose-700'}`}>
+            <div className={`p-2 rounded-lg border ${isProfit ? 'bg-emerald-50/50 border-emerald-200' : 'bg-rose-50/50 border-rose-200'}`}>
+              <p className={`text-[10px] uppercase font-medium ${isProfit ? 'text-emerald-700' : 'text-rose-700'}`}>Gross Profit</p>
+              <p className={`text-sm font-bold font-mono mt-0.5 ${isProfit ? 'text-emerald-700' : 'text-rose-700'}`}>
                 ₹{formatINR(grossProfit)}
               </p>
             </div>
-            <div className={`p-2.5 rounded-lg border ${isProfit ? 'bg-emerald-50/50 border-emerald-200' : 'bg-rose-50/50 border-rose-200'}`}>
-              <p className={`text-[11px] uppercase font-medium ${isProfit ? 'text-emerald-700' : 'text-rose-700'}`}>Margin</p>
-              <p className={`text-base font-bold font-mono mt-0.5 ${isProfit ? 'text-emerald-700' : 'text-rose-700'}`}>
-                {profitMargin.toFixed(2)}%
+            <div className={`p-2 rounded-lg border ${isProfit ? 'bg-emerald-50/50 border-emerald-200' : 'bg-rose-50/50 border-rose-200'}`}>
+              <p className={`text-[10px] uppercase font-medium ${isProfit ? 'text-emerald-700' : 'text-rose-700'}`}>Margin</p>
+              <p className={`text-sm font-bold font-mono mt-0.5 ${isProfit ? 'text-emerald-700' : 'text-rose-700'}`}>
+                {profitMargin.toFixed(1)}%
               </p>
             </div>
           </div>
-        </div>
-
-        {/* Date, Customer, Status */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-              Sale Date
-            </label>
-            <Input
-              type="date"
-              value={saleDate}
-              onChange={(e) => setSaleDate(e.target.value)}
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-              Customer Name
-            </label>
-            <Input
-              type="text"
-              value={customerName}
-              onChange={(e) => setCustomerName(e.target.value)}
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-              Transaction Status
-            </label>
-            <Select
-              value={status}
-              onChange={(e) => setStatus(e.target.value as SaleStatus)}
-              options={[
-                { value: 'COMPLETED', label: 'COMPLETED' },
-                { value: 'RETURNED', label: 'RETURNED (Restocks)' },
-                { value: 'CANCELLED', label: 'CANCELLED (Void)' }
-              ]}
-            />
-          </div>
-        </div>
-
-        {/* Notes */}
-        <div>
-          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-            Notes
-          </label>
-          <Input
-            type="text"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-          />
         </div>
 
         {/* Action Buttons */}
@@ -322,7 +258,7 @@ export const EditSaleModal: React.FC<EditSaleModalProps> = ({
             disabled={isSubmitting || isExceedingStock || quantity <= 0}
             icon={<CheckCircle2 className="h-4 w-4" />}
           >
-            {isSubmitting ? 'Saving Changes...' : 'Save Changes'}
+            {isSubmitting ? 'Saving...' : 'Save Selling Price'}
           </Button>
         </div>
       </form>
