@@ -290,22 +290,22 @@ export const RevenuePage: React.FC = () => {
       )
     },
     {
-      header: 'Total Revenue',
-      headerClassName: 'text-right',
-      className: 'text-right',
-      cell: (row) => (
-        <span className="text-xs font-mono font-bold text-brand-700 tabular-nums">
-          ₹{formatINR(row.total_revenue)}
-        </span>
-      )
-    },
-    {
       header: 'Total Purchase Amount',
       headerClassName: 'text-right',
       className: 'text-right',
       cell: (row) => (
         <span className="text-xs font-mono font-bold text-slate-800 tabular-nums">
           ₹{formatINR(row.total_cogs)}
+        </span>
+      )
+    },
+    {
+      header: 'Total Revenue',
+      headerClassName: 'text-right',
+      className: 'text-right',
+      cell: (row) => (
+        <span className="text-xs font-mono font-bold text-brand-700 tabular-nums">
+          ₹{formatINR(row.total_revenue)}
         </span>
       )
     },
