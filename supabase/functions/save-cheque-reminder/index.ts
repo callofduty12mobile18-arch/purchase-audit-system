@@ -177,11 +177,35 @@ Deno.serve(async (req: Request): Promise<Response> => {
       updated_at: new Date().toISOString(),
     };
 
-    const { data, error } = await adminClient
+    // Check if an existing reminder already exists for this invoice to avoid
+    // ON CONFLICT constraint mismatch issues across database schema variations
+    const { data: existing } = await adminClient
       .from('cheque_reminders')
-      .upsert(upsertRow, { onConflict: 'invoice_id' })
-      .select()
-      .single();
+      .select('id')
+      .eq('invoice_id', invoiceId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    let data, error;
+    if (existing?.id) {
+      const res = await adminClient
+        .from('cheque_reminders')
+        .update(upsertRow)
+        .eq('id', existing.id)
+        .select()
+        .single();
+      data = res.data;
+      error = res.error;
+    } else {
+      const res = await adminClient
+        .from('cheque_reminders')
+        .insert(upsertRow)
+        .select()
+        .single();
+      data = res.data;
+      error = res.error;
+    }
 
     if (error) return json({ error: error.message }, 500);
     return json({ ok: true, reminder: data });

@@ -171,19 +171,75 @@ export const chequeReminderService = {
     const reminderAt = istDateTimeToUtcIso(input.reminderDate, input.reminderTime);
     if (!reminderAt) throw new Error('Reminder date and time are required.');
 
-    const result = await callEdgeFn({
-      op: 'schedule',
-      invoiceId: input.invoiceId,
-      invoiceNumber: input.invoiceNumber,
-      supplierName: input.supplierName ?? null,
-      amount: input.amount,
-      chequePresentationDate: input.chequePresentationDate ?? null,
-      recipientEmail: input.recipientEmail,
-      reminderAt,
-      createdBy: input.createdBy ?? null,
-    });
+    try {
+      const result = await callEdgeFn({
+        op: 'schedule',
+        invoiceId: input.invoiceId,
+        invoiceNumber: input.invoiceNumber,
+        supplierName: input.supplierName ?? null,
+        amount: input.amount,
+        chequePresentationDate: input.chequePresentationDate ?? null,
+        recipientEmail: input.recipientEmail,
+        reminderAt,
+        createdBy: input.createdBy ?? null,
+      });
 
-    return result.reminder as ChequeReminder;
+      return result.reminder as ChequeReminder;
+    } catch (edgeErr: unknown) {
+      console.warn('Edge function schedule reminder error, attempting direct client fallback:', edgeErr);
+
+      // Direct client fallback for authenticated Supabase sessions
+      try {
+        const { data: existing } = await supabase
+          .from('cheque_reminders')
+          .select('id')
+          .eq('invoice_id', input.invoiceId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const row = {
+          invoice_id: input.invoiceId,
+          invoice_number: input.invoiceNumber,
+          supplier_name: input.supplierName ?? null,
+          amount: input.amount,
+          cheque_presentation_date: input.chequePresentationDate ?? null,
+          recipient_email: input.recipientEmail,
+          reminder_at: reminderAt,
+          status: 'PENDING',
+          attempts: 0,
+          last_error: null,
+          sent_at: null,
+          created_by: input.createdBy ?? null,
+          updated_at: new Date().toISOString(),
+        };
+
+        if (existing?.id) {
+          const { data, error } = await supabase
+            .from('cheque_reminders')
+            .update(row)
+            .eq('id', existing.id)
+            .select()
+            .single();
+
+          if (error) throw error;
+          return data as ChequeReminder;
+        } else {
+          const { data, error } = await supabase
+            .from('cheque_reminders')
+            .insert(row)
+            .select()
+            .single();
+
+          if (error) throw error;
+          return data as ChequeReminder;
+        }
+      } catch (fallbackErr: unknown) {
+        // If direct client also fails, rethrow the original or fallback error
+        const msg = edgeErr instanceof Error ? edgeErr.message : String(edgeErr);
+        throw new Error(msg);
+      }
+    }
   },
 
   /**
@@ -193,7 +249,19 @@ export const chequeReminderService = {
    * This is a best-effort operation — it must never block invoice save.
    */
   cancel: async (invoiceId: string): Promise<void> => {
-    await callEdgeFn({ op: 'cancel', invoiceId });
+    try {
+      await callEdgeFn({ op: 'cancel', invoiceId });
+    } catch (err) {
+      console.warn('Edge function cancel error, attempting direct client fallback:', err);
+      try {
+        await supabase
+          .from('cheque_reminders')
+          .update({ status: 'CANCELLED', updated_at: new Date().toISOString() })
+          .eq('invoice_id', invoiceId);
+      } catch (directErr) {
+        console.warn('Direct cancel fallback failed:', directErr);
+      }
+    }
   },
 
   /**

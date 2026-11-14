@@ -45,3 +45,4 @@ const derivedRoundOff = Number((enteredNet - itemsTotal).toFixed(2));
 assert.strictEqual(derivedRoundOff, 0.04, 'Manual net entry must derive round off +0.04');
 
 console.log('✅ All invoice total and rate precision assertions passed successfully!');
+
