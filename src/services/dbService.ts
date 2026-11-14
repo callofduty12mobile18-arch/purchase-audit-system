@@ -314,7 +314,21 @@ export const dbService = {
       throw error;
     }
 
-    return (data || []) as PurchaseInvoice[];
+    const invoices = (data || []) as PurchaseInvoice[];
+    for (const inv of invoices) {
+      if (inv.items) {
+        inv.items = inv.items.map((it) => {
+          const qty = Number(it.quantity) || 0;
+          const tot = Number(it.total) || 0;
+          if (qty > 0 && tot > 0) {
+            it.purchase_rate = tot / qty;
+          }
+          return it;
+        });
+      }
+    }
+
+    return invoices;
   },
 
   getInvoiceById: async (id: string): Promise<PurchaseInvoice | null> => {
@@ -331,7 +345,19 @@ export const dbService = {
       throw error;
     }
 
-    return (data as PurchaseInvoice) || null;
+    const inv = data as PurchaseInvoice | null;
+    if (inv && inv.items) {
+      inv.items = inv.items.map((it) => {
+        const qty = Number(it.quantity) || 0;
+        const tot = Number(it.total) || 0;
+        if (qty > 0 && tot > 0) {
+          it.purchase_rate = tot / qty;
+        }
+        return it;
+      });
+    }
+
+    return inv;
   },
 
   checkDuplicateInvoice: async (supplierId: string, invoiceNumber: string, invoiceDate?: string, excludeInvoiceId?: string): Promise<PurchaseInvoice | null> => {
@@ -385,8 +411,11 @@ export const dbService = {
     const itemsToInsert: PurchaseItem[] = [];
 
     for (const itemData of extractedData.items) {
-      const effectiveRate = Number(itemData.each_pack_rate || itemData.purchase_rate) || 0;
       const effectiveQty = Number(itemData.pack_qty || itemData.quantity || itemData.qty) || 1;
+      const lineTotal = Number(itemData.invoice_amount || itemData.total || 0);
+      const effectiveRate = (effectiveQty > 0 && lineTotal > 0)
+        ? (lineTotal / effectiveQty)
+        : (Number(itemData.each_pack_rate || itemData.purchase_rate) || 0);
       const sellingPrice = Number(itemData.mrp_rsp) || Math.round(effectiveRate * 1.3);
 
       const savedProduct = await dbService.saveProduct({
@@ -401,6 +430,11 @@ export const dbService = {
         is_active: true
       }, undefined, true);
 
+      const taxableVal = Number(itemData.taxable_value) || Number((lineTotal / 1.4).toFixed(2));
+      const totTax = Number(itemData.total_tax) || Number((lineTotal - taxableVal).toFixed(2));
+      const cgstVal = Number(itemData.cgst) || Number((totTax / 2).toFixed(2));
+      const sgstVal = Number(itemData.sgst) || Number((totTax - cgstVal).toFixed(2));
+
       const itemId = generateUUID();
       itemsToInsert.push({
         id: itemId,
@@ -413,11 +447,11 @@ export const dbService = {
         uom_snapshot: itemData.uom || 'PAC',
         purchase_rate: effectiveRate,
         gst_rate: Number(itemData.gst_rate) || 40,
-        taxable_value: Number(itemData.taxable_value) || 0,
-        cgst: Number(itemData.cgst) || 0,
-        sgst: Number(itemData.sgst) || 0,
+        taxable_value: taxableVal,
+        cgst: cgstVal,
+        sgst: sgstVal,
         igst: Number(itemData.igst) || 0,
-        total: Number(itemData.invoice_amount || itemData.total || (effectiveRate * effectiveQty)),
+        total: lineTotal,
         created_at: now
       });
     }

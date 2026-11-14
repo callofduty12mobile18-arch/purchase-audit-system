@@ -131,7 +131,7 @@ CREATE TABLE IF NOT EXISTS purchase_items (
     hsn_snapshot TEXT,
     quantity NUMERIC(12, 3) NOT NULL CHECK (quantity > 0),
     uom_snapshot TEXT NOT NULL DEFAULT 'PCS',
-    purchase_rate NUMERIC(12, 2) NOT NULL CHECK (purchase_rate >= 0),
+    purchase_rate NUMERIC(16, 6) NOT NULL CHECK (purchase_rate >= 0),
     gst_rate NUMERIC(5, 2) NOT NULL DEFAULT 0.00 CHECK (gst_rate >= 0),
     taxable_value NUMERIC(12, 2) NOT NULL CHECK (taxable_value >= 0),
     cgst NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
@@ -217,7 +217,7 @@ ALTER TABLE purchase_items ADD COLUMN IF NOT EXISTS supplier_item_name_snapshot 
 ALTER TABLE purchase_items ADD COLUMN IF NOT EXISTS hsn_snapshot TEXT;
 ALTER TABLE purchase_items ADD COLUMN IF NOT EXISTS quantity NUMERIC(12, 3);
 ALTER TABLE purchase_items ADD COLUMN IF NOT EXISTS uom_snapshot TEXT DEFAULT 'PAC';
-ALTER TABLE purchase_items ADD COLUMN IF NOT EXISTS purchase_rate NUMERIC(12, 2);
+ALTER TABLE purchase_items ADD COLUMN IF NOT EXISTS purchase_rate NUMERIC(16, 6);
 ALTER TABLE purchase_items ADD COLUMN IF NOT EXISTS gst_rate NUMERIC(5, 2) DEFAULT 0.00;
 ALTER TABLE purchase_items ADD COLUMN IF NOT EXISTS taxable_value NUMERIC(12, 2) DEFAULT 0.00;
 ALTER TABLE purchase_items ADD COLUMN IF NOT EXISTS cgst NUMERIC(12, 2) DEFAULT 0.00;

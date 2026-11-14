@@ -515,6 +515,23 @@ export const PurchasesPage: React.FC = () => {
                   </tbody>
                 </table>
               </div>
+
+              <div className="mt-3 pt-3 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-end gap-5 text-xs font-mono">
+                <div className="flex items-center justify-between sm:justify-start gap-2">
+                  <span className="text-slate-500 font-sans uppercase">Line Items Total:</span>
+                  <span className="font-semibold text-slate-900">₹{formatINR(selectedInvoice.subtotal)}</span>
+                </div>
+                <div className="flex items-center justify-between sm:justify-start gap-2">
+                  <span className="text-slate-500 font-sans uppercase">Round Off Amount:</span>
+                  <span className="font-semibold text-slate-700">
+                    {(selectedInvoice.round_off ?? 0) >= 0 ? '+' : '−'}₹{formatINR(Math.abs(selectedInvoice.round_off ?? 0))}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between sm:justify-start gap-2 p-1.5 bg-brand-50 rounded border border-brand-200">
+                  <span className="text-brand-700 font-sans font-bold uppercase">Net Amount Payable:</span>
+                  <span className="text-sm font-bold text-brand-800">₹{formatINR(selectedInvoice.grand_total)}</span>
+                </div>
+              </div>
             </div>
           </div>
         </Modal>

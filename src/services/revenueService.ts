@@ -273,7 +273,9 @@ export const revenueService = {
         const qty = Number(item.quantity) || 0;
         if (qty <= 0) continue;
 
-        const unitCost = Number(item.purchase_rate) || item.product?.current_purchase_ref_price || 0;
+        const unitCost = (item.total && item.quantity && Number(item.quantity) > 0)
+          ? (Number(item.total) / Number(item.quantity))
+          : (Number(item.purchase_rate) || item.product?.current_purchase_ref_price || 0);
         const totalCost = Number((item.total || (qty * unitCost)).toFixed(2));
         const invDate = inv.invoice_date || item.created_at?.slice(0, 10) || getTodayIST();
 
@@ -411,7 +413,9 @@ export const revenueService = {
       for (const item of inv.items) {
         const qty = Number(item.quantity) || 0;
         if (qty <= 0) continue;
-        const unitCost = Number(item.purchase_rate) || item.product?.current_purchase_ref_price || 0;
+        const unitCost = (item.total && item.quantity && Number(item.quantity) > 0)
+          ? (Number(item.total) / Number(item.quantity))
+          : (Number(item.purchase_rate) || item.product?.current_purchase_ref_price || 0);
 
         const batch: PurchaseBatch = {
           purchase_item_id: item.id,
@@ -420,7 +424,7 @@ export const revenueService = {
           invoice_date: inv.invoice_date,
           original_qty: qty,
           remaining_qty: qty,
-          unit_cost: Number(unitCost.toFixed(2))
+          unit_cost: unitCost
         };
 
         if (item.product_id) {
@@ -646,7 +650,9 @@ export const revenueService = {
         if (matchesProduct) {
           const qty = Number(item.quantity) || 0;
           if (qty <= 0) continue;
-          const unitCost = Number(item.purchase_rate) || product.current_purchase_ref_price || 0;
+          const unitCost = (item.total && item.quantity && Number(item.quantity) > 0)
+            ? (Number(item.total) / Number(item.quantity))
+            : (Number(item.purchase_rate) || product.current_purchase_ref_price || 0);
 
           batches.push({
             purchase_item_id: item.id,
@@ -655,7 +661,7 @@ export const revenueService = {
             invoice_date: inv.invoice_date,
             original_qty: qty,
             remaining_qty: qty,
-            unit_cost: Number(unitCost.toFixed(2))
+            unit_cost: unitCost
           });
         }
       }

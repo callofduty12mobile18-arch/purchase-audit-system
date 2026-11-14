@@ -154,9 +154,12 @@ export const PurchaseDetailPage: React.FC = () => {
             </p>
           </div>
           <div className="text-left sm:text-right">
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Grand total</p>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Net Amount Payable</p>
             <p className="text-3xl font-bold font-mono tabular-nums text-brand-700 mt-1">
               ₹{formatINR(invoice.grand_total)}
+            </p>
+            <p className="text-xs font-mono text-slate-500 mt-1">
+              Line items: ₹{formatINR(invoice.subtotal)} · Round off: {(invoice.round_off ?? 0) >= 0 ? '+' : '−'}₹{formatINR(Math.abs(invoice.round_off ?? 0))}
             </p>
           </div>
         </div>
@@ -229,6 +232,23 @@ export const PurchaseDetailPage: React.FC = () => {
           isLoading={false}
           emptyText="No line items for this invoice."
         />
+
+        <div className="mt-4 pt-4 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-end gap-6 text-sm font-mono">
+          <div className="flex items-center justify-between sm:justify-start gap-2">
+            <span className="text-slate-500 font-sans text-xs uppercase tracking-wide">Line Items Total:</span>
+            <span className="font-semibold text-slate-900">₹{formatINR(invoice.subtotal)}</span>
+          </div>
+          <div className="flex items-center justify-between sm:justify-start gap-2">
+            <span className="text-slate-500 font-sans text-xs uppercase tracking-wide">Round Off Amount:</span>
+            <span className="font-semibold text-slate-700">
+              {(invoice.round_off ?? 0) >= 0 ? '+' : '−'}₹{formatINR(Math.abs(invoice.round_off ?? 0))}
+            </span>
+          </div>
+          <div className="flex items-center justify-between sm:justify-start gap-2 p-2 bg-brand-50 rounded border border-brand-200">
+            <span className="text-brand-700 font-sans text-xs font-bold uppercase tracking-wide">Net Amount Payable:</span>
+            <span className="text-base font-bold text-brand-800">₹{formatINR(invoice.grand_total)}</span>
+          </div>
+        </div>
       </Card>
     </div>
   );

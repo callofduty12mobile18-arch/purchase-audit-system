@@ -66,7 +66,7 @@ export const OrderPlannerPage: React.FC = () => {
           const rate =
             match.quantity > 0 ? match.total / match.quantity : match.purchase_rate;
           return {
-            rate: Number(rate.toFixed(2)),
+            rate: Number(rate),
             defaultQty: match.quantity || 0,
             gstRate: match.gst_rate || 40,
             source: 'SUPPLIER_LAST' as const,

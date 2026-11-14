@@ -53,6 +53,13 @@ export const BillUploadWorkflow: React.FC = () => {
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [formValidationErrors, setFormValidationErrors] = useState<string[]>([]);
   const [existingPayments, setExistingPayments] = useState<InvoicePayment[]>([]);
+  const [focusedRateIdx, setFocusedRateIdx] = useState<number | null>(null);
+  const [rawRateInputs, setRawRateInputs] = useState<Record<number, string>>({});
+  const [focusedTotalIdx, setFocusedTotalIdx] = useState<number | null>(null);
+  const [rawTotalInputs, setRawTotalInputs] = useState<Record<number, string>>({});
+  const [isManualRoundOff, setIsManualRoundOff] = useState(false);
+  const [roundOffInput, setRoundOffInput] = useState<string | null>(null);
+  const [netPayableInput, setNetPayableInput] = useState<string | null>(null);
 
   useEffect(() => { loadMetadata(); }, [id]);
 
@@ -70,27 +77,32 @@ export const BillUploadWorkflow: React.FC = () => {
       if (id) {
         const existingInv = await dbService.getInvoiceById(id);
         if (existingInv) {
-          const mappedItems: InvoiceFormItem[] = (existingInv.items || []).map((item) => ({
-            supplier_item_name: item.supplier_item_name_snapshot,
-            item_name: item.product?.nickname || item.supplier_item_name_snapshot,
-            product_id: item.product_id,
-            hsn: item.hsn_snapshot || '24022090',
-            uom: item.uom_snapshot || 'PAC',
-            pack_qty: Number(item.quantity) || 0,
-            qty: Number(item.quantity) || 0,
-            quantity: Number(item.quantity) || 0,
-            each_pack_rate: Number(item.purchase_rate) || 0,
-            purchase_rate: Number(item.purchase_rate) || 0,
-            mrp_rsp: item.product?.current_selling_price || Math.round((Number(item.purchase_rate) || 0) * 1.3),
-            invoice_amount: Number(item.total) || 0,
-            total: Number(item.total) || 0,
-            gst_rate: Number(item.gst_rate) || 40,
-            taxable_value: Number(item.taxable_value) || 0,
-            cgst: Number(item.cgst) || 0,
-            sgst: Number(item.sgst) || 0,
-            igst: Number(item.igst) || 0,
-            validation: { valid: true, warnings: [] },
-          }));
+          const mappedItems: InvoiceFormItem[] = (existingInv.items || []).map((item) => {
+            const qty = Number(item.quantity) || 0;
+            const tot = Number(item.total) || 0;
+            const rate = (qty > 0 && tot > 0) ? (tot / qty) : (Number(item.purchase_rate) || 0);
+            return {
+              supplier_item_name: item.supplier_item_name_snapshot,
+              item_name: item.product?.nickname || item.supplier_item_name_snapshot,
+              product_id: item.product_id,
+              hsn: item.hsn_snapshot || '24022090',
+              uom: item.uom_snapshot || 'PAC',
+              pack_qty: qty,
+              qty: qty,
+              quantity: qty,
+              each_pack_rate: rate,
+              purchase_rate: rate,
+              mrp_rsp: item.product?.current_selling_price || Math.round(rate * 1.3),
+              invoice_amount: tot,
+              total: tot,
+              gst_rate: Number(item.gst_rate) || 40,
+              taxable_value: Number(item.taxable_value) || 0,
+              cgst: Number(item.cgst) || 0,
+              sgst: Number(item.sgst) || 0,
+              igst: Number(item.igst) || 0,
+              validation: { valid: true, warnings: [] },
+            };
+          });
 
           // Re-hydrate any existing cheque email reminder for this invoice.
           const existingReminder = await chequeReminderService.getByInvoice(id);
@@ -144,6 +156,7 @@ export const BillUploadWorkflow: React.FC = () => {
             round_off: existingInv.round_off,
             grand_total: existingInv.grand_total,
           });
+          setIsManualRoundOff(true);
           setLoadingInitial(false);
           return;
         } else {
@@ -172,26 +185,64 @@ export const BillUploadWorkflow: React.FC = () => {
     }
   };
 
-  // ── Calculation (identical business logic) ──────────────────────────────────
-  const recalcFromItems = (items: InvoiceFormItem[]) => {
-    const itemsTotal = items.reduce((sum, i) => sum + (Number(i.invoice_amount ?? i.total) || 0), 0);
+  // ── Calculation (exact accounting & rounding logic matching paper bill) ──────
+  const recalcFromItems = (items: InvoiceFormItem[], explicitRoundOff?: number) => {
+    const itemsTotal = Number(items.reduce((sum, i) => sum + (Number(i.invoice_amount ?? i.total) || 0), 0).toFixed(2));
     const totalPacks = items.reduce((sum, i) => sum + (Number(i.pack_qty) || 0), 0);
-    const subtotal = Number((itemsTotal / 1.4).toFixed(2));
-    const totalTax = Number((itemsTotal - subtotal).toFixed(2));
+    const taxableAmount = Number((itemsTotal / 1.4).toFixed(2));
+    const totalTax = Number((itemsTotal - taxableAmount).toFixed(2));
     const halfTax = Number((totalTax / 2).toFixed(2));
+    const otherHalfTax = Number((totalTax - halfTax).toFixed(2));
+
+    const roundOff = explicitRoundOff !== undefined
+      ? Number(Number(explicitRoundOff).toFixed(2))
+      : (isManualRoundOff && formData.round_off !== undefined
+          ? formData.round_off
+          : Number((Math.round(itemsTotal) - itemsTotal).toFixed(2)));
+
+    const grandTotal = Number((itemsTotal + roundOff).toFixed(2));
+
     return {
       items,
       total_items: items.length,
       total_packs: Math.round(totalPacks),
-      subtotal: Number(itemsTotal.toFixed(2)),
-      taxable_amount: subtotal,
+      subtotal: itemsTotal,
+      taxable_amount: taxableAmount,
       cgst: halfTax,
-      sgst: halfTax,
+      sgst: otherHalfTax,
       igst: 0,
       total_tax: totalTax,
-      round_off: 0,
-      grand_total: Number(itemsTotal.toFixed(2)),
+      round_off: roundOff,
+      grand_total: grandTotal,
     };
+  };
+
+  const handleRoundOffChange = (val: string) => {
+    setIsManualRoundOff(true);
+    const parsed = parseFloat(val);
+    const roundOff = isNaN(parsed) ? 0 : Number(parsed.toFixed(2));
+    setFormData((prev) => {
+      const grandTotal = Number((prev.subtotal + roundOff).toFixed(2));
+      return {
+        ...prev,
+        round_off: roundOff,
+        grand_total: grandTotal,
+      };
+    });
+  };
+
+  const handleNetPayableChange = (val: string) => {
+    setIsManualRoundOff(true);
+    const parsed = parseFloat(val);
+    const grandTotal = isNaN(parsed) ? 0 : Number(parsed.toFixed(2));
+    setFormData((prev) => {
+      const roundOff = Number((grandTotal - prev.subtotal).toFixed(2));
+      return {
+        ...prev,
+        round_off: roundOff,
+        grand_total: grandTotal,
+      };
+    });
   };
 
   const handleHeaderChange = (field: keyof InvoiceFormData, value: string | number | boolean) => {
@@ -275,20 +326,38 @@ export const BillUploadWorkflow: React.FC = () => {
       const pQty = Number(value) || 0;
       item.pack_qty = pQty; item.qty = pQty; item.quantity = pQty;
       const rate = Number(item.each_pack_rate || item.purchase_rate) || 0;
-      if (pQty > 0 && rate > 0) { item.invoice_amount = Number((rate * pQty).toFixed(2)); item.total = item.invoice_amount; }
-      else if (pQty > 0 && item.invoice_amount && item.invoice_amount > 0) { item.each_pack_rate = Number((item.invoice_amount / pQty).toFixed(2)); item.purchase_rate = item.each_pack_rate; }
+      if (pQty > 0 && rate > 0) {
+        // Calculate total using full decimal precision rate (not rounded display rate)
+        item.invoice_amount = Number((rate * pQty).toFixed(2));
+        item.total = item.invoice_amount;
+      } else if (pQty > 0 && item.invoice_amount && item.invoice_amount > 0) {
+        // Calculate underlying rate as total / quantity with full precision
+        const preciseRate = item.invoice_amount / pQty;
+        item.each_pack_rate = preciseRate;
+        item.purchase_rate = preciseRate;
+      }
     } else if (field === 'each_pack_rate' || field === 'purchase_rate') {
-      const rate = Number(value) || 0;
-      item.each_pack_rate = rate; item.purchase_rate = rate;
+      const rate = parseFloat(String(value)) || 0;
+      item.each_pack_rate = rate;
+      item.purchase_rate = rate;
       const pQty = Number(item.pack_qty) || 0;
-      if (pQty > 0) { item.invoice_amount = Number((rate * pQty).toFixed(2)); item.total = item.invoice_amount; }
+      if (pQty > 0) {
+        item.invoice_amount = Number((rate * pQty).toFixed(2));
+        item.total = item.invoice_amount;
+      }
     } else if (field === 'mrp_rsp') {
       item.mrp_rsp = Number(value) || 0;
     } else if (field === 'invoice_amount' || field === 'total') {
       const invAmt = Number(value) || 0;
-      item.invoice_amount = invAmt; item.total = invAmt;
+      item.invoice_amount = invAmt;
+      item.total = invAmt;
       const packQty = Number(item.pack_qty) || 0;
-      if (packQty > 0) { item.each_pack_rate = Number((invAmt / packQty).toFixed(2)); item.purchase_rate = item.each_pack_rate; }
+      if (packQty > 0) {
+        // Calculate underlying unit rate as total / quantity with full decimal precision
+        const underlyingRate = invAmt / packQty;
+        item.each_pack_rate = underlyingRate;
+        item.purchase_rate = underlyingRate;
+      }
     }
 
     const warnings: string[] = [];
@@ -859,11 +928,67 @@ export const BillUploadWorkflow: React.FC = () => {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-slate-700 mb-1">Rate (₹)</label>
-                    <input type="number" min="0" step="0.01" placeholder="0.00" value={item.each_pack_rate || item.purchase_rate || ''} onChange={(e) => handleItemChange(idx, 'each_pack_rate', e.target.value)} className={`${inputCls} text-right font-semibold text-brand-700`} />
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      placeholder="0.00"
+                      value={
+                        focusedRateIdx === idx
+                          ? (rawRateInputs[idx] ?? (item.each_pack_rate != null && item.each_pack_rate !== 0 ? String(item.each_pack_rate) : ''))
+                          : (item.each_pack_rate != null && item.each_pack_rate !== 0)
+                            ? Number(item.each_pack_rate).toFixed(2)
+                            : ''
+                      }
+                      onFocus={() => {
+                        setFocusedRateIdx(idx);
+                        setRawRateInputs((prev) => ({
+                          ...prev,
+                          [idx]: item.each_pack_rate != null && item.each_pack_rate !== 0 ? String(item.each_pack_rate) : ''
+                        }));
+                      }}
+                      onBlur={() => {
+                        setFocusedRateIdx(null);
+                      }}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setRawRateInputs((prev) => ({ ...prev, [idx]: val }));
+                        handleItemChange(idx, 'each_pack_rate', val);
+                      }}
+                      className={`${inputCls} text-right font-semibold text-brand-700`}
+                    />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-slate-700 mb-1">Total (₹)</label>
-                    <input type="number" min="0" step="0.01" placeholder="0.00" value={item.invoice_amount || item.total || ''} onChange={(e) => handleItemChange(idx, 'invoice_amount', e.target.value)} className={`${inputCls} text-right font-semibold`} />
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={
+                        focusedTotalIdx === idx
+                          ? (rawTotalInputs[idx] ?? (item.invoice_amount != null && item.invoice_amount !== 0 ? String(item.invoice_amount) : ''))
+                          : (item.invoice_amount != null && item.invoice_amount !== 0)
+                            ? Number(item.invoice_amount).toFixed(2)
+                            : ''
+                      }
+                      onFocus={() => {
+                        setFocusedTotalIdx(idx);
+                        setRawTotalInputs((prev) => ({
+                          ...prev,
+                          [idx]: item.invoice_amount != null && item.invoice_amount !== 0 ? String(item.invoice_amount) : '',
+                        }));
+                      }}
+                      onBlur={() => {
+                        setFocusedTotalIdx(null);
+                      }}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setRawTotalInputs((prev) => ({ ...prev, [idx]: val }));
+                        handleItemChange(idx, 'invoice_amount', val);
+                      }}
+                      className={`${inputCls} text-right font-semibold text-slate-900`}
+                    />
                   </div>
                 </div>
               </div>
@@ -928,13 +1053,67 @@ export const BillUploadWorkflow: React.FC = () => {
                     </td>
                     {/* Rate */}
                     <td className="px-4 py-2.5">
-                      <input type="number" min="0" step="0.01" placeholder="0.00" value={item.each_pack_rate || item.purchase_rate || ''} onChange={(e) => handleItemChange(idx, 'each_pack_rate', e.target.value)}
-                        className="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-right text-sm font-mono font-semibold text-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600" />
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        placeholder="0.00"
+                        value={
+                          focusedRateIdx === idx
+                            ? (rawRateInputs[idx] ?? (item.each_pack_rate != null && item.each_pack_rate !== 0 ? String(item.each_pack_rate) : ''))
+                            : (item.each_pack_rate != null && item.each_pack_rate !== 0)
+                              ? Number(item.each_pack_rate).toFixed(2)
+                              : ''
+                        }
+                        onFocus={() => {
+                          setFocusedRateIdx(idx);
+                          setRawRateInputs((prev) => ({
+                            ...prev,
+                            [idx]: item.each_pack_rate != null && item.each_pack_rate !== 0 ? String(item.each_pack_rate) : ''
+                          }));
+                        }}
+                        onBlur={() => {
+                          setFocusedRateIdx(null);
+                        }}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setRawRateInputs((prev) => ({ ...prev, [idx]: val }));
+                          handleItemChange(idx, 'each_pack_rate', val);
+                        }}
+                        className="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-right text-sm font-mono font-semibold text-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600"
+                      />
                     </td>
                     {/* Total */}
                     <td className="px-4 py-2.5">
-                      <input type="number" min="0" step="0.01" placeholder="0.00" value={item.invoice_amount || item.total || ''} onChange={(e) => handleItemChange(idx, 'invoice_amount', e.target.value)}
-                        className="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-right text-sm font-mono font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600" />
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={
+                          focusedTotalIdx === idx
+                            ? (rawTotalInputs[idx] ?? (item.invoice_amount != null && item.invoice_amount !== 0 ? String(item.invoice_amount) : ''))
+                            : (item.invoice_amount != null && item.invoice_amount !== 0)
+                              ? Number(item.invoice_amount).toFixed(2)
+                              : ''
+                        }
+                        onFocus={() => {
+                          setFocusedTotalIdx(idx);
+                          setRawTotalInputs((prev) => ({
+                            ...prev,
+                            [idx]: item.invoice_amount != null && item.invoice_amount !== 0 ? String(item.invoice_amount) : '',
+                          }));
+                        }}
+                        onBlur={() => {
+                          setFocusedTotalIdx(null);
+                        }}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setRawTotalInputs((prev) => ({ ...prev, [idx]: val }));
+                          handleItemChange(idx, 'invoice_amount', val);
+                        }}
+                        className="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-right text-sm font-mono font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600"
+                      />
                     </td>
                     <td className="px-4 py-2.5 text-center">
                       <button
@@ -967,27 +1146,142 @@ export const BillUploadWorkflow: React.FC = () => {
 
       {/* ─── Totals summary card ───────────────────────────────────────────────── */}
       <div className="bg-white rounded-lg border border-slate-200 shadow-card p-5 space-y-4">
-        <h2 className="text-sm font-semibold text-slate-900 pb-4 border-b border-slate-100">
-          Invoice totals
-        </h2>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-100">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900">
+              Invoice totals
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Net Payable = Line Items Total + Round Off Amount
+            </p>
+          </div>
+          <div className="flex items-center gap-3 text-xs font-mono text-slate-500">
+            <span>Items: <strong className="text-slate-900 font-semibold">{formData.items.length}</strong></span>
+            <span>·</span>
+            <span>Total packs: <strong className="text-violet-700 font-semibold">{(formData.total_packs || 0).toLocaleString('en-IN')}</strong></span>
+          </div>
+        </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* 1. Line Items Total */}
           <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Line items</p>
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+              Line Items Total
+            </p>
             <p className="text-2xl font-bold font-mono tabular-nums text-slate-900 mt-1.5">
-              {formData.items.length}
+              ₹{formatINR(formData.subtotal)}
+            </p>
+            <p className="text-xs text-slate-500 mt-1">
+              Exact sum of line items
             </p>
           </div>
+
+          {/* 2. Round Off Amount */}
           <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Total packs</p>
-            <p className="text-2xl font-bold font-mono tabular-nums text-violet-700 mt-1.5">
-              {(formData.total_packs || 0).toLocaleString('en-IN')}
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                Round Off Amount
+              </p>
+              {isManualRoundOff && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsManualRoundOff(false);
+                    setRoundOffInput(null);
+                    setNetPayableInput(null);
+                    const autoRoundOff = Number((Math.round(formData.subtotal) - formData.subtotal).toFixed(2));
+                    setFormData((prev) => ({
+                      ...prev,
+                      ...recalcFromItems(prev.items, autoRoundOff),
+                    }));
+                  }}
+                  className="text-[11px] font-medium text-brand-600 hover:text-brand-700 hover:underline"
+                >
+                  Reset auto
+                </button>
+              )}
+            </div>
+            <div className="mt-1.5 flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  const newRoundOff = Number((-1 * (formData.round_off || 0)).toFixed(2));
+                  handleRoundOffChange(String(newRoundOff));
+                  if (roundOffInput !== null) {
+                    setRoundOffInput(Math.abs(newRoundOff).toFixed(2));
+                  }
+                }}
+                title="Click to toggle positive / negative"
+                className="h-9 px-2 rounded border border-slate-300 bg-white font-mono text-base font-bold text-slate-700 hover:bg-slate-100 transition-colors"
+              >
+                {(formData.round_off ?? 0) >= 0 ? '+' : '−'}
+              </button>
+              <span className="text-lg font-bold font-mono text-slate-600">₹</span>
+              <input
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                value={
+                  roundOffInput !== null
+                    ? roundOffInput
+                    : Math.abs(formData.round_off ?? 0).toFixed(2)
+                }
+                onFocus={() => {
+                  setRoundOffInput(Math.abs(formData.round_off ?? 0).toFixed(2));
+                }}
+                onBlur={() => {
+                  setRoundOffInput(null);
+                }}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  setRoundOffInput(raw);
+                  const isNeg = (formData.round_off ?? 0) < 0;
+                  const num = Math.abs(parseFloat(raw) || 0) * (isNeg ? -1 : 1);
+                  handleRoundOffChange(String(num));
+                }}
+                className="w-full h-9 rounded-md border border-slate-300 bg-white px-2 text-right text-xl font-bold font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600"
+              />
+            </div>
+            <p className="text-xs font-mono text-slate-500 mt-1">
+              {(formData.round_off ?? 0) >= 0 ? `+₹${Math.abs(formData.round_off ?? 0).toFixed(2)}` : `−₹${Math.abs(formData.round_off ?? 0).toFixed(2)}`} to net payable
             </p>
           </div>
+
+          {/* 3. Net Amount Payable */}
           <div className="p-4 bg-brand-50 rounded-lg border border-brand-200">
-            <p className="text-xs font-medium text-brand-700 uppercase tracking-wide">Grand total</p>
-            <p className="text-2xl font-bold font-mono tabular-nums text-brand-800 mt-1.5">
-              ₹{formatINR(formData.grand_total)}
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-brand-700 uppercase tracking-wide">
+                Net Amount Payable
+              </p>
+              <span className="text-[11px] font-mono text-brand-600 font-medium">Final bill total</span>
+            </div>
+            <div className="mt-1.5 flex items-center gap-1">
+              <span className="text-lg font-bold font-mono text-brand-700">₹</span>
+              <input
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                value={
+                  netPayableInput !== null
+                    ? netPayableInput
+                    : (formData.grand_total ?? 0).toFixed(2)
+                }
+                onFocus={() => {
+                  setNetPayableInput((formData.grand_total ?? 0).toFixed(2));
+                }}
+                onBlur={() => {
+                  setNetPayableInput(null);
+                }}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  setNetPayableInput(raw);
+                  handleNetPayableChange(raw);
+                }}
+                className="w-full h-9 rounded-md border border-brand-300 bg-white px-2 text-right text-xl font-bold font-mono text-brand-800 focus:outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600"
+              />
+            </div>
+            <p className="text-xs font-mono text-brand-700 mt-1 font-medium truncate">
+              ₹{formatINR(formData.subtotal)} {(formData.round_off ?? 0) >= 0 ? '+' : '−'} ₹{formatINR(Math.abs(formData.round_off ?? 0))}
             </p>
           </div>
         </div>
@@ -1011,7 +1305,7 @@ export const BillUploadWorkflow: React.FC = () => {
       {/* ─── Mobile sticky footer ──────────────────────────────────────────────── */}
       <div className="lg:hidden no-print fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur border-t border-slate-200 shadow-xl p-3 pb-safe z-30 flex items-center justify-between gap-3">
         <div>
-          <p className="text-xs text-slate-500">Total</p>
+          <p className="text-xs text-slate-500">Net Payable</p>
           <p className="text-base font-bold font-mono tabular-nums text-brand-700">₹{formatINR(formData.grand_total)}</p>
         </div>
         <Button
