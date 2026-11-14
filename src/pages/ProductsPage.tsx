@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Package, Plus, Search, AlertCircle, History } from 'lucide-react';
+import { Package, Plus, Search, History } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
@@ -24,11 +24,9 @@ export const ProductsPage: React.FC = () => {
     supplier_item_name: '', nickname: '', hsn: '24022090', uom: 'PAC',
     current_purchase_ref_price: 0, current_selling_price: 0, min_stock_level: 5, is_active: true,
   });
-  const [priceReason, setPriceReason] = useState('');
-  const [showReasonInput, setShowReasonInput] = useState(false);
   const [formErrors, setFormErrors] = useState<{
     nickname?: string; supplier_item_name?: string;
-    current_purchase_ref_price?: string; priceReason?: string;
+    current_purchase_ref_price?: string;
   }>({});
 
   const loadData = async () => {
@@ -53,14 +51,9 @@ export const ProductsPage: React.FC = () => {
 
   const openAdd = () => {
     setEditing({ supplier_item_name: '', nickname: '', hsn: '24022090', uom: 'PAC', current_purchase_ref_price: 0, current_selling_price: 0, min_stock_level: 5, is_active: true });
-    setPriceReason(''); setShowReasonInput(false); setFormErrors({}); setIsModalOpen(true);
+    setFormErrors({}); setIsModalOpen(true);
   };
-  const openEdit = (p: Product) => { setEditing(p); setPriceReason(''); setShowReasonInput(false); setFormErrors({}); setIsModalOpen(true); };
-
-  const checkPriceChange = (v: number) => {
-    const orig = products.find((p) => p.id === editing.id);
-    setShowReasonInput(!!orig && orig.current_purchase_ref_price !== v);
-  };
+  const openEdit = (p: Product) => { setEditing(p); setFormErrors({}); setIsModalOpen(true); };
 
   const validate = () => {
     const errs: typeof formErrors = {};
@@ -68,7 +61,6 @@ export const ProductsPage: React.FC = () => {
     if (!editing.supplier_item_name?.trim()) errs.supplier_item_name = 'Supplier item name is required';
     if (editing.current_purchase_ref_price === undefined || editing.current_purchase_ref_price < 0)
       errs.current_purchase_ref_price = 'Valid purchase rate required';
-    if (showReasonInput && !priceReason.trim()) errs.priceReason = 'Reason is required for price changes';
     setFormErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -78,7 +70,7 @@ export const ProductsPage: React.FC = () => {
     if (!validate()) return;
     setIsSaving(true);
     try {
-      await dbService.saveProduct(editing, priceReason || 'Manual catalog update');
+      await dbService.saveProduct(editing, 'Manual catalog update');
       toastSuccess(editing.id ? 'Product updated' : 'Product added', `"${editing.nickname}" saved.`);
       setIsModalOpen(false); loadData();
     } catch (err: unknown) {
@@ -224,7 +216,6 @@ export const ProductsPage: React.FC = () => {
               onChange={(e) => {
                 const v = parseFloat(e.target.value) || 0;
                 setEditing({ ...editing, current_purchase_ref_price: v });
-                checkPriceChange(v);
                 if (formErrors.current_purchase_ref_price) setFormErrors({ ...formErrors, current_purchase_ref_price: undefined });
               }}
               error={formErrors.current_purchase_ref_price}
@@ -237,23 +228,6 @@ export const ProductsPage: React.FC = () => {
               onChange={(e) => setEditing({ ...editing, current_selling_price: parseFloat(e.target.value) || 0 })}
             />
           </div>
-
-          {showReasonInput && (
-            <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-lg space-y-2">
-              <p className="text-xs font-semibold text-amber-800 flex items-center gap-2">
-                <AlertCircle className="h-3.5 w-3.5 text-amber-600" aria-hidden="true" />
-                Price change requires audit justification
-              </p>
-              <Input
-                label="Reason for price change"
-                required
-                placeholder="e.g. Supplier rate increase — Oct 2026"
-                value={priceReason}
-                onChange={(e) => { setPriceReason(e.target.value); if (formErrors.priceReason) setFormErrors({ ...formErrors, priceReason: undefined }); }}
-                error={formErrors.priceReason}
-              />
-            </div>
-          )}
 
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" size="sm" onClick={() => setIsModalOpen(false)}>Cancel</Button>
