@@ -82,6 +82,32 @@ export const ViewSaleModal: React.FC<ViewSaleModalProps> = ({
           ₹{formatINR(row.total_cost)}
         </span>
       )
+    },
+    {
+      header: 'Selling Price',
+      headerClassName: 'text-right',
+      className: 'text-right',
+      cell: (row) => {
+        const sp = row.selling_price || sale.selling_price;
+        return (
+          <span className="font-mono text-xs text-brand-700 font-semibold tabular-nums">
+            ₹{formatINR(sp)}
+          </span>
+        );
+      }
+    },
+    {
+      header: 'Revenue',
+      headerClassName: 'text-right',
+      className: 'text-right',
+      cell: (row) => {
+        const rev = row.total_revenue != null ? row.total_revenue : (row.quantity * (row.selling_price || sale.selling_price));
+        return (
+          <span className="font-mono text-xs font-bold text-brand-800 tabular-nums">
+            ₹{formatINR(rev)}
+          </span>
+        );
+      }
     }
   ];
 

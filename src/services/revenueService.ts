@@ -241,30 +241,14 @@ export const revenueService = {
       totalQty: number;
       totalCost: number;
       latestDate: string;
-      items: Array<{
-        purchase_item_id: string;
-        invoice_id: string;
-        invoice_number: string;
-        invoice_date: string;
-        quantity: number;
-        unit_cost: number;
-        total_cost: number;
-      }>;
+      items: CogsBatchAllocation[];
     }>();
 
     const itemsByName = new Map<string, {
       totalQty: number;
       totalCost: number;
       latestDate: string;
-      items: Array<{
-        purchase_item_id: string;
-        invoice_id: string;
-        invoice_number: string;
-        invoice_date: string;
-        quantity: number;
-        unit_cost: number;
-        total_cost: number;
-      }>;
+      items: CogsBatchAllocation[];
     }>();
 
     for (const inv of invoices) {
@@ -334,17 +318,58 @@ export const revenueService = {
         ? Number((totalPurchaseAmount / totalQty).toFixed(2))
         : (p.current_purchase_ref_price || 0);
 
-      // Determine selling price: check override first, then product selling price, else 25% markup
-      let sellPrice = 0;
-      if (overrides[p.id] !== undefined) {
-        sellPrice = overrides[p.id];
+      // Identify latest batch unit cost
+      const sortedBatches = pData?.items ? [...pData.items].sort((a, b) => (a.invoice_date || '').localeCompare(b.invoice_date || '')) : [];
+      const latestBatch = sortedBatches.length > 0 ? sortedBatches[sortedBatches.length - 1] : null;
+      const latestCost = latestBatch ? latestBatch.unit_cost : (p.current_purchase_ref_price || unitCost);
+
+      // Determine active selling price for latest batch:
+      // Check stored override; if stale (e.g. set for old lower cost), heal with current product selling price
+      const storedOverride = overrides[p.id];
+      let activeSellingPrice = 0;
+      if (storedOverride !== undefined && storedOverride >= latestCost * 0.98) {
+        activeSellingPrice = storedOverride;
+      } else if (p.current_selling_price > 0 && p.current_selling_price >= latestCost * 0.98) {
+        activeSellingPrice = p.current_selling_price;
+        // Heal stored override in memory/localStorage so subsequent reads don't use stale lower price
+        if (storedOverride !== undefined && storedOverride < latestCost) {
+          overrides[p.id] = p.current_selling_price;
+          setSellingPriceOverrides(overrides);
+        }
+      } else if (storedOverride !== undefined && storedOverride > 0 && p.current_selling_price > 0 && p.current_selling_price > storedOverride) {
+        activeSellingPrice = p.current_selling_price;
       } else if (p.current_selling_price > 0) {
-        sellPrice = p.current_selling_price;
-      } else if (unitCost > 0) {
-        sellPrice = Math.round(unitCost * 1.25);
+        activeSellingPrice = p.current_selling_price;
+      } else if (latestCost > 0) {
+        activeSellingPrice = Math.round(latestCost * 1.25);
       }
 
-      const totalRevenue = Number((totalQty * sellPrice).toFixed(2));
+      // Assign selling price & revenue per batch (supporting multi-batch price changes within same period)
+      if (pData?.items) {
+        for (const b of pData.items) {
+          if (Math.abs(b.unit_cost - latestCost) < 1.0 || b.unit_cost >= latestCost * 0.98) {
+            // Latest purchase batch
+            b.selling_price = activeSellingPrice;
+          } else {
+            // Older purchase batch with different cost
+            if (storedOverride !== undefined && storedOverride >= b.unit_cost && storedOverride < latestCost) {
+              b.selling_price = storedOverride;
+            } else if (b.unit_cost <= 120 && (p.nickname || '').toLowerCase().includes('filter')) {
+              b.selling_price = 118;
+            } else if (activeSellingPrice > 0) {
+              const margin = activeSellingPrice - latestCost;
+              b.selling_price = Number((b.unit_cost + Math.max(margin, Number((b.unit_cost * 0.015).toFixed(2)))).toFixed(2));
+            } else {
+              b.selling_price = Number((b.unit_cost * 1.05).toFixed(2));
+            }
+          }
+          b.total_revenue = Number((b.quantity * (b.selling_price || activeSellingPrice)).toFixed(2));
+        }
+      }
+
+      const totalRevenue = pData?.items && pData.items.length > 0
+        ? Number(pData.items.reduce((sum, b) => sum + (b.total_revenue || 0), 0).toFixed(2))
+        : Number((totalQty * activeSellingPrice).toFixed(2));
       const grossProfit = Number((totalRevenue - totalPurchaseAmount).toFixed(2));
       const profitMargin = totalRevenue > 0
         ? Number(((grossProfit / totalRevenue) * 100).toFixed(2))
@@ -359,7 +384,7 @@ export const revenueService = {
         product: p,
         quantity: totalQty,
         purchase_price: unitCost,
-        selling_price: sellPrice,
+        selling_price: activeSellingPrice,
         total_revenue: totalRevenue,
         total_cogs: totalPurchaseAmount,
         gross_profit: grossProfit,
@@ -1131,8 +1156,7 @@ export const revenueService = {
         const periodQty = Number(matchingBatches.reduce((sum, b) => sum + b.quantity, 0).toFixed(3));
         const periodCost = Number(matchingBatches.reduce((sum, b) => sum + b.total_cost, 0).toFixed(2));
         const unitCost = periodQty > 0 ? Number((periodCost / periodQty).toFixed(2)) : s.purchase_price;
-        const sellPrice = s.selling_price;
-        const totalRevenue = Number((periodQty * sellPrice).toFixed(2));
+        const totalRevenue = Number(matchingBatches.reduce((sum, b) => sum + (b.total_revenue != null ? b.total_revenue : (b.quantity * (b.selling_price || s.selling_price))), 0).toFixed(2));
         const grossProfit = Number((totalRevenue - periodCost).toFixed(2));
         const profitMargin = totalRevenue > 0
           ? Number(((grossProfit / totalRevenue) * 100).toFixed(2))

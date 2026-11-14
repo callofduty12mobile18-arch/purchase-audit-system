@@ -327,6 +327,8 @@ export interface CogsBatchAllocation {
   quantity: number;
   unit_cost: number;
   total_cost: number;
+  selling_price?: number;
+  total_revenue?: number;
 }
 
 export interface SaleTransaction {
