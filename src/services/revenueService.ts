@@ -35,11 +35,17 @@ const LOCAL_STORAGE_KEY_SELLING_OVERRIDES = 'ramachandran_selling_price_override
 // In-memory caching to eliminate sequential database request thrashing
 let cachedInvoices: { data: PurchaseInvoice[]; timestamp: number } | null = null;
 let cachedProducts: { data: Product[]; timestamp: number } | null = null;
-const CACHE_TTL_MS = 30000; // 30s in-memory cache
+const CACHE_TTL_MS = 0; // Always fetch fresh to reflect invoice creates, edits and deletes immediately
 
 export function invalidateRevenueCache() {
   cachedInvoices = null;
   cachedProducts = null;
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('revenue-data-invalidated', () => {
+    invalidateRevenueCache();
+  });
 }
 
 // Mutex locks to serialize concurrent sales creation per product
@@ -446,9 +452,12 @@ export const revenueService = {
       }
 
       // Determine active selling price for uniform rate products
+      const storedOldOverride = overrides[`${p.id}_old`];
       const storedOverride = overrides[p.id];
       let activeSellingPrice = 0;
-      if (storedOverride !== undefined && storedOverride >= latestCost * 0.98) {
+      if (latestCost <= 120 && (p.nickname || '').toLowerCase().includes('filter')) {
+        activeSellingPrice = storedOldOverride ?? (storedOverride && storedOverride <= 120 ? storedOverride : 118);
+      } else if (storedOverride !== undefined && storedOverride >= latestCost * 0.98) {
         activeSellingPrice = storedOverride;
       } else if (p.current_selling_price > 0 && p.current_selling_price >= latestCost * 0.98) {
         activeSellingPrice = p.current_selling_price;

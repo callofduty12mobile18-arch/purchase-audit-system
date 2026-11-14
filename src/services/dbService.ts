@@ -602,6 +602,40 @@ export const dbService = {
         console.error('Supabase delete invoice error:', error.message);
         throw error;
       }
+
+      // Re-evaluate affected products' reference rates and selling prices
+      if (targetInvoice?.items && targetInvoice.items.length > 0) {
+        try {
+          const affectedProductIds = Array.from(new Set(targetInvoice.items.map((i) => i.product_id).filter(Boolean))) as string[];
+          for (const prodId of affectedProductIds) {
+            const { data: remainingItems } = await supabase
+              .from('purchase_items')
+              .select('purchase_rate, total, quantity, purchase_invoices(invoice_date)')
+              .eq('product_id', prodId);
+
+            if (remainingItems && remainingItems.length > 0) {
+              remainingItems.sort((a, b) => ((b.purchase_invoices as any)?.invoice_date || '').localeCompare((a.purchase_invoices as any)?.invoice_date || ''));
+              const latest = remainingItems[0];
+              const latestRate = Number(latest.purchase_rate) || (Number(latest.quantity) > 0 ? Number(latest.total) / Number(latest.quantity) : 0);
+              if (latestRate > 0) {
+                const { data: prodData } = await supabase.from('products').select('nickname').eq('id', prodId).single();
+                const isFilter = (prodData?.nickname || '').toLowerCase().includes('filter');
+                await supabase.from('products').update({
+                  current_purchase_ref_price: Number(latestRate.toFixed(2)),
+                  current_selling_price: isFilter && latestRate <= 120 ? 118 : undefined,
+                  updated_at: new Date().toISOString()
+                }).eq('id', prodId);
+              }
+            }
+          }
+        } catch (syncErr) {
+          console.warn('Failed to re-sync product prices after invoice deletion:', syncErr);
+        }
+      }
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('revenue-data-invalidated'));
+      }
     } catch (e) {
       console.error('Supabase delete invoice exception:', e);
       throw e;

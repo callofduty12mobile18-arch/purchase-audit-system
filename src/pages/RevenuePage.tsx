@@ -154,7 +154,7 @@ export const RevenuePage: React.FC = () => {
     if (!background) setLoading(true);
     setFetchError(null);
     try {
-      const { sales: fetchedSales, stockInfos: fetchedStocks } = await revenueService.getRevenuePageData(background);
+      const { sales: fetchedSales, stockInfos: fetchedStocks } = await revenueService.getRevenuePageData(true);
       setSales(fetchedSales);
       setStockInfos(fetchedStocks);
     } catch (err: any) {
@@ -165,17 +165,15 @@ export const RevenuePage: React.FC = () => {
   };
 
   useEffect(() => {
-    let lastLoaded = Date.now();
     loadData();
     const handleSync = () => {
-      if (document.visibilityState === 'visible' && Date.now() - lastLoaded > 15000) {
-        lastLoaded = Date.now();
-        loadData(true);
-      }
+      loadData(true);
     };
+    window.addEventListener('revenue-data-invalidated', handleSync);
     window.addEventListener('visibilitychange', handleSync);
     window.addEventListener('focus', handleSync);
     return () => {
+      window.removeEventListener('revenue-data-invalidated', handleSync);
       window.removeEventListener('visibilitychange', handleSync);
       window.removeEventListener('focus', handleSync);
     };
