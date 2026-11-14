@@ -32,22 +32,29 @@ export const Modal: React.FC<ModalProps> = ({
 }) => {
   const dialogRef = useRef<HTMLDivElement>(null);
   const titleId = `modal-title-${title.replace(/\s+/g, '-').toLowerCase()}`;
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
 
   // Lock body scroll and handle ESC
   useEffect(() => {
     if (!isOpen) return;
 
-    const previouslyFocused = document.activeElement as HTMLElement;
+    previouslyFocusedRef.current = document.activeElement as HTMLElement;
     document.body.style.overflow = 'hidden';
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        onCloseRef.current();
+        return;
+      }
 
       // Focus trap
       if (e.key === 'Tab' && dialogRef.current) {
         const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
           'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
         );
+        if (focusable.length === 0) return;
         const first = focusable[0];
         const last = focusable[focusable.length - 1];
         if (e.shiftKey) {
@@ -66,20 +73,26 @@ export const Modal: React.FC<ModalProps> = ({
 
     document.addEventListener('keydown', handleKeyDown);
 
-    // Move focus into dialog
-    setTimeout(() => {
-      const firstFocusable = dialogRef.current?.querySelector<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-      );
-      firstFocusable?.focus();
+    // Initial focus on opening: focus first input in dialog body, or first focusable
+    const timer = setTimeout(() => {
+      if (dialogRef.current && !dialogRef.current.contains(document.activeElement)) {
+        const firstInput = dialogRef.current.querySelector<HTMLElement>(
+          'input:not([disabled]), textarea:not([disabled]), select:not([disabled])'
+        );
+        const firstFocusable = firstInput || dialogRef.current.querySelector<HTMLElement>(
+          'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        firstFocusable?.focus();
+      }
     }, 50);
 
     return () => {
+      clearTimeout(timer);
       document.body.style.overflow = '';
       document.removeEventListener('keydown', handleKeyDown);
-      previouslyFocused?.focus();
+      previouslyFocusedRef.current?.focus();
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 

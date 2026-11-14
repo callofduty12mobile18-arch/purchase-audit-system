@@ -10,6 +10,11 @@ import { dbService } from '../services/dbService';
 import { useToast } from '../context/ToastContext';
 import { formatINR } from '../utils/dateUtils';
 
+type EditingProductState = Omit<Partial<Product>, 'current_purchase_ref_price' | 'current_selling_price'> & {
+  current_purchase_ref_price?: number | string;
+  current_selling_price?: number | string;
+};
+
 export const ProductsPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -20,14 +25,18 @@ export const ProductsPage: React.FC = () => {
   const [search, setSearch] = useState(searchParams.get('search') || '');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [editing, setEditing] = useState<Partial<Product>>({
+  const [editing, setEditing] = useState<EditingProductState>({
     supplier_item_name: '', nickname: '', hsn: '24022090', uom: 'PAC',
-    current_purchase_ref_price: 0, current_selling_price: 0, min_stock_level: 5, is_active: true,
+    current_purchase_ref_price: '', current_selling_price: '', min_stock_level: 5, is_active: true,
   });
   const [formErrors, setFormErrors] = useState<{
     nickname?: string; supplier_item_name?: string;
     current_purchase_ref_price?: string;
   }>({});
+
+  const handleCloseModal = React.useCallback(() => {
+    setIsModalOpen(false);
+  }, []);
 
   const loadData = async () => {
     setLoading(true); setFetchError(null);
@@ -50,17 +59,38 @@ export const ProductsPage: React.FC = () => {
     .sort((a, b) => (a.nickname || a.supplier_item_name).localeCompare(b.nickname || b.supplier_item_name));
 
   const openAdd = () => {
-    setEditing({ supplier_item_name: '', nickname: '', hsn: '24022090', uom: 'PAC', current_purchase_ref_price: 0, current_selling_price: 0, min_stock_level: 5, is_active: true });
-    setFormErrors({}); setIsModalOpen(true);
+    setEditing({
+      supplier_item_name: '',
+      nickname: '',
+      hsn: '24022090',
+      uom: 'PAC',
+      current_purchase_ref_price: '',
+      current_selling_price: '',
+      min_stock_level: 5,
+      is_active: true
+    });
+    setFormErrors({});
+    setIsModalOpen(true);
   };
-  const openEdit = (p: Product) => { setEditing(p); setFormErrors({}); setIsModalOpen(true); };
+  const openEdit = (p: Product) => {
+    setEditing({
+      ...p,
+      current_purchase_ref_price: p.current_purchase_ref_price ?? '',
+      current_selling_price: p.current_selling_price ?? '',
+    });
+    setFormErrors({});
+    setIsModalOpen(true);
+  };
 
   const validate = () => {
     const errs: typeof formErrors = {};
     if (!editing.nickname?.trim()) errs.nickname = 'Nickname is required';
     if (!editing.supplier_item_name?.trim()) errs.supplier_item_name = 'Supplier item name is required';
-    if (editing.current_purchase_ref_price === undefined || editing.current_purchase_ref_price < 0)
+    const rawRate = editing.current_purchase_ref_price;
+    const parsedRate = typeof rawRate === 'number' ? rawRate : parseFloat(String(rawRate ?? '').trim());
+    if (rawRate === '' || rawRate === undefined || isNaN(parsedRate) || parsedRate < 0) {
       errs.current_purchase_ref_price = 'Valid purchase rate required';
+    }
     setFormErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -70,12 +100,28 @@ export const ProductsPage: React.FC = () => {
     if (!validate()) return;
     setIsSaving(true);
     try {
-      await dbService.saveProduct(editing, 'Manual catalog update');
+      const parsedPurchase = typeof editing.current_purchase_ref_price === 'number'
+        ? editing.current_purchase_ref_price
+        : parseFloat(String(editing.current_purchase_ref_price || '0').trim()) || 0;
+      const parsedSelling = typeof editing.current_selling_price === 'number'
+        ? editing.current_selling_price
+        : parseFloat(String(editing.current_selling_price || '0').trim()) || 0;
+
+      const payload: Partial<Product> = {
+        ...editing,
+        current_purchase_ref_price: parsedPurchase,
+        current_selling_price: parsedSelling,
+      };
+
+      await dbService.saveProduct(payload, 'Manual catalog update');
       toastSuccess(editing.id ? 'Product updated' : 'Product added', `"${editing.nickname}" saved.`);
-      setIsModalOpen(false); loadData();
+      setIsModalOpen(false);
+      loadData();
     } catch (err: unknown) {
       toastError('Save failed', err instanceof Error ? err.message : 'Could not save.');
-    } finally { setIsSaving(false); }
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const columns: TableColumn<Product>[] = [
@@ -155,7 +201,7 @@ export const ProductsPage: React.FC = () => {
 
       <Modal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={handleCloseModal}
         title={editing.id ? `Edit: ${editing.nickname || 'Product'}` : 'Add product'}
         size="md"
       >
@@ -183,7 +229,11 @@ export const ProductsPage: React.FC = () => {
             label="Nickname (primary display name)"
             required
             value={editing.nickname || ''}
-            onChange={(e) => { setEditing({ ...editing, nickname: e.target.value }); if (formErrors.nickname) setFormErrors({ ...formErrors, nickname: undefined }); }}
+            onChange={(e) => {
+              const val = e.target.value;
+              setEditing((prev) => ({ ...prev, nickname: val }));
+              if (formErrors.nickname) setFormErrors((prev) => ({ ...prev, nickname: undefined }));
+            }}
             error={formErrors.nickname}
             isValid={!!editing.nickname?.trim()}
             helperText="e.g. 'Ice Burst 10s' or 'Gold Flake King 10R'"
@@ -193,7 +243,11 @@ export const ProductsPage: React.FC = () => {
             label="Supplier item name (exact invoice text)"
             required
             value={editing.supplier_item_name || ''}
-            onChange={(e) => { setEditing({ ...editing, supplier_item_name: e.target.value }); if (formErrors.supplier_item_name) setFormErrors({ ...formErrors, supplier_item_name: undefined }); }}
+            onChange={(e) => {
+              const val = e.target.value;
+              setEditing((prev) => ({ ...prev, supplier_item_name: val }));
+              if (formErrors.supplier_item_name) setFormErrors((prev) => ({ ...prev, supplier_item_name: undefined }));
+            }}
             error={formErrors.supplier_item_name}
             isValid={!!editing.supplier_item_name?.trim()}
             helperText="Exact text as printed on purchase bills"
@@ -202,7 +256,10 @@ export const ProductsPage: React.FC = () => {
           <Input
             label="HSN code"
             value={editing.hsn || ''}
-            onChange={(e) => setEditing({ ...editing, hsn: e.target.value })}
+            onChange={(e) => {
+              const val = e.target.value;
+              setEditing((prev) => ({ ...prev, hsn: val }));
+            }}
             placeholder="24022090"
           />
 
@@ -214,9 +271,11 @@ export const ProductsPage: React.FC = () => {
               required
               value={editing.current_purchase_ref_price ?? ''}
               onChange={(e) => {
-                const v = parseFloat(e.target.value) || 0;
-                setEditing({ ...editing, current_purchase_ref_price: v });
-                if (formErrors.current_purchase_ref_price) setFormErrors({ ...formErrors, current_purchase_ref_price: undefined });
+                const val = e.target.value;
+                setEditing((prev) => ({ ...prev, current_purchase_ref_price: val }));
+                if (formErrors.current_purchase_ref_price) {
+                  setFormErrors((prev) => ({ ...prev, current_purchase_ref_price: undefined }));
+                }
               }}
               error={formErrors.current_purchase_ref_price}
             />
@@ -225,12 +284,15 @@ export const ProductsPage: React.FC = () => {
               type="number"
               step="0.01"
               value={editing.current_selling_price ?? ''}
-              onChange={(e) => setEditing({ ...editing, current_selling_price: parseFloat(e.target.value) || 0 })}
+              onChange={(e) => {
+                const val = e.target.value;
+                setEditing((prev) => ({ ...prev, current_selling_price: val }));
+              }}
             />
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" size="sm" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+            <Button type="button" variant="outline" size="sm" onClick={handleCloseModal}>Cancel</Button>
             <Button type="submit" variant="primary" size="sm" isLoading={isSaving}>Save product</Button>
           </div>
         </form>
