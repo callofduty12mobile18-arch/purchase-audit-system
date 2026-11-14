@@ -239,9 +239,21 @@ export const RevenuePage: React.FC = () => {
       className: 'min-w-[150px]',
       cell: (row) => (
         <div>
-          <p className="text-xs font-semibold text-slate-900">
-            {row.product?.nickname || 'Unknown Item'}
-          </p>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <p className="text-xs font-semibold text-slate-900">
+              {row.product?.nickname || 'Unknown Item'}
+            </p>
+            {row.rate_tier === 'NEW' && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-100 text-blue-700 border border-blue-200">
+                New
+              </span>
+            )}
+            {row.rate_tier === 'OLD' && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-200">
+                Old
+              </span>
+            )}
+          </div>
           <p className="text-[10px] text-slate-400 font-mono truncate max-w-[180px]" title={row.product?.supplier_item_name}>
             {row.product?.supplier_item_name}
           </p>
@@ -272,48 +284,38 @@ export const RevenuePage: React.FC = () => {
       header: 'Selling Price (Manual Entry)',
       headerClassName: 'text-right min-w-[130px]',
       className: 'text-right min-w-[130px]',
-      cell: (row) => {
-        const hasMultiPrice = row.cogs_breakdown && row.cogs_breakdown.some(b => b.selling_price && b.selling_price !== row.selling_price);
-        return (
-          <div className="flex flex-col items-end gap-0.5" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-end gap-1">
-              <span className="text-xs font-mono text-slate-400">₹</span>
-              <input
-                type="number"
-                step="any"
-                min="0"
-                key={`${row.id}-${row.selling_price}`}
-                defaultValue={row.selling_price || ''}
-                placeholder="0.00"
-                onBlur={async (e) => {
-                  const val = parseFloat(e.target.value) || 0;
-                  if (val !== row.selling_price) {
-                    try {
-                      await revenueService.updateSellingPrice(row.id, val);
-                      toastSuccess('Price Updated', `Selling price for ${row.product?.nickname || 'Item'} set to ₹${formatINR(val)}`);
-                      loadData(true);
-                    } catch (err: any) {
-                      toastError('Error', err.message);
-                    }
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    (e.target as HTMLInputElement).blur();
-                  }
-                }}
-                className="w-24 h-7 text-right text-xs font-mono font-semibold text-slate-900 bg-white border border-slate-200 hover:border-slate-300 focus:border-brand-600 focus:ring-1 focus:ring-brand-600 rounded px-1.5 transition-colors shadow-2xs"
-                title="Click to enter/update selling price"
-              />
-            </div>
-            {hasMultiPrice && (
-              <span className="text-[10px] font-medium text-brand-600 tracking-tight" title="Multiple purchase batches sold at different rates">
-                Batch-wise rates applied
-              </span>
-            )}
-          </div>
-        );
-      }
+      cell: (row) => (
+        <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+          <span className="text-xs font-mono text-slate-400">₹</span>
+          <input
+            type="number"
+            step="any"
+            min="0"
+            key={`${row.id}-${row.selling_price}`}
+            defaultValue={row.selling_price || ''}
+            placeholder="0.00"
+            onBlur={async (e) => {
+              const val = parseFloat(e.target.value) || 0;
+              if (val !== row.selling_price) {
+                try {
+                  await revenueService.updateSellingPrice(row.id, val);
+                  toastSuccess('Price Updated', `Selling price for ${row.product?.nickname || 'Item'} set to ₹${formatINR(val)}`);
+                  loadData(true);
+                } catch (err: any) {
+                  toastError('Error', err.message);
+                }
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                (e.target as HTMLInputElement).blur();
+              }
+            }}
+            className="w-24 h-7 text-right text-xs font-mono font-semibold text-slate-900 bg-white border border-slate-200 hover:border-slate-300 focus:border-brand-600 focus:ring-1 focus:ring-brand-600 rounded px-1.5 transition-colors shadow-2xs"
+            title="Click to enter/update selling price"
+          />
+        </div>
+      )
     },
     {
       header: 'Total Purchase Amount',

@@ -318,20 +318,140 @@ export const revenueService = {
         ? Number((totalPurchaseAmount / totalQty).toFixed(2))
         : (p.current_purchase_ref_price || 0);
 
-      // Identify latest batch unit cost
+      // We have purchase items
       const sortedBatches = pData?.items ? [...pData.items].sort((a, b) => (a.invoice_date || '').localeCompare(b.invoice_date || '')) : [];
       const latestBatch = sortedBatches.length > 0 ? sortedBatches[sortedBatches.length - 1] : null;
       const latestCost = latestBatch ? latestBatch.unit_cost : (p.current_purchase_ref_price || unitCost);
 
-      // Determine active selling price for latest batch:
-      // Check stored override; if stale (e.g. set for old lower cost), heal with current product selling price
+      // Check if product has distinct purchase rate tiers (e.g. old rate vs new rate, difference >= ₹2.00)
+      const distinctRates = sortedBatches.length > 0 ? Array.from(new Set(sortedBatches.map(b => Number(b.unit_cost.toFixed(2))))) : [];
+      const hasRateTiers = distinctRates.length > 1 && (Math.max(...distinctRates) - Math.min(...distinctRates) >= 2.0);
+
+      if (hasRateTiers && sortedBatches.length > 0) {
+        // Partition batches into new tier (latest purchase cost) and old tier
+        const newBatches = sortedBatches.filter(b => Math.abs(b.unit_cost - latestCost) < 1.0 || b.unit_cost >= latestCost * 0.98);
+        const oldBatches = sortedBatches.filter(b => !newBatches.includes(b));
+
+        if (oldBatches.length > 0 && newBatches.length > 0) {
+          // 1. Process Old Stock Row
+          const oldQty = Number(oldBatches.reduce((sum, b) => sum + b.quantity, 0).toFixed(3));
+          const oldTotalCost = Number(oldBatches.reduce((sum, b) => sum + b.total_cost, 0).toFixed(2));
+          const oldUnitCost = oldQty > 0 ? Number((oldTotalCost / oldQty).toFixed(2)) : 0;
+
+          let oldSellingPrice = 0;
+          if (overrides[`${p.id}_old`] !== undefined && overrides[`${p.id}_old`] > 0) {
+            oldSellingPrice = overrides[`${p.id}_old`];
+          } else if (overrides[p.id] !== undefined && overrides[p.id] >= oldUnitCost && overrides[p.id] < latestCost) {
+            oldSellingPrice = overrides[p.id];
+          } else if (oldUnitCost <= 120 && (p.nickname || '').toLowerCase().includes('filter')) {
+            oldSellingPrice = 118;
+          } else if (p.current_selling_price > 0 && p.current_selling_price < latestCost) {
+            oldSellingPrice = p.current_selling_price;
+          } else {
+            oldSellingPrice = Number((oldUnitCost * 1.015).toFixed(2));
+          }
+
+          for (const b of oldBatches) {
+            b.selling_price = oldSellingPrice;
+            b.total_revenue = Number((b.quantity * oldSellingPrice).toFixed(2));
+          }
+
+          const oldRevenue = Number(oldBatches.reduce((sum, b) => sum + (b.total_revenue || 0), 0).toFixed(2));
+          const oldProfit = Number((oldRevenue - oldTotalCost).toFixed(2));
+          const oldMargin = oldRevenue > 0 ? Number(((oldProfit / oldRevenue) * 100).toFixed(2)) : 0;
+          const oldCode = `PRD-${(p.nickname || 'ITEM').slice(0, 4).toUpperCase().replace(/[^A-Z0-9]/g, '')}-OLD`;
+
+          catalogSales.push({
+            id: `${p.id}_old`,
+            sale_number: oldCode,
+            product_id: p.id,
+            product: {
+              ...p,
+              nickname: `${p.nickname || 'Item'} (Old Stock)`
+            },
+            quantity: oldQty,
+            purchase_price: oldUnitCost,
+            selling_price: oldSellingPrice,
+            total_revenue: oldRevenue,
+            total_cogs: oldTotalCost,
+            gross_profit: oldProfit,
+            profit_margin: oldMargin,
+            sale_date: oldBatches[oldBatches.length - 1]?.invoice_date || p.created_at?.slice(0, 10) || getTodayIST(),
+            customer_name: null,
+            notes: `${oldBatches.length} purchase(s) at previous rate`,
+            status: 'COMPLETED',
+            costing_method: 'FIFO',
+            cogs_breakdown: oldBatches,
+            rate_tier: 'OLD',
+            stock_label: 'Old Stock',
+            created_at: p.created_at || new Date().toISOString(),
+            updated_at: p.updated_at || new Date().toISOString()
+          });
+
+          // 2. Process New Stock Row
+          const newQty = Number(newBatches.reduce((sum, b) => sum + b.quantity, 0).toFixed(3));
+          const newTotalCost = Number(newBatches.reduce((sum, b) => sum + b.total_cost, 0).toFixed(2));
+          const newUnitCost = newQty > 0 ? Number((newTotalCost / newQty).toFixed(2)) : latestCost;
+
+          let newSellingPrice = 0;
+          if (overrides[`${p.id}_new`] !== undefined && overrides[`${p.id}_new`] > 0) {
+            newSellingPrice = overrides[`${p.id}_new`];
+          } else if (overrides[p.id] !== undefined && overrides[p.id] >= latestCost * 0.98) {
+            newSellingPrice = overrides[p.id];
+          } else if (p.current_selling_price > 0 && p.current_selling_price >= latestCost * 0.98) {
+            newSellingPrice = p.current_selling_price;
+          } else if (latestCost > 0) {
+            newSellingPrice = Math.round(latestCost * 1.25);
+          }
+
+          for (const b of newBatches) {
+            b.selling_price = newSellingPrice;
+            b.total_revenue = Number((b.quantity * newSellingPrice).toFixed(2));
+          }
+
+          const newRevenue = Number(newBatches.reduce((sum, b) => sum + (b.total_revenue || 0), 0).toFixed(2));
+          const newProfit = Number((newRevenue - newTotalCost).toFixed(2));
+          const newMargin = newRevenue > 0 ? Number(((newProfit / newRevenue) * 100).toFixed(2)) : 0;
+          const newCode = `PRD-${(p.nickname || 'ITEM').slice(0, 4).toUpperCase().replace(/[^A-Z0-9]/g, '')}-NEW`;
+
+          catalogSales.push({
+            id: `${p.id}_new`,
+            sale_number: newCode,
+            product_id: p.id,
+            product: {
+              ...p,
+              nickname: `${p.nickname || 'Item'} (New Stock)`
+            },
+            quantity: newQty,
+            purchase_price: newUnitCost,
+            selling_price: newSellingPrice,
+            total_revenue: newRevenue,
+            total_cogs: newTotalCost,
+            gross_profit: newProfit,
+            profit_margin: newMargin,
+            sale_date: newBatches[newBatches.length - 1]?.invoice_date || getTodayIST(),
+            customer_name: null,
+            notes: `${newBatches.length} purchase(s) at updated rate`,
+            status: 'COMPLETED',
+            costing_method: 'FIFO',
+            cogs_breakdown: newBatches,
+            rate_tier: 'NEW',
+            stock_label: 'New Stock',
+            created_at: p.created_at || new Date().toISOString(),
+            updated_at: p.updated_at || new Date().toISOString()
+          });
+
+          continue;
+        }
+      }
+
+      // Determine active selling price for uniform rate products
       const storedOverride = overrides[p.id];
       let activeSellingPrice = 0;
       if (storedOverride !== undefined && storedOverride >= latestCost * 0.98) {
         activeSellingPrice = storedOverride;
       } else if (p.current_selling_price > 0 && p.current_selling_price >= latestCost * 0.98) {
         activeSellingPrice = p.current_selling_price;
-        // Heal stored override in memory/localStorage so subsequent reads don't use stale lower price
         if (storedOverride !== undefined && storedOverride < latestCost) {
           overrides[p.id] = p.current_selling_price;
           setSellingPriceOverrides(overrides);
@@ -344,26 +464,10 @@ export const revenueService = {
         activeSellingPrice = Math.round(latestCost * 1.25);
       }
 
-      // Assign selling price & revenue per batch (supporting multi-batch price changes within same period)
       if (pData?.items) {
         for (const b of pData.items) {
-          if (Math.abs(b.unit_cost - latestCost) < 1.0 || b.unit_cost >= latestCost * 0.98) {
-            // Latest purchase batch
-            b.selling_price = activeSellingPrice;
-          } else {
-            // Older purchase batch with different cost
-            if (storedOverride !== undefined && storedOverride >= b.unit_cost && storedOverride < latestCost) {
-              b.selling_price = storedOverride;
-            } else if (b.unit_cost <= 120 && (p.nickname || '').toLowerCase().includes('filter')) {
-              b.selling_price = 118;
-            } else if (activeSellingPrice > 0) {
-              const margin = activeSellingPrice - latestCost;
-              b.selling_price = Number((b.unit_cost + Math.max(margin, Number((b.unit_cost * 0.015).toFixed(2)))).toFixed(2));
-            } else {
-              b.selling_price = Number((b.unit_cost * 1.05).toFixed(2));
-            }
-          }
-          b.total_revenue = Number((b.quantity * (b.selling_price || activeSellingPrice)).toFixed(2));
+          b.selling_price = activeSellingPrice;
+          b.total_revenue = Number((b.quantity * activeSellingPrice).toFixed(2));
         }
       }
 
@@ -593,14 +697,20 @@ export const revenueService = {
     // Otherwise it's a catalog product item: persist in overrides map & database
     const overrides = getSellingPriceOverrides();
     overrides[id] = Number(newSellingPrice.toFixed(2));
+    const baseProductId = id.replace(/_(old|new)$/, '');
+    if (id.endsWith('_new') || !id.includes('_')) {
+      overrides[baseProductId] = Number(newSellingPrice.toFixed(2));
+    }
     setSellingPriceOverrides(overrides);
     invalidateRevenueCache();
 
     try {
-      await supabase.from('products').update({
-        current_selling_price: Number(newSellingPrice.toFixed(2)),
-        updated_at: new Date().toISOString()
-      }).eq('id', id);
+      if (id.endsWith('_new') || !id.includes('_')) {
+        await supabase.from('products').update({
+          current_selling_price: Number(newSellingPrice.toFixed(2)),
+          updated_at: new Date().toISOString()
+        }).eq('id', baseProductId);
+      }
     } catch {
       // Non-blocking
     }
@@ -1284,7 +1394,7 @@ export const revenueService = {
     }> = {};
 
     completed.forEach(s => {
-      const pName = s.product?.nickname || 'Unknown Item';
+      const pName = s.product?.nickname?.replace(/\s*\((Old|New) Stock\)$/i, '') || 'Unknown Item';
       const pid = s.product_id;
       if (!productStatsMap[pid]) {
         productStatsMap[pid] = {

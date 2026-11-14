@@ -349,6 +349,8 @@ export interface SaleTransaction {
   status: SaleStatus;
   costing_method?: 'FIFO';
   cogs_breakdown?: CogsBatchAllocation[];
+  rate_tier?: 'OLD' | 'NEW';
+  stock_label?: string;
   created_by?: string | null;
   created_at: string;
   updated_at: string;
